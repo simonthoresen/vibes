@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Undertale-like Movement — Even Frames</title>
+  <style>
+    :root { --scale: 3; }
+    html, body { height: 100%; margin: 0; background:#0a0a0a; }
+    .wrap { height: 100%; display: grid; place-items: center; }
+    canvas { image-rendering: pixelated; background:#000; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="320" height="180"></canvas>
+  </div>
+  <script>
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const keys = new Set();
+  addEventListener('keydown', e => keys.add(e.key.toLowerCase()));
+  addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+
+  const SPR = { img: new Image(), ready:false, cols:4, rows:6, fw:0, fh:0, scale:1 };
+  SPR.img.onload = ()=>{
+    SPR.fw = SPR.img.width / SPR.cols;
+    SPR.fh = SPR.img.height / SPR.rows;
+    SPR.scale = 44 / SPR.fh;
+    SPR.ready = true;
+  };
+  SPR.img.src = 'player.png';
+
+  const player = { x:140, y:90, dir:'down', state:'idle', animTime:0, animFrame:0, speed:1.2 };
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+  function isMoving(){ return ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].some(k=>keys.has(k)); }
+
+  function update(dt){
+    let dx=0, dy=0;
+    if (keys.has('w')||keys.has('arrowup')) { dy-=player.speed; player.dir='up'; }
+    if (keys.has('s')||keys.has('arrowdown')) { dy+=player.speed; player.dir='down'; }
+    if (keys.has('a')||keys.has('arrowleft')) { dx-=player.speed; player.dir='left'; }
+    if (keys.has('d')||keys.has('arrowright')) { dx+=player.speed; player.dir='right'; }
+
+    if (dx&&dy){ dx*=0.7071; dy*=0.7071; }
+    player.x+=dx; player.y+=dy;
+    const dw = SPR.fw*SPR.scale, dh = SPR.fh*SPR.scale;
+    player.x = clamp(player.x, 0, canvas.width-dw);
+    player.y = clamp(player.y, 0, canvas.height-dh);
+    player.state = (dx||dy)?'walk':'idle';
+    const speed = (player.state==='walk')?12:0;
+    player.animTime += dt;
+    if(speed>0 && player.animTime>1/speed){ player.animFrame=(player.animFrame+1)%4; player.animTime=0; } else if(speed===0){ player.animFrame=0; }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(!SPR.ready) return;
+    let row=0,col=0;
+    if(player.state==='idle'){
+      row=0; col={down:0,left:1,right:2,up:3}[player.dir];
+    } else {
+      const rows={down:1,left:2,right:3,up:4};
+      row=rows[player.dir]; col=player.animFrame;
+    }
+    ctx.drawImage(SPR.img, col*SPR.fw, row*SPR.fh, SPR.fw, SPR.fh, player.x, player.y, SPR.fw*SPR.scale, SPR.fh*SPR.scale);
+  }
+
+  let last=performance.now();
+  function loop(t){ const dt=(t-last)/1000; last=t; update(dt); draw(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
