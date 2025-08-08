@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Space-Hulk-like (Tiny)</title>
+  <style>
+    html, body { background:#0b0e13; margin:0; height:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#c7d2fe; }
+    #wrap { position:relative; display:flex; gap:16px; padding:16px; box-sizing:border-box; }
+    canvas { image-rendering: pixelated; background:#05070a; border:2px solid #1f2937; box-shadow:0 0 0 2px #111827 inset; cursor:pointer; }
+    #ui { max-width:420px; line-height:1.4; }
+    .pill { display:inline-block; border:1px solid #374151; padding:2px 6px; border-radius:999px; margin:2px 4px 2px 0; font-size:12px; color:#e5e7eb; }
+    .legend { display:grid; grid-template-columns:auto 1fr; gap:8px 10px; align-items:center; margin-top:8px; }
+    .swatch { width:14px; height:14px; border:1px solid #111; }
+    button { background:#1f2937; color:#e5e7eb; border:1px solid #374151; padding:8px 10px; border-radius:10px; cursor:pointer; }
+    button:hover { background:#111827; }
+    .row { margin:10px 0; }
+    .log { height:160px; overflow:auto; background:#0b0e13; border:1px solid #111827; padding:8px; border-radius:8px; font-size:12px; }
+    a { color:#93c5fd; }
+    /* Intro overlay */
+    #introOverlay {
+      position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+      background:#000; z-index:5;
+    }
+    #introOverlay video, #introOverlay img { max-width:100%; max-height:100%; object-fit:contain; image-rendering: pixelated; }
+    #skipHint {
+      position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#e5e7eb; font-size:12px;
+      text-shadow:0 1px 2px #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <!-- Intro overlay: prefers MP4, falls back to GIF -->
+    <div id="introOverlay">
+      <video id="introVideo" src="G3DNPJ.mp4" preload="auto" muted playsinline style="display:none"></video>
+      <img id="introGif" src="G3DNPJ.gif" alt="Intro" style="display:none" />
+      <div id="skipHint">(Press any key or click to skip)</div>
+    </div>
+
+    <canvas id="game" width="720" height="540" title="Click to start"></canvas>
+    <div id="ui">
+      <h2>Simple 2D Pixelized Space-Hulk-like</h2>
+      <div class="row">Turn-based, grid tactics. Guide your <b>Deathwing Terminators</b> to the exit. (Fan-made homage, no GW assets.)</div>
+      <div class="row">
+        <div class="pill">Arrows / WASD: move (1 AP)</div>
+        <div class="pill">F: fire (2 AP) — bolter (2 shots) or macro plasma (1 shot)</div>
+        <div class="pill">Q: rotate</div>
+        <div class="pill">O: overwatch (1 AP)</div>
+        <div class="pill">G: open/close door (1 AP)</div>
+        <div class="pill">Tab / Shift+Tab: switch Terminator</div>
+        <div class="pill">E: end selected / end round</div>
+        <div class="pill">R: restart</div>
+      </div>
+      <div class="legend">
+        <div class="swatch" style="background:#64748b"></div><div>Wall</div>
+        <div class="swatch" style="background:#0f172a"></div><div>Floor</div>
+        <div class="swatch" style="background:#22c55e"></div><div>Exit</div>
+        <div class="swatch" style="background:#9ca3af"></div><div>Door (closed)</div>
+        <div class="swatch" style="background:#4b5563"></div><div>Door (open)</div>
+        <div class="swatch" style="background:#60a5fa"></div><div>Terminator</div>
+        <div class="swatch" style="background:#ef4444"></div><div>Genestealer</div>
+        <div class="swatch" style="background:#a855f7"></div><div>Broodlord</div>
+        <div class="swatch" style="background:#f59e0b"></div><div>Overwatch lane</div>
+      </div>
+      <div class="row"><button id="btnRestart">Restart</button></div>
+      <div class="row log" id="log"></div>
+    </div>
+  </div>
+
+  <!-- Background Music -->
+  <audio id="bgm" src="01 - At Doom's Gate.mp3" loop autoplay></audio>
+
+  <script>
+    // --- Audio setup ---
+    const bgm = document.getElementById('bgm');
+    bgm.volume = 0.5; // softer volume
+    bgm.muted = true; // will unmute when game starts
+
+    // --- High Score (highest stage reached), persisted via localStorage ---
+    let highStage = 0;
+    function loadHighScore(){
+      try{
+        const v = localStorage.getItem('ba_high_stage');
+        highStage = v ? Math.max(0, parseInt(v,10) || 0) : 0;
+      }catch(e){
+        highStage = 0;
+      }
+    }
+    function saveHighScore(){
+      try{ localStorage.setItem('ba_high_stage', String(highStage)); }catch(e){}
+    }
+    function updateHighScore(stage){
+      if(stage > highStage){
+        highStage = stage;
+        saveHighScore();
+      }
+    }
+
+    // --- Intro (MP4 preferred; GIF fallback) ---
+    const introOverlay = document.getElementById('introOverlay');
+    const introVideo = document.getElementById('introVideo');
+    const introGif = document.getElementById('introGif');
+    let introTimer = null;
+    const GIF_DURATION_MS = 6000; // change if your GIF is longer/shorter
+
+    function showIntro(){
+      introOverlay.style.display = 'flex';
+      state.mode = 'intro';
+
+      // Try the MP4 first
+      tryMp4().catch(()=>{ tryGif(); });
+    }
+
+    async function tryMp4(){
+      introVideo.style.display = 'block';
+      introGif.style.display = 'none';
+
+      const endedHandler = () => endIntro();
+      const errorHandler = () => { cleanup(); tryGif(); };
+
+      function cleanup(){
+        introVideo.removeEventListener('ended', endedHandler);
+        introVideo.removeEventListener('error', errorHandler);
+      }
+
+      introVideo.addEventListener('ended', endedHandler, { once:true });
+      introVideo.addEventListener('error', errorHandler, { once:true });
+
+      try {
+        introVideo.currentTime = 0;
+        await introVideo.play();
+      } catch (e) {
+        cleanup();
+        throw e; // fall back to GIF
+      }
+    }
+
+    function tryGif(){
+      introVideo.style.display = 'none';
+      introGif.style.display = 'block';
+
+      introGif.onload = () => {
+        if (introTimer) clearTimeout(introTimer);
+        introTimer = setTimeout(endIntro, GIF_DURATION_MS);
+      };
+      introGif.onerror = () => { endIntro(); };
+      introGif.src = "G3DNPJ.gif?" + Date.now();
+    }
+
+    function endIntro(){
+      if (state.mode !== 'intro') return;
+      if (introTimer) { clearTimeout(introTimer); introTimer = null; }
+      introOverlay.style.display = 'none';
+      state.mode = 'title';
+      drawTitle();
+    }
+
+    // --- Game core ---
+    const TILE = 24; // pixels per tile
+    const W = 30, H = 22; // grid size
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    canvas.width = W * TILE;
+    canvas.height = H * TILE;
+
+    const logEl = document.getElementById('log');
+    const btnRestart = document.getElementById('btnRestart');
+
+    // Title image
+    const startImg = new Image();
+    startImg.src = 'start.png'; // Put start.png next to this HTML
+    let startReady = false; startImg.onload = () => { startReady = true; if(state.mode==='title') drawTitle(); };
+
+    function log(msg) {
+      const time = new Date().toLocaleTimeString();
+      logEl.innerHTML = `[${time}] ${msg}<br>` + logEl.innerHTML;
+    }
+
+    const C = {
+      wall: '#64748b', floor: '#0f172a', exit: '#22c55e',
+      doorClosed: '#9ca3af', doorOpen: '#4b5563',
+      marine: '#60a5fa', marineFacing: '#93c5fd', selected: '#bfdbfe',
+      xeno: '#ef4444', xenoDark: '#7f1d1d', broodlord:'#a855f7',
+      text: '#e5e7eb', fog: 'rgba(0,0,0,0.55)', fov: 'rgba(245,158,11,0.25)', bullet:'#fbbf24', ui:'#1f2937',
+      plasmaBullet: '#3b82f6', plasmaFlash: 'rgba(59,130,246,0.6)'
+    };
+
+    const DIRS = [ {x:0,y:-1,name:'N'},{x:1,y:0,name:'E'},{x:0,y:1,name:'S'},{x:-1,y:0,name:'W'} ];
+
+    // --- Map system (runtime generated) ---
+    // Tiles: 0 floor, 1 wall, 2 exit, 3 doorClosed, 4 doorOpen
+    let MAP = Array.from({length:H},()=>Array(W).fill(1));
+    let startPos = {x:2,y:2};
+
+    function inBounds(x,y){ return x>=0 && y>=0 && x<W && y<H; }
+    function isWall(x,y){ return MAP[y][x] === 1; }
+    function isExit(x,y){ return MAP[y][x] === 2; }
+    function isDoor(x,y){ return MAP[y][x] === 3 || MAP[y][x] === 4; }
+    function isDoorClosed(x,y){ return MAP[y][x] === 3; }
+    function isBlocked(x,y){ return isWall(x,y) || isDoorClosed(x,y); }
+
+    function carveRect(x,y,w,h,tile=0){ for(let j=y;j<y+h;j++) for(let i=x;i<w+x;i++) if(inBounds(i,j)) MAP[j][i]=tile; }
+
+    function intersect(a,b){ return !(a.x+a.w+1<b.x || b.x+b.w+1<a.x || a.y+a.h+1<b.y || b.y+b.h+1<a.y); }
+
+    function generateMap(){
+      // reset to walls
+      MAP = Array.from({length:H},()=>Array(W).fill(1));
+      const rooms=[];
+      const roomCount = 8 + Math.floor(Math.random()*4); // 8-11 rooms
+      for(let tries=0; tries<80 && rooms.length<roomCount; tries++){
+        const w = 4 + Math.floor(Math.random()*6); // 4-9
+        const h = 4 + Math.floor(Math.random()*5); // 4-8
+        const x = 1 + Math.floor(Math.random()*(W-w-2));
+        const y = 1 + Math.floor(Math.random()*(H-h-2));
+        const r = {x,y,w,h,cx:Math.floor(x+w/2), cy:Math.floor(y+h/2)};
+        if(rooms.every(o=>!intersect(r,o))){
+          carveRect(x,y,w,h,0); rooms.push(r);
+        }
+      }
+      if(rooms.length===0){ // fail-safe simple room
+        carveRect(2,2,W-4,H-4,0); rooms.push({x:2,y:2,w:W-4,h:H-4,cx:Math.floor(W/2),cy:Math.floor(H/2)});
+      }
+      // corridors: connect in order of x (simple spanning)
+      rooms.sort((a,b)=>a.cx-b.cx);
+      for(let i=1;i<rooms.length;i++){
+        const a=rooms[i-1], b=rooms[i];
+        // L-shaped
+        for(let x=Math.min(a.cx,b.cx); x<=Math.max(a.cx,b.cx); x++) MAP[a.cy][x]=0;
+        for(let y=Math.min(a.cy,b.cy); y<=Math.max(a.cy,b.cy); y++) MAP[y][b.cx]=0;
+        // doors near junctions
+        const maybe = [ {x:b.cx, y:a.cy}, {x:a.cx, y:b.cy} ];
+        for(const p of maybe){
+          const around = DIRS.filter(d=>inBounds(p.x+d.x,p.y+d.y)).map(d=>MAP[p.y+d.y][p.x+d.x]);
+          if(around.filter(t=>t===1).length>=2 && MAP[p.y][p.x]===0) MAP[p.y][p.x]=3;
+        }
+      }
+      // pick start at first room center (ensure floor)
+      startPos = {x:rooms[0].cx, y:rooms[0].cy}; MAP[startPos.y][startPos.x]=0;
+      // exit at farthest room center
+      let far=rooms[0], best=-1;
+      for(const r of rooms){ const d=Math.abs(r.cx-startPos.x)+Math.abs(r.cy-startPos.y); if(d>best){best=d; far=r;} }
+      MAP[far.cy][far.cx]=2;
+    }
+
+    function toggleDoorAt(x,y){
+      if(MAP[y][x]===3){ MAP[y][x]=4; log('Door opened.'); }
+      else if(MAP[y][x]===4){
+        const occupied = state.marines.some(m=>m.x===x&&m.y===y) || state.xenos.some(z=>z.x===x&&z.y===y);
+        if(occupied){ log("Can't close: tile occupied."); return; }
+        MAP[y][x]=3; log('Door closed.');
+      }
+    }
+
+    function line(x0,y0,x1,y1){ const pts=[]; let dx=Math.abs(x1-x0), dy=-Math.abs(y1-y0); let sx=x0<x1?1:-1, sy=y0<y1?1:-1, err=dx+dy; while(true){ pts.push({x:x0,y:y0}); if(x0===x1 && y0===y1) break; const e2=2*err; if(e2>=dy){err+=dy; x0+=sx;} if(e2<=dx){err+=dx; y0+=sy;} } return pts; }
+    function los(a,b){ const pts=line(a.x,a.y,b.x,b.y); for(let i=1;i<pts.length;i++) if(isBlocked(pts[i].x, pts[i].y)) return false; return true; }
+
+    const state = { 
+      marines:[], sel:0, xenos:[], turn:'marine', seen:new Set(), gameOver:false, win:false, mode:'intro',
+      stage:1, wave:0, wavesPerStage:3, broodlordAlive:false,
+      bullets:[], explosions:[], blueBursts:[]
+    };
+
+    function spawnMarines(){
+      // Try to place a 2x2 formation near startPos
+      const spots = [ {dx:0,dy:0},{dx:1,dy:0},{dx:0,dy:1} ];
+      state.marines = spots.map((s,i)=>({ 
+        x:startPos.x+s.dx, y:startPos.y+s.dy, dir:1, ap:6, hp:3, overwatch:false, name:`DW-${i+1}`, weapon:'bolter'
+      }));
+      // Randomly assign one marine the macro plasma blaster
+      const plasmaIndex = Math.floor(Math.random()*state.marines.length);
+      state.marines[plasmaIndex].weapon = 'plasma';
+
+      state.sel = 0;
+    }
+
+    function validSpawn(x,y){ if(!inBounds(x,y)) return false; if(isBlocked(x,y)||isDoor(x,y)||isExit(x,y)) return false; if(state.marines.some(m=>m.x===x&&m.y===y)) return false; return true; }
+    function farFromMarines(x,y,dist=8){ return state.marines.every(m=>Math.abs(m.x-x)+Math.abs(m.y-y)>=dist); }
+    function randomSpot(){ for(let tries=0;tries<500;tries++){ const x=Math.floor(Math.random()*W), y=Math.floor(Math.random()*H); if(validSpawn(x,y)&&farFromMarines(x,y)) return {x,y}; } for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(validSpawn(x,y)) return {x,y}; return {x:1,y:1}; }
+
+    function stealerStats(){
+      return {
+        hp: 2 + Math.floor((state.stage-1)/1),           // scales up quickly
+        steps: 4 + Math.floor((state.stage-1)/2),        // faster each 2 stages
+        dmg: 1 + Math.floor((state.stage-1)/3)           // more damage every 3 stages
+      };
+    }
+    function broodlordStats(){ return { hp: 10 + state.stage, steps: 6 + Math.floor(state.stage/2), dmg: 2 + Math.floor(state.stage/2) }; }
+
+    function spawnEnemies(n, type='stealer'){
+      for(let i=0;i<n;i++){
+        const s = randomSpot();
+        if(type==='broodlord'){
+          const st = broodlordStats();
+          state.xenos.push({x:s.x,y:s.y,hp:st.hp,steps:st.steps,dmg:st.dmg,type:'broodlord'});
+          state.broodlordAlive = true;
+        } else {
+          const st = stealerStats();
+          state.xenos.push({x:s.x,y:s.y,hp:st.hp,steps:st.steps,dmg:st.dmg,type:'stealer'});
+        }
+      }
+    }
+
+    function key(x,y){ return x+","+y; }
+    function current(){ return state.marines[state.sel]; }
+
+    function visibleTiles(){ const vis=new Set(); for(const who of state.marines){ const origin={x:who.x,y:who.y}; for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const dx=Math.abs(x-origin.x), dy=Math.abs(y-origin.y); const d=Math.max(dx,dy); if(d<=8 && los(origin,{x,y})) vis.add(key(x,y)); } } vis.forEach(k=>state.seen.add(k)); return vis; }
+
+    function draw(){
+      if(state.mode!=='playing'){ drawTitle(); return; }
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+      const vis = visibleTiles();
+      for(let y=0;y<H;y++){
+        for(let x=0;x<W;x++){
+          const t=MAP[y][x]; 
+          ctx.fillStyle = t===1?C.wall : t===2?C.exit : t===3?C.doorClosed : t===4?C.doorOpen : C.floor; 
+          ctx.fillRect(x*TILE,y*TILE,TILE,TILE); 
+          if(t===4){ ctx.fillStyle='#e5e7eb'; ctx.fillRect(x*TILE+TILE/2-1,y*TILE+4,2,TILE-8);} 
+        }
+      }
+      // Overwatch lanes
+      for(const m of state.marines){ 
+        if(!m.overwatch) continue; 
+        const d=DIRS[m.dir]; ctx.fillStyle=C.fov; 
+        for(let i=1;i<=8;i++){ 
+          const cx=m.x+d.x*i, cy=m.y+d.y*i; 
+          if(!inBounds(cx,cy)||isBlocked(cx,cy)) break; 
+          ctx.fillRect(cx*TILE,cy*TILE,TILE,TILE);
+        } 
+      }
+      // Marines
+      state.marines.forEach((m,idx)=>{ 
+        rect(m.x,m.y, idx===state.sel?C.selected:C.marine); 
+        const f=DIRS[m.dir]; 
+        // Head color: white if plasma, else light blue
+        if(m.weapon==='plasma'){
+          pix(m.x*3+1+f.x, m.y*3+1+f.y, '#ffffff');
+        } else {
+          pix(m.x*3+1+f.x, m.y*3+1+f.y, C.marineFacing);
+        }
+      });
+      // Xenos
+      for(const xeno of state.xenos){
+        const seenNow=vis.has(key(xeno.x,xeno.y));
+        const col = xeno.type==='broodlord' ? C.broodlord : (seenNow? C.xeno : C.xenoDark);
+        rect(xeno.x, xeno.y, col);
+      }
+      // Fog of war
+      ctx.fillStyle=C.fog; 
+      for(let y=0;y<H;y++){ 
+        for(let x=0;x<W;x++){ 
+          const k=key(x,y); 
+          if(!state.seen.has(k)) ctx.fillRect(x*TILE,y*TILE,TILE,TILE); 
+        } 
+      }
+
+      // Bullets (draw above fog for clarity)
+      for(const b of state.bullets){
+        const px = (b.x)*TILE;
+        const py = (b.y)*TILE;
+        ctx.fillStyle = b.color || C.bullet;
+        ctx.fillRect(px-3, py-3, 6, 6);
+      }
+
+      // Plasma blue tile-bursts (3x3, fade fast)
+      for(const burst of state.blueBursts){
+        const alpha = Math.max(0, 1 - burst.t / burst.life);
+        if(alpha <= 0) continue;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = C.plasmaBullet;
+        for(const t of burst.tiles){
+          ctx.fillRect(t.x*TILE, t.y*TILE, TILE, TILE);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // Small orange explosions (bolter impacts)
+      for(const ex of state.explosions){
+        const alpha = Math.max(0, 1 - ex.t / ex.life);
+        const r = ex.maxR * (1 - alpha);
+        ctx.beginPath();
+        ctx.arc(ex.x*TILE, ex.y*TILE, r, 0, Math.PI*2);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(251,191,36,${alpha*0.8})`;
+        ctx.fill();
+      }
+
+      drawBar();
+      if(state.gameOver){ drawOverlay(state.win?'Stage Cleared!':'Squad Eliminated'); }
+    }
+
+    function drawTitle(){
+      if(state.mode==='intro') return; // title not visible during intro
+      ctx.fillStyle = '#0b0e13'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      if(startReady){
+        const sw=startImg.width, sh=startImg.height; if(sw && sh){
+          const scale = Math.min(canvas.width/sw, canvas.height/sh);
+          const dw = Math.floor(sw*scale), dh = Math.floor(sh*scale);
+          const dx = Math.floor((canvas.width - dw)/2), dy = Math.floor((canvas.height - dh)/2);
+          ctx.drawImage(startImg, dx, dy, dw, dh);
+        }
+      }
+      const g = ctx.createLinearGradient(0,0,0,canvas.height);
+      g.addColorStop(0,'rgba(0,0,0,0.25)'); g.addColorStop(1,'rgba(0,0,0,0.65)');
+      ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = C.text; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font = '28px monospace'; ctx.fillText('BOARDING ACTION', canvas.width/2, canvas.height/2 - 40);
+      ctx.font = '16px monospace'; ctx.fillText('Click or press any key to start', canvas.width/2, canvas.height/2 + 4);
+      ctx.font = '12px monospace'; ctx.fillText('(Place start.png next to this HTML file)', canvas.width/2, canvas.height/2 + 28);
+      // High score display
+      ctx.font = '14px monospace';
+      ctx.fillText(`Highest Stage Reached: ${highStage}`, canvas.width/2, canvas.height/2 + 54);
+    }
+
+    function rect(x,y,color){ ctx.fillStyle=color; ctx.fillRect(x*TILE+4, y*TILE+4, TILE-8, TILE-8); }
+    function pix(px,py,color){ ctx.fillStyle=color; ctx.fillRect(px*(TILE/3), py*(TILE/3), TILE/3, TILE/3); }
+
+    function drawOverlay(text){ ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width, canvas.height); ctx.fillStyle=C.text; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='28px monospace'; ctx.fillText(text, canvas.width/2, canvas.height/2); ctx.font='14px monospace'; ctx.fillText('Press R to continue', canvas.width/2, canvas.height/2+28); }
+
+    function drawBar(){ const pad=6,h=24; ctx.fillStyle=C.ui; ctx.fillRect(0, canvas.height-h-pad*2, canvas.width, h+pad*2); ctx.fillStyle=C.text; ctx.font='14px monospace'; ctx.textAlign='left'; ctx.textBaseline='middle'; const m=current(); const alive=state.marines.filter(mm=>mm.hp>0).length; const txt=m?`Stage ${state.stage}  |  Wave ${state.wave}/${state.wavesPerStage}  |  Turn: ${state.turn.toUpperCase()}  |  Selected: ${state.sel+1}/${state.marines.length} (${m.name})  |  AP: ${m.ap}  |  HP: ${m.hp}  |  Weapon: ${m.weapon.toUpperCase()}  |  Overwatch: ${m.overwatch? 'ON':'OFF'}  |  DW alive: ${alive}`:`Stage ${state.stage}  |  Wave ${state.wave}/${state.wavesPerStage}  |  Turn: ${state.turn.toUpperCase()}  |  DW alive: ${alive}`; ctx.fillText(txt,8,canvas.height-h); }
+
+    // Input
+    window.addEventListener('keydown', (e)=>{
+      if(state.mode==='intro'){ endIntro(); return; }
+      if(state.mode==='title'){ startGame(); return; }
+      if(state.gameOver){ if(e.key.toLowerCase()==='r'){ e.preventDefault(); if(state.win) nextStage(); else startGame(); } return; }
+      if(state.turn!=='marine') return;
+      const k=e.key;
+      if(k==='r'||k==='R'){ e.preventDefault(); reset(); }
+      else if(k==='q'||k==='Q'){ rotate(); }
+      else if(k==='o'||k==='O'){ toggleOverwatch(); }
+      else if(k==='e'||k==='E'){ endSelectedOrRound(); }
+      else if(k==='f'||k==='F'){ fire(); }
+      else if(k==='g'||k==='G'){ useDoor(); }
+      else if(k==='Tab'){ e.preventDefault(); cycleSel(e.shiftKey?-1:1); }
+      else if(['ArrowUp','w','W','ArrowDown','s','S','ArrowLeft','a','A','ArrowRight','d','D'].includes(k)){
+        e.preventDefault(); let dx=0,dy=0; if(k==='ArrowUp'||k==='w'||k==='W') dy=-1; if(k==='ArrowDown'||k==='s'||k==='S') dy=1; if(k==='ArrowLeft'||k==='a'||k==='A') dx=-1; if(k==='ArrowRight'||k==='d'||k==='D') dx=1; moveMarine(dx,dy);
+      }
+    });
+
+    canvas.addEventListener('click', ()=>{
+      if(state.mode==='intro'){ endIntro(); return; }
+      if(state.mode==='title') startGame();
+    });
+    btnRestart.onclick = ()=> { if(state.mode==='title') startGame(); else if(state.mode==='intro') endIntro(); else reset(); };
+
+    function startGame(){
+      // Unmute and play music
+      bgm.muted = false;
+      bgm.play().catch(()=>{}); // in case browser needs interaction
+      state.mode='playing';
+      state.stage=1;
+      updateHighScore(state.stage); // starting Stage 1 counts as reached
+      nextStage(true);
+    }
+
+    function rotate(){ const m=current(); m.dir=(m.dir+1)%4; draw(); }
+    function spendAP(n=1){ const m=current(); if(m.ap>=n){ m.ap-=n; return true; } log('No AP on selected.'); return false; }
+    function tileOccupiedByAny(nx,ny){ if(state.xenos.some(z=>z.x===nx&&z.y===ny)) return true; if(state.marines.some((mm,i)=>i!==state.sel&&mm.x===nx&&mm.y===ny)) return true; return false; }
+
+    function moveMarine(dx,dy){ 
+      if(dx===0&&dy===0) return; 
+      const m=current(); 
+      const dirIdx=(dx===0&&dy<0)?0:(dx>0&&dy===0)?1:(dx===0&&dy>0)?2:3; 
+      m.dir=dirIdx; 
+      const nx=m.x+dx, ny=m.y+dy; 
+      if(!inBounds(nx,ny)||isBlocked(nx,ny)) return; 
+      if(tileOccupiedByAny(nx,ny)){ log('Tile occupied.'); return; } 
+      if(!spendAP(1)) return; 
+      m.x=nx; m.y=ny; 
+      if(isExit(nx,ny)){ // Stage clear
+        state.gameOver=true; state.win=true; 
+        updateHighScore(state.stage); // ensure saved
+        log(`Stage ${state.stage} cleared! Press R to advance.`);
+      } 
+      draw(); 
+    }
+
+    function toggleOverwatch(){ if(!spendAP(1)) return; const m=current(); m.overwatch=!m.overwatch; log(`Overwatch ${m.overwatch?'enabled':'disabled'} for ${m.name}.`); draw(); }
+
+    // --- Fire: bolter vs plasma ---
+    function fire(){ 
+      if(!spendAP(2)) return; 
+      const m=current(); 
+      const d=DIRS[m.dir]; 
+
+      if(m.weapon === 'plasma'){
+        // Single blue plasma bolt
+        spawnBullet(m.x+0.5, m.y+0.5, d.x, d.y, 'plasma');
+        draw();
+
+        // 1-in-6 catastrophic overload on firing
+        if(Math.random() < (1/6)){
+          log(`${m.name} overloads the Macro Plasma Blaster!`);
+          triggerPlasmaExplosion(m.x, m.y); // visual + enemy-only damage (but centered on marine)
+          // Remove the marine (self-detonation)
+          const idx = state.marines.indexOf(m);
+          if(idx !== -1){
+            state.marines.splice(idx,1);
+            // Adjust selection index
+            if(state.sel >= state.marines.length) state.sel = Math.max(0, state.marines.length-1);
+            if(state.marines.length===0){
+              state.gameOver = true; state.win = false;
+              updateHighScore(state.stage);
+            }
+          }
+        }
+      } else {
+        // Bolter: two yellow rounds with tiny delay
+        spawnBullet(m.x+0.5, m.y+0.5, d.x, d.y, 'bolter');
+        setTimeout(()=>spawnBullet(m.x+0.5, m.y+0.5, d.x, d.y, 'bolter'), 80);
+        draw();
+      }
+    }
+
+    function spawnBullet(x,y,dx,dy,type){
+      const speed = 12; // tiles per second
+      const maxRange = 8; // tiles
+      state.bullets.push({
+        x, y, dx, dy,
+        speed, remaining:maxRange,
+        type,
+        color: type==='plasma' ? C.plasmaBullet : C.bullet
+      });
+    }
+
+    function useDoor(){ 
+      const m=current(); 
+      const around=DIRS.map(d=>({x:m.x+d.x,y:m.y+d.y})).filter(p=>inBounds(p.x,p.y)&&isDoor(p.x,p.y)); 
+      if(around.length===0){ log('No adjacent door.'); return; } 
+      if(!spendAP(1)) return; 
+      toggleDoorAt(around[0].x, around[0].y); 
+      draw(); 
+    }
+
+    function endSelectedOrRound(){ 
+      const m=current(); 
+      m.ap=0; m.overwatch=false; 
+      let next=state.marines.findIndex((mm,idx)=>idx!==state.sel && mm.ap>0 && mm.hp>0); 
+      if(next!==-1){ state.sel=next; draw(); return; } 
+      endRound(); 
+    }
+
+    function endRound(){ 
+      state.turn='xenos'; 
+      log('Xenos are moving...'); 
+      setTimeout(xenoTurn,50); 
+    }
+
+    function neighbors(x,y){ return DIRS.map(d=>({x:x+d.x, y:y+d.y})).filter(p=>inBounds(p.x,p.y)&&!isBlocked(p.x,p.y)); }
+
+    function pathfind(start, goal){ 
+      const q=[start]; 
+      const came=new Map(); 
+      const k0=key(start.x,start.y); came.set(k0,null); 
+      while(q.length){ 
+        const cur=q.shift(); 
+        const k=key(cur.x,cur.y); 
+        if(cur.x===goal.x && cur.y===goal.y) break; 
+        for(const n of neighbors(cur.x,cur.y)){ 
+          const nk=key(n.x,n.y); 
+          if(came.has(nk)) continue; 
+          if(state.xenos.some(z=>z.x===n.x&&z.y===n.y)) continue; 
+          if(state.marines.some(mm=>mm.x===n.x&&mm.y===n.y)) continue; 
+          came.set(nk,k); 
+          q.push(n); 
+        } 
+      } 
+      const gk=key(goal.x,goal.y); 
+      if(!came.has(gk)) return null; 
+      const path=[goal]; 
+      let curk=gk; 
+      while(true){ 
+        const prev=came.get(curk); 
+        if(prev===null) break; 
+        const [px,py]=prev.split(',').map(Number); 
+        path.push({x:px,y:py}); 
+        curk=prev; 
+      } 
+      path.reverse(); 
+      return path; 
+    }
+
+    function pathToAdjacent(target, start){ 
+      const goals=DIRS.map(d=>({x:target.x+d.x,y:target.y+d.y})).filter(p=>inBounds(p.x,p.y)&&!isBlocked(p.x,p.y)&&!state.marines.some(m=>m.x===p.x&&m.y===p.y)); 
+      let best=null, bestLen=1e9; 
+      for(const g of goals){ 
+        const p=pathfind(start,g); 
+        if(p && p.length<bestLen){ best=p; bestLen=p.length; } 
+      } 
+      return best; 
+    }
+
+    function overwatchReaction(newX,newY){ 
+      for(const m of state.marines){ 
+        if(!m.overwatch) continue; 
+        if(!los({x:m.x,y:m.y},{x:newX,y:newY})) continue; 
+        ctx.strokeStyle=C.bullet; ctx.lineWidth=3; 
+        ctx.beginPath(); 
+        ctx.moveTo((m.x+0.5)*TILE,(m.y+0.5)*TILE); 
+        ctx.lineTo((newX+0.5)*TILE,(newY+0.5)*TILE); 
+        ctx.stroke(); 
+        const target=state.xenos.find(z=>z.x===newX&&z.y===newY); 
+        if(target){ 
+          target.hp-=1; 
+          if(target.hp<=0){ 
+            state.xenos=state.xenos.filter(z=>z!==target); 
+            if(target.type==='broodlord'){ state.broodlordAlive=false; log('Broodlord down on overwatch!'); } 
+            else { log('Overwatch kill!'); } 
+            draw(); 
+            return true; 
+          } else { 
+            log('Overwatch hit.'); 
+          } 
+        } 
+      } 
+      return false; 
+    }
+
+    function findNearestMarineTo(x,y){ let bd=1e9,bm=null; for(const m of state.marines){ const d=Math.abs(m.x-x)+Math.abs(m.y-y); if(d<bd){ bd=d; bm=m; } } return bm; }
+
+    function xenoTurn(){
+      for(const z of [...state.xenos]){
+        let steps = Math.max(1, z.steps||4);
+        while(steps-- > 0){
+          const tgt=findNearestMarineTo(z.x,z.y); if(!tgt) break;
+          const path=pathToAdjacent({x:tgt.x,y:tgt.y},{x:z.x,y:z.y}); if(!path||path.length<2) break;
+          const nxt=path[1];
+          const killed=overwatchReaction(nxt.x,nxt.y); if(killed){ state.xenos=state.xenos.filter(q=>q!==z); break; }
+          const adj=Math.abs(nxt.x-tgt.x)+Math.abs(nxt.y-tgt.y)===1;
+          if(adj){ 
+            tgt.hp -= (z.dmg||1); 
+            log(`${z.type==='broodlord'?'Broodlord':'Xeno'} slashes ${tgt.name||'a Terminator'}!`);
+            if(tgt.hp<=0){ 
+              log(`${tgt.name||'Terminator'} falls!`); 
+              state.marines=state.marines.filter(mm=>mm!==tgt); 
+              if(state.marines.length===0){ 
+                state.gameOver=true; state.win=false; 
+                updateHighScore(state.stage); // save progress on defeat too
+                draw(); 
+                return; 
+              } 
+              if(state.sel>=state.marines.length) state.sel=state.marines.length-1; 
+            }
+            break;
+          }
+          z.x=nxt.x; z.y=nxt.y; draw();
+        }
+      }
+      // Refresh marines
+      state.marines.forEach(m=>{ m.ap=6; m.overwatch=false; });
+      state.turn='marine';
+      // Spawn next wave if any remain
+      maybeSpawnNextWave();
+      draw();
+    }
+
+    function cycleSel(dir){ const n=state.marines.length; state.sel=(state.sel+dir+n)%n; draw(); }
+    function hardSeedVisibility(){ state.marines.forEach(m=> state.seen.add(key(m.x,m.y)) ); }
+
+    function reset(){
+      state.turn='marine'; state.seen=new Set(); state.gameOver=false; state.win=false; state.wave=0; state.broodlordAlive=false;
+      state.bullets=[]; state.explosions=[]; state.blueBursts=[];
+      generateMap();
+      spawnMarines();
+      state.xenos=[];
+      hardSeedVisibility();
+      // Initial wave(s)
+      spawnInitialWaves();
+      draw();
+    }
+
+    function spawnInitialWaves(){
+      const base = 4 + state.stage * 2; // initial pressure
+      spawnEnemies(base, 'stealer');
+      state.wave = 1; // first wave considered spawned
+      log(`Stage ${state.stage} begins. Initial contacts: ${base}.`);
+      if(state.stage>=5 && !state.broodlordAlive){
+        spawnEnemies(1,'broodlord');
+        log('Bio-signature detected: BROODLORD!');
+      }
+    }
+
+    function maybeSpawnNextWave(){
+      if(state.wave >= state.wavesPerStage) return;
+      const add = 2 + state.stage; // wave size scales with stage
+      spawnEnemies(add,'stealer');
+      state.wave++;
+      log(`Wave ${state.wave}/${state.wavesPerStage}: ${add} more xenos!`);
+    }
+
+    function nextStage(first=false){
+      if(!first){ 
+        state.stage++; 
+        updateHighScore(state.stage); // record the new stage reached
+      }
+      log(`Preparing Stage ${state.stage}...`);
+      reset();
+    }
+
+    // --- Animation tick for bullets & explosions ---
+    let lastTs = 0;
+    function tick(ts){
+      const dt = Math.min(50, (ts - lastTs) || 16); // clamp dt
+      lastTs = ts;
+      updateBullets(dt/1000); // dt in seconds
+      updateExplosions(dt/1000);
+      updateBlueBursts(dt/1000);
+      draw();
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    function updateBullets(dt){
+      if(state.bullets.length===0) return;
+      for(const b of [...state.bullets]){
+        // advance
+        b.x += b.dx * b.speed * dt;
+        b.y += b.dy * b.speed * dt;
+        b.remaining -= b.speed * dt;
+
+        // bounds/range
+        if(b.x < 0 || b.y < 0 || b.x >= W || b.y >= H || b.remaining <= 0){
+          removeBullet(b);
+          continue;
+        }
+
+        const tx = Math.floor(b.x);
+        const ty = Math.floor(b.y);
+
+        // wall/door collision
+        if(isBlocked(tx,ty)){
+          if(b.type === 'plasma'){
+            triggerPlasmaExplosion(tx, ty);
+          } else {
+            makeSmallExplosion(tx+0.5, ty+0.5);
+          }
+          removeBullet(b);
+          continue;
+        }
+
+        // xeno collision
+        const hit = state.xenos.find(z=>z.x===tx && z.y===ty);
+        if(hit){
+          if(b.type === 'plasma'){
+            triggerPlasmaExplosion(tx, ty);
+          } else {
+            hit.hp -= 1;
+            if(hit.hp <= 0){
+              state.xenos = state.xenos.filter(z=>z!==hit);
+              if(hit.type==='broodlord'){ state.broodlordAlive=false; log('Broodlord obliterated!'); }
+              else { log('Xeno down!'); }
+            } else {
+              log('Hit confirmed.');
+            }
+            makeSmallExplosion(tx+0.5, ty+0.5);
+          }
+          removeBullet(b);
+          continue;
+        }
+      }
+    }
+
+    function removeBullet(b){
+      const i = state.bullets.indexOf(b);
+      if(i>=0) state.bullets.splice(i,1);
+    }
+
+    // --- Bolter small explosion (orange circle) ---
+    function makeSmallExplosion(cx, cy){
+      state.explosions.push({
+        x: cx, y: cy,
+        t: 0, life: 0.25, // seconds
+        maxR: TILE * 0.6
+      });
+    }
+
+    // --- Plasma 3x3 explosion: enemies-only damage + blue tile flash with fade ---
+    function triggerPlasmaExplosion(cx, cy){
+      // Damage: all enemies within 3x3 around (cx,cy)
+      for(let dy=-1; dy<=1; dy++){
+        for(let dx=-1; dx<=1; dx++){
+          const tx = cx + dx, ty = cy + dy;
+          if(!inBounds(tx,ty)) continue;
+          for(const enemy of [...state.xenos]){
+            if(enemy.x===tx && enemy.y===ty){
+              enemy.hp -= 5;
+              if(enemy.hp <= 0){
+                // remove enemy
+                state.xenos = state.xenos.filter(z=>z!==enemy);
+                if(enemy.type==='broodlord'){ state.broodlordAlive=false; log('Broodlord disintegrated by plasma!'); }
+                else { log('Xeno vaporized!'); }
+              }
+            }
+          }
+        }
+      }
+      // Visual: store blue burst tiles with fade
+      const tiles=[];
+      for(let dy=-1; dy<=1; dy++){
+        for(let dx=-1; dx<=1; dx++){
+          const tx = cx + dx, ty = cy + dy;
+          if(inBounds(tx,ty)) tiles.push({x:tx,y:ty});
+        }
+      }
+      state.blueBursts.push({ tiles, t:0, life:0.2 });
+    }
+
+    function updateExplosions(dt){
+      if(state.explosions.length===0) return;
+      for(const ex of [...state.explosions]){
+        ex.t += dt;
+        if(ex.t >= ex.life){
+          const i = state.explosions.indexOf(ex);
+          if(i>=0) state.explosions.splice(i,1);
+        }
+      }
+    }
+
+    function updateBlueBursts(dt){
+      if(state.blueBursts.length===0) return;
+      for(const b of [...state.blueBursts]){
+        b.t += dt;
+        if(b.t >= b.life){
+          const i = state.blueBursts.indexOf(b);
+          if(i>=0) state.blueBursts.splice(i,1);
+        }
+      }
+    }
+
+    // Start sequence
+    window.addEventListener('load', ()=>{
+      loadHighScore();
+      showIntro(); // show intro (MP4 preferred, GIF fallback)
+    });
+  </script>
+</body>
+</html>
