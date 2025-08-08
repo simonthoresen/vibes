@@ -1,3 +1,18 @@
+// --- Sound System ---
+const sounds = {
+    shoot: new Audio("shoot.mp3"),
+    explode: new Audio("explode.mp3"),
+    hit: new Audio("hit.mp3")
+};
+
+sounds.shoot.volume = 0.1;
+sounds.explode.volume = 0.5;
+sounds.hit.volume = 0.6;
+
+for (const key in sounds) {
+    sounds[key].load();
+}
+
 const canvas = document.createElement("canvas");
 const ctx = canvas.getContext("2d");
 document.body.style.margin = '0';
@@ -61,6 +76,8 @@ class Player extends GameObject {
 
         if (this.shootCooldown-- <= 0) {
             bullets.push(new Bullet(this.pos.x, this.pos.y - 15));
+            sounds.shoot.currentTime = 0;
+            sounds.shoot.play();
             this.shootCooldown = 5;
         }
 
@@ -68,7 +85,7 @@ class Player extends GameObject {
             particles.push(new Particle(
                 this.pos.x - 5 + Math.random() * 10,
                 this.pos.y + 10,
-                0, 2, 30, "white", "rect"
+                0, 5, 25 + Math.random() * 25, "white", "rect"
             ));
         }
     }
@@ -360,6 +377,8 @@ function gameLoop() {
         for (let b of bullets) {
             if (checkCollision(e, b, 15)) {
                 explode(e, "red", "triangle");
+                sounds.explode.currentTime = 0;
+                sounds.explode.play();
                 enemies.splice(enemies.indexOf(e), 1);
                 bullets.splice(bullets.indexOf(b), 1);
                 score += 10;
@@ -369,6 +388,8 @@ function gameLoop() {
         if (checkCollision(player, e, 20)) {
             explode(e, "red", "triangle");
             explode(player, "white", "triangle");
+            sounds.hit.currentTime = 0;
+            sounds.hit.play();
             enemies.splice(enemies.indexOf(e), 1);
             life--;
             screenFlash = 15;
@@ -380,6 +401,8 @@ function gameLoop() {
         for (let b of bullets) {
             if (checkCollision(t, b, 15)) {
                 explode(t, "green", "circle");
+                sounds.explode.currentTime = 0;
+                sounds.explode.play();
                 turrets.splice(turrets.indexOf(t), 1);
                 bullets.splice(bullets.indexOf(b), 1);
                 score += 20;
