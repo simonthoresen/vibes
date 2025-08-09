@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Infinite Platformer with Levels</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background: #222;
+      color: white;
+      text-align: center;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 2px solid black;
+    }
+    #menu, #settingsMenu, #pauseMenu {
+      margin-top: 100px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    .key-input {
+      width: 30px;
+      text-align: center;
+      font-size: 16px;
+    }
+    #pauseMenu {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background-color: rgba(100, 100, 100, 0.6);
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+    }
+    #pauseMenuContent {
+      background-color: #333;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px black;
+    }
+    #scoreDisplay {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div id="menu">
+    <h1>Infinite Platformer</h1>
+    <button onclick="startGame()">Start Game</button>
+    <button onclick="openSettings()">Settings</button>
+    <button onclick="quitGame()">Quit</button>
+  </div>
+
+  <div id="settingsMenu" style="display:none;">
+    <h2>Key Bindings</h2>
+    <p>Left: <input id="leftKey" class="key-input" value="a" /></p>
+    <p>Right: <input id="rightKey" class="key-input" value="d" /></p>
+    <p>Jump: <input id="jumpKey" class="key-input" value="w" /></p>
+    <button onclick="saveSettings()">Save</button>
+    <button onclick="backToPrevious()">Back</button>
+  </div>
+
+  <div id="pauseMenu">
+    <div id="pauseMenuContent">
+      <h2>Paused</h2>
+      <button onclick="resumeGame()">Resume</button>
+      <button onclick="startGame()">Retry Level</button>
+      <button onclick="openSettingsFromPause()">Settings</button>
+      <button onclick="quitToMenu()">Quit to Menu</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="400" style="display: none;"></canvas>
+  <div id="scoreDisplay">Levels: 0 | High Score: 0</div>
+
+  <script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+
+  const SPRITE_SIZE = 48;
+  const spriteSheet = new Image();
+  spriteSheet.src = 'character.png';
+  let spriteLoaded = false;
+  spriteSheet.onload = () => { spriteLoaded = true; };
+
+  let keyBindings = { left: 'a', right: 'd', jump: 'w' };
+  const keys = { left: false, right: false };
+  let cameraY = 0;
+  let highestPlatformY = 350;
+  let platformGenY = 300;
+  let level = 0;
+  let totalPlatformsGenerated = 0;
+  let inCutscene = false;
+  let cutsceneTimer = 0;
+  let cubeAngle = 0;
+  let levelsCompleted = 0;
+  let highScore = parseInt(localStorage.getItem('highScore')) || 0;
+
+  const levels = [
+    { background: '#87ceeb', ground: '#8B4513' },
+    { background: '#e6e6fa', ground: '#8B4513' },
+    { background: '#2f4f4f', ground: '#8B4513' }
+  ];
+
+  let player = {
+    x: 50, y: 300, width: 60, height: 60,
+    vx: 0, vy: 0, speed: 3, jumpPower: 12,
+    onGround: false, color: "red", jumps: 0,
+    maxJumps: 2, scale: 1
+  };
+
+  let platforms = [];
+  let gameRunning = false;
+  let gamePaused = false;
+  let previousMenu = 'menu';
+  const gravity = 0.5;
+  const friction = 0.8;
+
+  function updateScoreDisplay() {
+    scoreDisplay.textContent = `Levels: ${levelsCompleted} | High Score: ${highScore}`;
+  }
+
+  function isSolid(color) {
+    const temp = document.createElement('div');
+    temp.style.color = color;
+    document.body.appendChild(temp);
+    const computed = getComputedStyle(temp).color;
+    document.body.removeChild(temp);
+    const match = computed.match(/(\d+), (\d+), (\d+)/);
+    if (!match) return false;
+    const [r, g, b] = match.slice(1).map(Number);
+    return (g > r + 20 && g > b + 20) || (r >= 100 && r <= 180 && g >= 40 && g <= 100 && b <= 80);
+  }
+
+  function generatePlatformChunk(fromY) {
+    for (let i = 0; i < 10; i++) {
+      const width = 80 + Math.random() * 40;
+      const height = 10;
+      const x = 20 + Math.random() * (canvas.width - 40 - width);
+      const y = fromY - Math.random() * 400;
+      const greenShade = `rgb(${Math.random()*50|0}, ${150+Math.random()*105|0}, ${Math.random()*50|0})`;
+      platforms.push({ x, y, width, height, color: greenShade });
+      totalPlatformsGenerated++;
+      if (y < highestPlatformY) highestPlatformY = y;
+    }
+    platformGenY = fromY - 500;
+  }
+
+  function checkPlayerStuck() {
+    if (!player.onGround || totalPlatformsGenerated < 100 || inCutscene) return;
+    const jumpHeight = 150;
+    const reachable = platforms.some(p =>
+      p.y < player.y && p.y > player.y - jumpHeight &&
+      player.x + player.width > p.x && player.x < p.x + p.width
+    );
+    if (!reachable) startCutscene();
+  }
+
+  function startCutscene() {
+    inCutscene = true;
+    cutsceneTimer = 0;
+    player.scale = 1;
+  }
+
+  function updateCutscene() {
+    cutsceneTimer++;
+    cubeAngle += 0.1;
+    if (cutsceneTimer > 60 && cutsceneTimer <= 120) player.scale -= 0.01;
+    if (cutsceneTimer === 150) {
+      nextLevel();
+      player.scale = 0.1;
+    }
+    if (cutsceneTimer > 150 && player.scale < 1) player.scale += 0.02;
+    if (cutsceneTimer > 200) {
+      inCutscene = false;
+      player.scale = 1;
+    }
+  }
+
+  function nextLevel() {
+    level = (level + 1) % levels.length;
+    levelsCompleted++;
+    if (levelsCompleted > highScore) {
+      highScore = levelsCompleted;
+      localStorage.setItem('highScore', highScore);
+    }
+    updateScoreDisplay();
+    canvas.style.background = levels[level].background;
+    player.y = 250;
+    player.vx = 0;
+    player.vy = 0;
+    cameraY = 0;
+    platforms = [
+      { x: 0, y: 350, width: canvas.width, height: 50, color: '#8B4513' },
+      { x: 0, y: 410, width: canvas.width, height: 20, color: "green" }
+    ];
+    highestPlatformY = 300;
+    platformGenY = 300;
+    totalPlatformsGenerated = 0;
+    generatePlatformChunk(platformGenY);
+  }
+
+  function updateGame() {
+    if (inCutscene) return updateCutscene();
+    if (keys.left) player.vx = -player.speed;
+    else if (keys.right) player.vx = player.speed;
+    else player.vx *= friction;
+
+    player.vy += gravity;
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Wrap around screen
+    if (player.x + player.width < 0) player.x = canvas.width;
+    if (player.x > canvas.width) player.x = -player.width;
+
+    player.onGround = false;
+    for (const p of platforms) {
+      if (isSolid(p.color)) {
+        const falling =
+          player.vy >= 0 &&
+          player.x + player.width > p.x &&
+          player.x < p.x + p.width &&
+          player.y + player.height <= p.y + 5 &&
+          player.y + player.height + player.vy >= p.y;
+        if (falling) {
+          player.y = p.y - player.height;
+          player.vy = 0;
+          player.onGround = true;
+          player.jumps = 0;
+        }
+      }
+    }
+
+    if (player.y < cameraY + 100) cameraY = player.y - 100;
+    else if (player.y - cameraY > canvas.height - 100) cameraY = player.y - (canvas.height - 100);
+
+    while (player.y < platformGenY + 400) generatePlatformChunk(platformGenY);
+    checkPlayerStuck();
+  }
+
+  function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of platforms) {
+      ctx.fillStyle = p.color || "green";
+      ctx.fillRect(p.x, p.y - cameraY, p.width, p.height);
+    }
+
+    if (spriteLoaded) {
+      let row = 0;
+      if (!player.onGround) row = 3;
+      else if (keys.left || keys.right) row = 1;
+      if (!window.animFrame) window.animFrame = 0;
+      window.animFrame = (window.animFrame + 1) % 8;
+
+      const sx = window.animFrame * SPRITE_SIZE;
+      const sy = row * SPRITE_SIZE;
+      ctx.drawImage(spriteSheet, sx, sy, SPRITE_SIZE, SPRITE_SIZE,
+        player.x, player.y - cameraY, player.width, player.height);
+    } else {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y - cameraY, player.width, player.height);
+    }
+
+    if (inCutscene && cutsceneTimer <= 150) {
+      ctx.save();
+      ctx.translate(player.x + player.width / 2, player.y - cameraY + player.height / 2);
+      ctx.rotate(cubeAngle);
+      ctx.fillStyle = "purple";
+      ctx.fillRect(-50, -50, 100, 100);
+      ctx.restore();
+    }
+  }
+
+  function gameLoop() {
+    if (!gameRunning || gamePaused) return;
+    updateGame();
+    drawGame();
+    requestAnimationFrame(gameLoop);
+  }
+
+  function startGame() {
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('pauseMenu').style.display = 'none';
+    document.getElementById('settingsMenu').style.display = 'none';
+    canvas.style.display = 'block';
+    gameRunning = true;
+    gamePaused = false;
+    level = 0;
+    levelsCompleted = 0;
+    totalPlatformsGenerated = 0;
+    player.scale = 1;
+    inCutscene = false;
+    updateScoreDisplay();
+    canvas.style.background = levels[0].background;
+    player.y = 250;
+    player.vx = 0;
+    player.vy = 0;
+    cameraY = 0;
+    platforms = [
+      { x: 0, y: 350, width: canvas.width, height: 50, color: '#8B4513' },
+      { x: 0, y: 410, width: canvas.width, height: 20, color: "green" }
+    ];
+    highestPlatformY = 300;
+    platformGenY = 300;
+    generatePlatformChunk(platformGenY);
+    requestAnimationFrame(gameLoop);
+  }
+
+  function quitGame() {
+    canvas.style.display = 'none';
+    document.getElementById('menu').style.display = 'block';
+    gameRunning = false;
+    gamePaused = false;
+  }
+
+  function openSettings() {
+    previousMenu = 'menu';
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('settingsMenu').style.display = 'block';
+  }
+
+  function openSettingsFromPause() {
+    previousMenu = 'pause';
+    document.getElementById('pauseMenu').style.display = 'none';
+    document.getElementById('settingsMenu').style.display = 'block';
+  }
+
+  function backToPrevious() {
+    document.getElementById('settingsMenu').style.display = 'none';
+    if (previousMenu === 'menu') document.getElementById('menu').style.display = 'block';
+    else document.getElementById('pauseMenu').style.display = 'flex';
+  }
+
+  function saveSettings() {
+    keyBindings.left = document.getElementById('leftKey').value.toLowerCase();
+    keyBindings.right = document.getElementById('rightKey').value.toLowerCase();
+    keyBindings.jump = document.getElementById('jumpKey').value.toLowerCase();
+    backToPrevious();
+  }
+
+  function quitToMenu() {
+    gameRunning = false;
+    gamePaused = false;
+    canvas.style.display = 'none';
+    document.getElementById('pauseMenu').style.display = 'none';
+    document.getElementById('menu').style.display = 'block';
+  }
+
+  function pauseGame() {
+    gamePaused = true;
+    document.getElementById('pauseMenu').style.display = 'flex';
+  }
+
+  function resumeGame() {
+    gamePaused = false;
+    document.getElementById('pauseMenu').style.display = 'none';
+    requestAnimationFrame(gameLoop);
+  }
+
+  document.addEventListener('keydown', e => {
+    let konamiInput = [];
+const konamiCode = [
+  "arrowup", "arrowup",
+  "arrowdown", "arrowdown",
+  "arrowleft", "arrowright",
+  "arrowleft", "arrowright",
+  "b", "a"
+];
+
+document.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  konamiInput.push(key);
+
+  // Keep array length under 10
+  if (konamiInput.length > konamiCode.length) {
+    konamiInput.shift();
+  }
+
+  // Check if the input matches the Konami Code
+  if (konamiInput.join(',') === konamiCode.join(',')) {
+    const newHighScore = prompt("🎉 Konami Code activated! Set your new high score:");
+    const scoreNum = parseInt(newHighScore);
+    if (!isNaN(scoreNum)) {
+      localStorage.setItem('highScore', scoreNum);
+      alert("High score set to " + scoreNum);
+      location.reload(); // Refresh to apply
+    } else {
+      alert("That's not a valid number.");
+    }
+    konamiInput = []; // reset input
+  }
+});
+
+    const key = e.key.toLowerCase();
+    if (key === 'escape') {
+      if (gameRunning) gamePaused ? resumeGame() : pauseGame();
+    }
+    if (inCutscene) return;
+    if (key === keyBindings.left) keys.left = true;
+    if (key === keyBindings.right) keys.right = true;
+    if (key === keyBindings.jump && player.jumps < player.maxJumps) {
+      player.vy = -player.jumpPower;
+      player.onGround = false;
+      player.jumps++;
+    }
+  });
+
+  document.addEventListener('keyup', e => {
+    const key = e.key.toLowerCase();
+    if (key === keyBindings.left) keys.left = false;
+    if (key === keyBindings.right) keys.right = false;
+  });
+</script>
+</body>
+</html>
