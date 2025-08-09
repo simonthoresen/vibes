@@ -5,6 +5,51 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
+// Key binding configuration
+const keyBindings = {
+  up: 'w',
+  down: 's',
+  left: 'a',
+  right: 'd'
+};
+
+// Save key bindings to local storage
+function saveKeyBindings() {
+  localStorage.setItem('keyBindings', JSON.stringify(keyBindings));
+}
+
+// Load key bindings from local storage
+function loadKeyBindings() {
+  const saved = localStorage.getItem('keyBindings');
+  if (saved) {
+    Object.assign(keyBindings, JSON.parse(saved));
+    updateKeyBindButtons();
+  }
+}
+
+// Update the key bind button displays
+function updateKeyBindButtons() {
+  document.querySelectorAll('.keybind-button').forEach(button => {
+    const action = button.dataset.action;
+    button.textContent = keyBindings[action].toUpperCase();
+  });
+}
+
+// Helper functions for showing/hiding menus
+function showMenu(menu, isCheatMenu = false) {
+  const darkOverlay = document.getElementById("darkOverlay");
+  darkOverlay.style.display = "block";
+  // Make overlay darker for cheat menu
+  darkOverlay.style.background = isCheatMenu ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.7)";
+  menu.style.display = "block";
+}
+
+function hideMenu(menu) {
+  const darkOverlay = document.getElementById("darkOverlay");
+  darkOverlay.style.display = "none";
+  menu.style.display = "none";
+}
+
 const keys = {};
 let gamePaused = false;
 let gameStarted = false;
@@ -44,6 +89,8 @@ const obelisk = {
   radius: 30,
   maxHealth: 10,
   health: 10,
+  shieldDefense: 0, // Extra defense from shield
+  hasShield: false, // Whether the shield is active
 };
 
 const player = {
@@ -71,6 +118,7 @@ const player = {
 let enemies = [];
 let bullets = [];
 let xpOrbs = [];
+let particles = [];
 
 // Store all available upgrades globally
 const normalUpgrades = [
@@ -119,6 +167,14 @@ const normalUpgrades = [
     description: "Restore 5 health points to the obelisk",
     apply: () => {
       obelisk.health = Math.min(obelisk.maxHealth, obelisk.health + 5);
+    }
+  },
+  {
+    name: "Obelisk Shield",
+    description: "Add 5 defense to the obelisk with a protective shield",
+    apply: () => {
+      obelisk.shieldDefense += 5;
+      obelisk.hasShield = true;
     }
   },
   {
@@ -205,11 +261,69 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (e.key === "Escape" && gameStarted && !fadingIn && !fadingOut) {
-    togglePause();
+    const menu = document.getElementById("levelUpMenu");
+    // Check if cheat menu is visible
+    if (menu.style.display === "block") {
+      hideMenu(menu);
+      gamePaused = false;
+    } else {
+      togglePause();
+    }
   }
 });
 
 window.addEventListener("keyup", (e) => (keys[e.key.toLowerCase()] = false));
+
+// Set up key binding system
+document.getElementById("settingsButton").addEventListener("click", () => {
+  showMenu(document.getElementById("settingsMenu"));
+});
+
+let activeKeyBindButton = null;
+
+document.querySelectorAll('.keybind-button').forEach(button => {
+  button.addEventListener('click', (e) => {
+    // Reset any previously active button
+    if (activeKeyBindButton) {
+      activeKeyBindButton.style.background = '#333';
+    }
+    
+    activeKeyBindButton = e.target;
+    activeKeyBindButton.style.background = '#555';
+    activeKeyBindButton.textContent = 'Press a key...';
+    
+    // One-time event listener for the next keypress
+    const keyHandler = (e) => {
+      e.preventDefault();
+      const newKey = e.key.toLowerCase();
+      
+      // Don't allow Escape as a binding
+      if (newKey === 'escape') {
+        activeKeyBindButton.style.background = '#333';
+        activeKeyBindButton.textContent = keyBindings[activeKeyBindButton.dataset.action].toUpperCase();
+        activeKeyBindButton = null;
+        document.removeEventListener('keydown', keyHandler);
+        return;
+      }
+      
+      // Update the binding
+      keyBindings[activeKeyBindButton.dataset.action] = newKey;
+      activeKeyBindButton.textContent = newKey.toUpperCase();
+      activeKeyBindButton.style.background = '#333';
+      activeKeyBindButton = null;
+      
+      // Save the new bindings
+      saveKeyBindings();
+      
+      document.removeEventListener('keydown', keyHandler);
+    };
+    
+    document.addEventListener('keydown', keyHandler, { once: true });
+  });
+});
+
+// Load saved key bindings when the game starts
+loadKeyBindings();
 
 startButton.addEventListener("click", () => {
   if (!gameStarted) {
@@ -237,84 +351,7 @@ function startCutscene() {
   text.innerText = cutsceneData[0].text;
 }
 
-function showCheatMenu() {
-  gamePaused = true;
-  const menu = document.getElementById("levelUpMenu");
-  menu.innerHTML = "<h2 style='color: gold'>🎮 Cheat Menu 🎮</h2>";
 
-  // Create level selector
-  const levelDiv = document.createElement("div");
-  levelDiv.className = "upgrade";
-  levelDiv.innerHTML = `
-    <div class="upgrade-name">Set Level</div>
-    <div class="upgrade-description">
-      Current Level: <input type="number" id="levelSelect" min="1" max="20" value="${player.level}" style="width: 60px; margin: 0 10px;">
-      <button style="padding: 5px 10px;" onclick="setPlayerLevel(parseInt(document.getElementById('levelSelect').value))">Set</button>
-    </div>
-  `;
-  menu.appendChild(levelDiv);
-
-  // Add section headers
-  const normalHeader = document.createElement("div");
-  normalHeader.innerHTML = "<h3 style='margin: 20px 0 10px 0; color: cyan'>Normal Upgrades</h3>";
-  menu.appendChild(normalHeader);
-
-  // Add normal upgrades
-  normalUpgrades.forEach(upg => {
-    const div = document.createElement("div");
-    div.className = "upgrade";
-    div.innerHTML = `
-      <div class="upgrade-name">${upg.name}</div>
-      <div class="upgrade-description">${upg.description}</div>
-    `;
-    div.onclick = () => {
-      upg.apply();
-      // Flash effect to show it was applied
-      div.style.backgroundColor = "rgba(0, 255, 0, 0.2)";
-      setTimeout(() => div.style.backgroundColor = "", 200);
-    };
-    menu.appendChild(div);
-  });
-
-  // Add legendary upgrades section
-  const legendaryHeader = document.createElement("div");
-  legendaryHeader.innerHTML = "<h3 style='margin: 20px 0 10px 0; color: gold'>Legendary Upgrades</h3>";
-  menu.appendChild(legendaryHeader);
-
-  // Add legendary upgrades
-  legendaryUpgrades.forEach(upg => {
-    const div = document.createElement("div");
-    div.className = "upgrade";
-    div.style.border = "1px solid gold";
-    div.innerHTML = `
-      <div class="upgrade-name" style="color: gold">⭐ ${upg.name}</div>
-      <div class="upgrade-description">${upg.description}</div>
-    `;
-    div.onclick = () => {
-      upg.apply();
-      // Flash effect to show it was applied
-      div.style.backgroundColor = "rgba(255, 215, 0, 0.2)";
-      setTimeout(() => div.style.backgroundColor = "", 200);
-    };
-    menu.appendChild(div);
-  });
-
-  // Add close button
-  const closeDiv = document.createElement("div");
-  closeDiv.className = "upgrade";
-  closeDiv.style.marginTop = "20px";
-  closeDiv.innerHTML = `
-    <div class="upgrade-name" style="color: red">✖ Close Cheat Menu</div>
-    <div class="upgrade-description">Return to game</div>
-  `;
-  closeDiv.onclick = () => {
-    menu.style.display = "none";
-    gamePaused = false;
-  };
-  menu.appendChild(closeDiv);
-
-  menu.style.display = "block";
-}
 
 // Helper function for setting player level
 function setPlayerLevel(level) {
@@ -333,7 +370,13 @@ function setPlayerLevel(level) {
 function showCheatMenu() {
   gamePaused = true;
   const menu = document.getElementById("levelUpMenu");
-  menu.innerHTML = "<h2 style='color: gold'>🎮 Cheat Menu 🎮</h2>";
+  showMenu(menu, true); // Use helper function with darker overlay
+  menu.innerHTML = `
+    <div style="position: relative;">
+      <button style="position: absolute; right: -10px; top: -10px; background: #333; color: red; border: none; width: 24px; height: 24px; border-radius: 12px; cursor: pointer; font-weight: bold; line-height: 24px; padding: 0;" 
+        onclick="hideMenu(document.getElementById('levelUpMenu')); gamePaused = false;">✖</button>
+      <h2 style='color: gold'>🎮 Cheat Menu 🎮</h2>
+    </div>`;
 
   // Create level selector
   const levelDiv = document.createElement("div");
@@ -362,7 +405,9 @@ function showCheatMenu() {
     { name: "Stronger Bullets", apply: () => player.bulletDamage++ },
     { name: "XP Magnet Range +40%", apply: () => player.magnetStrength *= 1.4 },
     { name: "Obelisk Heal +5", apply: () => obelisk.health = Math.min(obelisk.maxHealth, obelisk.health + 5) },
-    { name: "Bigger Bullets", apply: () => bullets.forEach(b => b.radius = (b.radius || 4) * 1.5) }
+    { name: "Bigger Bullets", apply: () => bullets.forEach(b => b.radius = (b.radius || 4) * 1.5) },
+    { name: "Obelisk Shield", description: "Add 5 defense to the obelisk with a protective shield", 
+      apply: () => { obelisk.shieldDefense += 5; obelisk.hasShield = true; } }
   ];
 
   normalUpgrades.forEach(upg => {
@@ -404,19 +449,7 @@ function showCheatMenu() {
     menu.appendChild(div);
   });
 
-  // Add close button
-  const closeDiv = document.createElement("div");
-  closeDiv.className = "upgrade";
-  closeDiv.style.marginTop = "20px";
-  closeDiv.innerHTML = `
-    <div class="upgrade-name" style="color: red">✖ Close Cheat Menu</div>
-    <div class="upgrade-description">Return to game</div>
-  `;
-  closeDiv.onclick = () => {
-    menu.style.display = "none";
-    gamePaused = false;
-  };
-  menu.appendChild(closeDiv);
+  // Note: Close button removed in favor of corner X and ESC key
 
   menu.style.display = "block";
 }
@@ -438,7 +471,14 @@ function togglePause() {
   gamePaused = !gamePaused;
 
   const pauseMenu = document.getElementById("pauseMenu");
-  pauseMenu.style.display = gamePaused ? "block" : "none";
+  const darkOverlay = document.getElementById("darkOverlay");
+  
+  if (gamePaused) {
+    showMenu(pauseMenu);
+  } else {
+    hideMenu(pauseMenu);
+  }
+  darkOverlay.style.display = gamePaused ? "block" : "none";
 
   // Update highscore display in pause menu
   if (gamePaused) {
@@ -499,6 +539,8 @@ function draw() {
   drawEnemies();
   drawBullets();
   drawXPOrbs();
+  updateParticles();
+  drawParticles();
   drawUI();
 }
 
@@ -507,10 +549,10 @@ function draw() {
 function movePlayer() {
   let dx = 0;
   let dy = 0;
-  if (keys["w"]) dy -= 1;
-  if (keys["s"]) dy += 1;
-  if (keys["a"]) dx -= 1;
-  if (keys["d"]) dx += 1;
+  if (keys[keyBindings.up]) dy -= 1;
+  if (keys[keyBindings.down]) dy += 1;
+  if (keys[keyBindings.left]) dx -= 1;
+  if (keys[keyBindings.right]) dx += 1;
   if (dx !== 0 || dy !== 0) {
     const length = Math.hypot(dx, dy);
     dx /= length;
@@ -808,6 +850,7 @@ function checkCollisions() {
           if (player.killShieldDuration) {
             player.shieldTime = player.killShieldDuration;
           }
+          spawnDeathParticles(enemy.x, enemy.y);
           xpOrbs.push({ x: enemy.x, y: enemy.y, value: 3 });
           enemies.splice(i, 1);
         }
@@ -818,7 +861,22 @@ function checkCollisions() {
     const dx = obelisk.x - enemy.x;
     const dy = obelisk.y - enemy.y;
     if (Math.hypot(dx, dy) < obelisk.radius + enemy.radius) {
-      obelisk.health -= Math.round(1 * obeliskDamageMultiplier);
+      // Calculate damage after shield
+      let damage = Math.round(1 * obeliskDamageMultiplier);
+      if (obelisk.hasShield && obelisk.shieldDefense > 0) {
+        // Shield absorbs damage and is reduced
+        if (damage <= obelisk.shieldDefense) {
+          // Shield absorbs all damage
+          obelisk.shieldDefense -= damage;
+          damage = 0;
+        } else {
+          // Shield breaks and remaining damage goes through
+          damage -= obelisk.shieldDefense;
+          obelisk.shieldDefense = 0;
+          obelisk.hasShield = false;
+        }
+      }
+      obelisk.health -= damage;
       enemies.splice(i, 1);
     }
 
@@ -835,6 +893,23 @@ function checkCollisions() {
 }
 
 function drawObelisk() {
+  // Draw shield if active
+  if (obelisk.hasShield && obelisk.shieldDefense > 0) {
+    ctx.save();
+    ctx.translate(obelisk.x, obelisk.y);
+    ctx.rotate(Math.PI / 4); // Rotate to make a diamond
+    ctx.strokeStyle = "rgba(0, 150, 255, 0.6)"; // Blue color for shield
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    // Draw shield slightly larger than the obelisk
+    const shieldSize = obelisk.radius + 8;
+    ctx.rect(-shieldSize, -shieldSize, shieldSize * 2, shieldSize * 2);
+    ctx.stroke();
+    ctx.closePath();
+    ctx.restore();
+  }
+
+  // Draw main obelisk
   ctx.save();
   ctx.translate(obelisk.x, obelisk.y);
   ctx.rotate(Math.PI / 4); // Rotate to make a diamond
@@ -856,6 +931,7 @@ function drawUI() {
 function showLevelUpMenu() {
   gamePaused = true;
   const menu = document.getElementById("levelUpMenu");
+  showMenu(menu);
   menu.innerHTML = "<h2>Level Up! Choose an Upgrade</h2>";
   const choices = normalUpgrades.sort(() => 0.5 - Math.random()).slice(0, 3);
   choices.forEach((upg) => {
@@ -867,7 +943,7 @@ function showLevelUpMenu() {
     `;
     div.onclick = () => {
       upg.apply();
-      menu.style.display = "none";
+      hideMenu(menu);
       gamePaused = false;
       enemySpeed += 0.05;
       enemySpawnInterval = Math.max(300, enemySpawnInterval - 100);
@@ -880,6 +956,7 @@ function showLevelUpMenu() {
 function showLegendaryUpgradeMenu() {
   gamePaused = true;
   const menu = document.getElementById("levelUpMenu");
+  showMenu(menu);
   menu.innerHTML = "<h2>Legendary Upgrade! Choose One</h2>";
   const choices = legendaryUpgrades.sort(() => 0.5 - Math.random()).slice(0, 3);
   choices.forEach((upg) => {
@@ -891,7 +968,7 @@ function showLegendaryUpgradeMenu() {
     `;
     div.onclick = () => {
       upg.apply();
-      menu.style.display = "none";
+      hideMenu(menu);
       gamePaused = false;
     };
     menu.appendChild(div);
@@ -1078,6 +1155,50 @@ function drawStartMenu() {
 
   ctx.font = "24px sans-serif";
   ctx.fillText("Click to Begin", WIDTH / 2, HEIGHT / 2 + 20);
+}
+
+function createParticle(x, y, color) {
+  const speed = 2 + Math.random() * 2;
+  const angle = Math.random() * Math.PI * 2;
+  return {
+    x,
+    y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    life: 1,
+    color,
+    size: 3 + Math.random() * 3
+  };
+}
+
+function spawnDeathParticles(x, y) {
+  const colors = ['#ff0000', '#ff4400', '#ff6600'];
+  for (let i = 0; i < 12; i++) {
+    particles.push(createParticle(x, y, colors[Math.floor(Math.random() * colors.length)]));
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.02;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+    }
+  }
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
 }
 
 function drawFadeOverlay() {
