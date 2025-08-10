@@ -1518,7 +1518,7 @@
                                     }
 
                                     tryAgainBtn.onclick = () => {
-                                        // Start door transition immediately
+                                        // Start door transition immediately using the game over door
                                         requestAnimationFrame(() => {
                                             doorTransition.style.display = 'block';
                                             doorTransition.style.backgroundColor = 'transparent';
