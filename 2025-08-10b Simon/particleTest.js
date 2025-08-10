@@ -23,6 +23,8 @@
     let grid = { rows: 3, cols: 3 };
     let cellWidth, cellHeight;
     let explosionActive = [false, false, false]; // For cells 1,1, 1,2, 1,3
+    let emitters = [];
+    let mouseX = 0, mouseY = 0;
 
     function enter(stateManager) {
         canvas = document.getElementById('gameCanvas');
@@ -33,7 +35,66 @@
         startExplosion(0); // cell 1,1
         startExplosion(1); // cell 1,2
         startExplosion(2); // cell 1,3
+
+        // Cell 2,1: emitter of circles pointing at mouse
+        const emitterX1 = cellWidth * 1.5;
+        const emitterY1 = cellHeight / 2;
+        // Cell 2,2: emitter of squares pointing at mouse
+        const emitterX2 = cellWidth * 1.5;
+        const emitterY2 = cellHeight * 1.5;
+        // Cell 2,3: emitter of triangles pointing at mouse
+        const emitterX3 = cellWidth * 1.5;
+        const emitterY3 = cellHeight * 2.5;
+
+        emitters = [
+            particleSystem.addEmitter({
+                x: emitterX1,
+                y: emitterY1,
+                emissionRate: 30,
+                shape: 'circle',
+                color: '#ff6600',
+                size: 10,
+                direction: 0, // will be updated
+                speed: 120,
+                lifetime: 1.2,
+                radius: 0
+            }),
+            particleSystem.addEmitter({
+                x: emitterX2,
+                y: emitterY2,
+                emissionRate: 30,
+                shape: 'square',
+                color: '#00ccff',
+                size: 10,
+                direction: 0, // will be updated
+                speed: 120,
+                lifetime: 1.2,
+                radius: 0
+            }),
+            particleSystem.addEmitter({
+                x: emitterX3,
+                y: emitterY3,
+                emissionRate: 30,
+                shape: 'triangle',
+                color: '#cc00ff',
+                size: 10,
+                direction: 0, // will be updated
+                speed: 120,
+                lifetime: 1.2,
+                radius: 0
+            })
+        ];
+
+        mouseX = emitterX1;
+        mouseY = emitterY1;
+        canvas.addEventListener('mousemove', onMouseMove);
         canvas.addEventListener('mousedown', onMouseDown);
+    }
+
+    function onMouseMove(e) {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
     }
 
     function startExplosion(cellIdx) {
@@ -57,6 +118,7 @@
 
     function exit() {
         canvas.removeEventListener('mousedown', onMouseDown);
+        canvas.removeEventListener('mousemove', onMouseMove);
     }
 
     function onMouseDown(e) {
@@ -81,6 +143,18 @@
     }
 
     function update(dt) {
+        // Update emitter directions to point at mouse
+        const emitterPositions = [
+            [cellWidth * 1.5, cellHeight / 2],
+            [cellWidth * 1.5, cellHeight * 1.5],
+            [cellWidth * 1.5, cellHeight * 2.5]
+        ];
+        for (let i = 0; i < emitters.length; i++) {
+            const [ex, ey] = emitterPositions[i];
+            const dx = mouseX - ex;
+            const dy = mouseY - ey;
+            emitters[i].direction = Math.atan2(dy, dx);
+        }
         particleSystem.update(dt);
         // For each cell in column 1 (cells 1,1; 1,2; 1,3)
         const shapes = ['circle', 'square', 'triangle'];
@@ -94,6 +168,7 @@
                 startExplosion(i);
             }
         }
+        // emitters are updated by particleSystem.update(dt)
     }
 
     function draw() {

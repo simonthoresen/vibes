@@ -78,7 +78,7 @@ window.onload = function() {
     // Register states
     window.stateManager.register('menu', menuState);
     window.stateManager.register('particleTest', window.particleTestState);
-    window.stateManager.setState('menu');
+    window.stateManager.setState('particleTest');
 
     let lastTime = performance.now();
     function gameLoop(now) {
