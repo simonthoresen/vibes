@@ -127,6 +127,27 @@ class ParticleSystem {
         }
     }
 
+    // Hit effect: directional explosion
+    emitHitEffect({ x, y, count, shape, color, size, speed, lifetime, direction, spread }) {
+        // direction: radians, spread: radians (e.g. Math.PI/6)
+        for (let i = 0; i < count; i++) {
+            const angle = direction + (Math.random() - 0.5) * spread;
+            const randomSpeed = speed * (0.5 + Math.random());
+            const randomLifetime = lifetime * (0.7 + Math.random() * 0.6);
+            this.addParticle({
+                x,
+                y,
+                shape,
+                color,
+                size,
+                speed: randomSpeed,
+                direction: angle,
+                rotation: Math.random() * Math.PI * 2,
+                lifetime: randomLifetime
+            });
+        }
+    }
+
     addEmitter(config) {
         const emitter = new ParticleEmitter(config);
         this.emitters.push(emitter);

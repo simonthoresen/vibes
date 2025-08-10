@@ -23,10 +23,17 @@
     let grid = { rows: 3, cols: 3 };
     let cellWidth, cellHeight;
     let explosionActive = [false, false, false]; // For cells 1,1, 1,2, 1,3
+    let hitEffectActive = false;
+    let hitEffectTimer = 0;
+    let hitEffectSquareTimer = 0;
+    let hitEffectTriangleTimer = 0;
     let emitters = [];
     let mouseX = 0, mouseY = 0;
 
     function enter(stateManager) {
+        hitEffectTriangleTimer = 0;
+        hitEffectSquareTimer = 0;
+        hitEffectTimer = 0;
         canvas = document.getElementById('gameCanvas');
         ctx = canvas.getContext('2d');
         particleSystem = new window.ParticleSystem();
@@ -35,6 +42,9 @@
         startExplosion(0); // cell 1,1
         startExplosion(1); // cell 1,2
         startExplosion(2); // cell 1,3
+
+        // Cell 1,3 (upper right): hit effect with circles
+        startHitEffect();
 
         // Cell 2,1: emitter of circles pointing at mouse
         const emitterX1 = cellWidth * 1.5;
@@ -91,6 +101,73 @@
         canvas.addEventListener('mousedown', onMouseDown);
     }
 
+    function startHitEffect() {
+        // Cell 1,3: upper right
+        const x = cellWidth * 2.5;
+        const y = cellHeight / 2;
+        // Point towards mouse
+        const dx = mouseX - x;
+        const dy = mouseY - y;
+        const direction = Math.atan2(dy, dx);
+        particleSystem.emitHitEffect({
+            x,
+            y,
+            count: 40,
+            shape: 'circle',
+            color: '#ff2222',
+            size: 5,
+            speed: 180,
+            lifetime: 0.5,
+            direction,
+            spread: Math.PI / 6
+        });
+    }
+
+    function startHitEffectSquare() {
+        // Cell 2,3: below upper right (cell 1,3)
+        const x = cellWidth * 2.5;
+        const y = cellHeight * 1.5;
+        // Point towards mouse
+        const dx = mouseX - x;
+        const dy = mouseY - y;
+        const direction = Math.atan2(dy, dx);
+        particleSystem.emitHitEffect({
+            x,
+            y,
+            count: 40,
+            shape: 'square',
+            color: '#22ff22',
+            size: 5,
+            speed: 180,
+            lifetime: 0.5,
+            direction,
+            spread: Math.PI / 6
+        });
+    }
+
+    function startHitEffectTriangle() {
+        // Cell 3,3: bottom right
+        const x = cellWidth * 2.5;
+        const y = cellHeight * 2.5;
+        // Point towards mouse
+        const dx = mouseX - x;
+        const dy = mouseY - y;
+        const direction = Math.atan2(dy, dx);
+        particleSystem.emitHitEffect({
+            x,
+            y,
+            count: 40,
+            shape: 'triangle',
+            color: '#2222ff',
+            size: 5,
+            speed: 180,
+            lifetime: 0.5,
+            direction,
+            spread: Math.PI / 6
+        });
+        hitEffectActive = true;
+    }
+
     function onMouseMove(e) {
         const rect = canvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
@@ -143,6 +220,24 @@
     }
 
     function update(dt) {
+        // Cell 1,3: repeat hit effect every 2 seconds
+        hitEffectTimer += dt;
+    if (hitEffectTimer >= 1) {
+            startHitEffect();
+            hitEffectTimer = 0;
+        }
+        // Cell 2,3: repeat square hit effect every 1 second
+        hitEffectSquareTimer += dt;
+        if (hitEffectSquareTimer >= 1) {
+            startHitEffectSquare();
+            hitEffectSquareTimer = 0;
+        }
+        // Cell 3,3: repeat triangle hit effect every 1 second
+        hitEffectTriangleTimer += dt;
+        if (hitEffectTriangleTimer >= 1) {
+            startHitEffectTriangle();
+            hitEffectTriangleTimer = 0;
+        }
         // Update emitter directions to point at mouse
         const emitterPositions = [
             [cellWidth * 1.5, cellHeight / 2],
@@ -168,7 +263,7 @@
                 startExplosion(i);
             }
         }
-        // emitters are updated by particleSystem.update(dt)
+    // ...existing code...
     }
 
     function draw() {
