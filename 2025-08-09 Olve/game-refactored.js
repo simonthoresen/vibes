@@ -79,7 +79,7 @@ class DungeonCrawlerGame {
         // Make methods available globally for HTML onclick handlers
         window.resumeGame = () => this.resumeGame();
         window.toggleSettings = () => this.toggleSettings();
-        window.returnToMainMenu = () => this.quitToMainMenu();
+        window.returnToMainMenu = () => this.quitToMenuImmediate();
         window.closeSettings = () => this.closeSettings();
 
         // Setup pause menu buttons (legacy approach using IDs)
@@ -90,7 +90,7 @@ class DungeonCrawlerGame {
 
         if (resumeBtn) resumeBtn.onclick = () => this.resumeGame();
         if (settingsBtn) settingsBtn.onclick = () => this.openSettings();
-        if (quitBtn) quitBtn.onclick = () => this.quitToMenu();
+        if (quitBtn) quitBtn.onclick = () => this.quitToMenuImmediate();
         if (cheatBtn) cheatBtn.onclick = () => this.openCheatMenu();
     }
 
@@ -213,6 +213,24 @@ class DungeonCrawlerGame {
             this.hideGameContainer();
             this.showMainMenu();
         });
+    }
+
+    quitToMenuImmediate() {
+        // Immediate quit from pause menu (no transition like the original)
+        this.gameLoop.stop();
+        this.hidePauseMenu();
+        this.hideGameOverScreen();
+        this.hideGameContainer();
+        this.showMainMenu();
+        
+        // Reset game state
+        this.gameState.reset();
+        this.playerController.reset();
+        this.projectileSystem.clear();
+        this.particleEngine.clear();
+        this.gameState.isPaused = false;
+        this.gameState.gameStarted = false;
+        this.gameState.gameCompleted = false;
     }
 
     pushEnemiesAwayFromPlayer() {

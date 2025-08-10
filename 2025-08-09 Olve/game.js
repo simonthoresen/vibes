@@ -59,7 +59,7 @@
             SKELETON: {
                 health: 30,
                 damage: 5,
-                speed: 2,
+                speed: 159,
                 color: '#8B8B8B',
                 width: TILE_SIZE,
                 height: TILE_SIZE,
@@ -68,7 +68,7 @@
             SLIME: {
                 health: 60,
                 damage: 15,
-                speed: 1,
+                speed: 140,
                 color: '#00AA00',
                 width: TILE_SIZE,
                 height: TILE_SIZE * 0.75,
@@ -77,7 +77,7 @@
             DRAGON: {
                 health: 1200,  // 20x slime health
                 damage: 50,    // Can kill in 2 hits (player has 100 hp)
-                speed: 1,
+                speed: 0.15,
                 color: '#FF0000',
                 width: TILE_SIZE * 3,
                 height: TILE_SIZE * 3,
@@ -123,7 +123,7 @@
                 y: CANVAS_HEIGHT / 2,
                 width: TILE_SIZE,
                 height: TILE_SIZE,
-                speed: 3,
+                speed: 160,
                 health: 100,
                 maxHealth: 100,
                 weapons: [],
@@ -161,7 +161,8 @@
             gameStarted: false,  // Track if game has started
             showMainMenu: true,  // Show main menu by default
             showSkinMenu: false,  // Skin selection menu state
-            gameCompleted: false  // Track if player has beaten floor 100
+            gameCompleted: false,  // Track if player has beaten floor 100
+            timeScale: 1  // Ensure movement speed works correctly
         };
 
         // Input handling
@@ -1227,10 +1228,23 @@
             // Update player movement using keybinds with time scaling
             const timeScale = gameState.timeScale || 1;
             const keybinds = gameState.settings.keybinds;
-            if (keys[keybinds.up]) gameState.player.y -= gameState.player.speed * timeScale;
-            if (keys[keybinds.down]) gameState.player.y += gameState.player.speed * timeScale;
-            if (keys[keybinds.left]) gameState.player.x -= gameState.player.speed * timeScale;
-            if (keys[keybinds.right]) gameState.player.x += gameState.player.speed * timeScale;
+            console.log("Player speed:", gameState.player.speed, "TimeScale:", timeScale);
+            if (keys[keybinds.up]) {
+                console.log("Moving up");
+                gameState.player.y -= gameState.player.speed * timeScale;
+            }
+            if (keys[keybinds.down]) {
+                console.log("Moving down");
+                gameState.player.y += gameState.player.speed * timeScale;
+            }
+            if (keys[keybinds.left]) {
+                console.log("Moving left");
+                gameState.player.x -= gameState.player.speed * timeScale;
+            }
+            if (keys[keybinds.right]) {
+                console.log("Moving right");
+                gameState.player.x += gameState.player.speed * timeScale;
+            }
             
             // Automatic attacking
             attack();
