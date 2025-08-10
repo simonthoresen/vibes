@@ -189,4 +189,10 @@ export class Renderer {
         this.ctx.textBaseline = baseline;
         this.ctx.fillText(text, x, y);
     }
+
+    drawParticles(particleEngine) {
+        if (particleEngine && particleEngine.render) {
+            particleEngine.render(this.ctx);
+        }
+    }
 }

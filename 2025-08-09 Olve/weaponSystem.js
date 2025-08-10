@@ -1,8 +1,9 @@
 import { WEAPONS } from './constants.js';
 
 export class WeaponSystem {
-    constructor(gameState) {
+    constructor(gameState, particleEngine = null) {
         this.gameState = gameState;
+        this.particleEngine = particleEngine;
     }
 
     update(deltaTime) {
@@ -200,8 +201,22 @@ export class WeaponSystem {
 
     damageEnemy(enemy, weapon, hitTime) {
         const damage = this.gameState.player.oneHitKill ? enemy.maxHealth || 9999 : weapon.damage;
+        const enemyWillDie = enemy.health - damage <= 0;
+        
         enemy.health -= damage;
         enemy.hitTime = hitTime;
+        
+        // Create particle effect for hit (if enemy doesn't die, death effect will be handled elsewhere)
+        if (this.particleEngine && !enemyWillDie) {
+            const centerX = enemy.x + enemy.width / 2;
+            const centerY = enemy.y + enemy.height / 2;
+            
+            if (enemy.isBoss) {
+                this.particleEngine.createBossHitEffect(centerX, centerY, enemy.color);
+            } else {
+                this.particleEngine.createEnemyHitEffect(centerX, centerY, enemy.color);
+            }
+        }
     }
 
     setupWeaponSelection(isBossReward = false) {

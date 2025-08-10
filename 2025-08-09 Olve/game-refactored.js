@@ -9,6 +9,7 @@ import { EnemySystem } from './enemySystem.js';
 import { ProjectileSystem } from './projectileSystem.js';
 import { PlayerController } from './playerController.js';
 import { GameLoop } from './gameLoop.js';
+import { ParticleEngine } from './particleEngine.js';
 import { KONAMI_CODE } from './constants.js';
 
 class DungeonCrawlerGame {
@@ -31,17 +32,22 @@ class DungeonCrawlerGame {
 
         // Initialize game systems
         this.menuManager = new MenuManager(this.gameState);
-        this.weaponSystem = new WeaponSystem(this.gameState);
+        this.particleEngine = new ParticleEngine();
+        this.weaponSystem = new WeaponSystem(this.gameState, this.particleEngine);
         this.enemySystem = new EnemySystem(this.gameState);
-        this.projectileSystem = new ProjectileSystem(this.gameState);
+        this.projectileSystem = new ProjectileSystem(this.gameState, this.particleEngine);
         this.playerController = new PlayerController(this.gameState, this.inputManager);
+
+        // Connect particle engine to systems that need it
+        this.enemySystem.setParticleEngine(this.particleEngine);
 
         // Initialize game loop with all systems
         const systems = [
             this.playerController,
             this.weaponSystem,
             this.enemySystem,
-            this.projectileSystem
+            this.projectileSystem,
+            this.particleEngine
         ];
         this.gameLoop = new GameLoop(this.gameState, systems, this.renderer);
     }
@@ -336,6 +342,7 @@ class DungeonCrawlerGame {
         this.gameState.reset();
         this.playerController.reset();
         this.projectileSystem.clear();
+        this.particleEngine.clear();
     }
 
     showCompletionScreen() {
