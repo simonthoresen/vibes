@@ -347,12 +347,60 @@ class DungeonCrawlerGame {
     }
 
     quitToMainMenu() {
-        this.showDoorTransition(() => {
-            this.resetGameState();
+        // Create custom zoom-out transition with game-over-background.png
+        const customTransition = document.createElement('div');
+        customTransition.style.position = 'fixed';
+        customTransition.style.top = '0';
+        customTransition.style.left = '0';
+        customTransition.style.width = '100%';
+        customTransition.style.height = '100%';
+        customTransition.style.background = 'url("images/game-over-background.png") center/cover no-repeat';
+        customTransition.style.zIndex = '2002';
+        customTransition.style.transform = 'scale(1)';
+        customTransition.style.transition = 'transform 1.5s ease';
+        document.body.appendChild(customTransition);
+        
+        // Create black overlay for fade effect
+        const blackOverlay = document.createElement('div');
+        blackOverlay.style.position = 'fixed';
+        blackOverlay.style.top = '0';
+        blackOverlay.style.left = '0';
+        blackOverlay.style.width = '100%';
+        blackOverlay.style.height = '100%';
+        blackOverlay.style.backgroundColor = 'black';
+        blackOverlay.style.opacity = '0';
+        blackOverlay.style.zIndex = '2003';
+        blackOverlay.style.transition = 'opacity 0.8s ease';
+        document.body.appendChild(blackOverlay);
+        
+        // Start both zoom out and fade to black immediately
+        customTransition.offsetHeight;
+        requestAnimationFrame(() => {
+            customTransition.style.transform = 'scale(0.1)'; // 1.5s duration
+            blackOverlay.style.opacity = '1'; // 0.8s duration
+        });
+        
+        // At 0.8s when screen is fully black, hide game over screen and reset game state
+        setTimeout(() => {
             this.hideGameOverScreen();
+            this.resetGameState();
             this.hideGameContainer();
             this.showMainMenu();
-        });
+        }, 800);
+        
+        // Complete transition and cleanup at 1.5s, then fade out black to reveal main menu
+        setTimeout(() => {
+            document.body.removeChild(customTransition);
+            
+            // Start fading out the black overlay to reveal the main menu
+            blackOverlay.style.transition = 'opacity 0.7s ease';
+            blackOverlay.style.opacity = '0';
+            
+            // Remove black overlay after fade completes
+            setTimeout(() => {
+                document.body.removeChild(blackOverlay);
+            }, 700);
+        }, 1500);
     }
 
     resetGameState() {
