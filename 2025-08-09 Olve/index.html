@@ -94,15 +94,27 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
+            background: url('images/game-over-background.png') center/cover no-repeat;
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
+            opacity: 0;
+            transition: opacity 2s ease;
+        }
+        #gameOver.visible {
+            opacity: 1;
         }
         #gameOver .content {
             text-align: center;
             color: white;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 1s ease, transform 1s ease;
+        }
+        #gameOver.visible .content {
+            opacity: 1;
+            transform: translateY(0);
         }
         #gameOver h1 {
             font-size: 64px;
@@ -127,6 +139,54 @@
         #gameOver button:hover {
             background-color: #ff6666;
             transform: scale(1.1);
+        }
+        .door-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('images/dungeon-door-open.png') center/cover no-repeat;
+            opacity: 0;
+            transform: scale(1);
+            transition: opacity 0.5s ease, transform 1.2s ease;
+            transition-delay: 0s, 0.8s;
+            z-index: 2001;
+            pointer-events: none;
+        }
+        .door-transition.active {
+            opacity: 1;
+            transform: scale(5);
+        }
+        .gameover-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('images/dungeon-door-open-game-over-version.png') center/cover no-repeat;
+            opacity: 0;
+            transform: scale(1);
+            transition: opacity 0.5s ease, transform 1.2s ease;
+            transition-delay: 0s, 0.8s;
+            z-index: 1001;
+            pointer-events: none;
+            display: none;
+        }
+        .gameover-transition.active {
+            opacity: 1;
+            transform: scale(5);
+        }
+        #deathOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            pointer-events: none;
+            z-index: 999;
+            transition: background-color 2s ease;
         }
         #pauseMenu {
             position: fixed;
@@ -270,13 +330,19 @@
             <button class="pause-button" onclick="closeSettings()">Back</button>
         </div>
     </div>
+    <div class="door-transition"></div>
+    <div class="gameover-transition"></div>
+    <div id="deathOverlay"></div>
     <div id="gameOver">
         <div class="content">
             <h1>GAME OVER</h1>
             <div class="stats">
                 Floors Cleared: <span id="floorsCleared">0</span>
             </div>
-            <button onclick="location.reload()">Try Again</button>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <button id="tryAgain">Try Again</button>
+                <button id="quitToMenu" style="background-color: #333;">Quit to Menu</button>
+            </div>
         </div>
     </div>
     <div id="gameContainer" style="display: none;">
@@ -478,7 +544,7 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background-color: rgba(0, 0, 0, 0.9);
+                background: url('images/dungeon-door.png') center/cover no-repeat;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -487,9 +553,7 @@
 
             const content = document.createElement('div');
             content.style.cssText = `
-                background-color: rgba(20, 20, 20, 0.95);
                 padding: 40px;
-                border-radius: 15px;
                 text-align: center;
                 min-width: 300px;
             `;
@@ -706,11 +770,32 @@
         }
 
         function startGame() {
-            // Ensure clean game state
-            gameLoopRunning = false;
-            document.getElementById('mainMenu').style.display = 'none';
-            gameState.gameStarted = true;
-            setupWeaponSelection(false);
+            const mainMenu = document.getElementById('mainMenu');
+            const doorTransition = document.querySelector('.door-transition');
+            
+            // Show and start the transition immediately
+            doorTransition.style.display = 'block';
+            doorTransition.style.backgroundColor = 'transparent';
+            
+            // Force a reflow to ensure the transition starts
+            doorTransition.offsetHeight;
+            
+            // Start transition
+            doorTransition.classList.add('active');
+            
+            // Add black background near the end of the zoom
+            setTimeout(() => {
+                doorTransition.style.backgroundColor = 'black';
+            }, 1700);
+            
+            // After transition completes
+            setTimeout(() => {
+                mainMenu.style.display = 'none';
+                doorTransition.classList.remove('active');
+                doorTransition.style.display = 'none';
+                gameState.gameStarted = true;
+                setupWeaponSelection(false);
+            }, 2200);
         }
 
         // Setup weapon selection
@@ -794,6 +879,7 @@
                         container.style.display = 'none';
                         gameState.floorCleared = true;  // Move to next floor
                         gameLoopRunning = true;  // Ensure the game loop is running
+                        gameLoop();  // Restart the game loop
                     } else {
                         // First stop any existing game loop
                         gameLoopRunning = false;
@@ -1263,53 +1349,13 @@
             // Add weapon confirm button to the weapon section
             weaponSection.appendChild(confirmButton);
 
-            const unlockSurvivorButton = document.createElement('button');
-            unlockSurvivorButton.textContent = 'Unlock Survivor Mode';
-            unlockSurvivorButton.style.cssText = buttonStyle;
-            
-            // Add hover effect for unlock survivor mode button
-            unlockSurvivorButton.addEventListener('mouseenter', () => {
-                unlockSurvivorButton.style.transform = 'scale(1.05)';
-                unlockSurvivorButton.style.backgroundColor = '#2a5';
-            });
-            
-            unlockSurvivorButton.addEventListener('mouseleave', () => {
-                unlockSurvivorButton.style.transform = 'scale(1)';
-                unlockSurvivorButton.style.backgroundColor = gameState.player.survivorUnlocked ? '#2a5' : '#333';
-            });
-            
-            unlockSurvivorButton.onclick = () => {
-                gameState.player.cheatsEnabled = true;
-                gameState.player.survivorUnlocked = true;
-                localStorage.setItem('survivorUnlocked', 'true');  // Save to localStorage
-                unlockSurvivorButton.style.backgroundColor = '#2a5';
-                unlockSurvivorButton.textContent = 'Survivor Mode Unlocked!';
-                
-                // Update survivor mode button in main menu if it exists
-                const survivorButton = document.querySelector('#mainMenu button:nth-child(3)');
-                if (survivorButton) {
-                    survivorButton.textContent = 'Survivor Mode';
-                    survivorButton.style.opacity = '1';
-                    
-                    // Add hover effects to the open world button
-                    openWorldButton.addEventListener('mouseenter', () => {
-                        openWorldButton.style.transform = 'scale(1.05)';
-                        openWorldButton.style.backgroundColor = '#444';
-                    });
-                    
-                    openWorldButton.addEventListener('mouseleave', () => {
-                        openWorldButton.style.transform = 'scale(1)';
-                        openWorldButton.style.backgroundColor = '#333';
-                    });
-                }
-            };
+
 
             content.appendChild(title);
             content.appendChild(weaponSection);
             content.appendChild(floorSection);
             content.appendChild(invincibilityButton);
             content.appendChild(unlockSkinsButton);
-            content.appendChild(unlockSurvivorButton);
             content.appendChild(oneHitKillButton);
             content.appendChild(closeButton);
             cheatMenu.appendChild(content);
@@ -1383,7 +1429,7 @@
         });
 
         function attack() {
-            if (gameState.isPaused) return;
+            if (gameState.isPaused || gameState.player.health <= 0 || gameState.deathSequence) return;
             
             const now = Date.now();
             const playerCenterX = gameState.player.x + gameState.player.width/2;
@@ -1484,19 +1530,40 @@
                         });
                     }
                 } else if (weapon.type === 'melee') {
-                    const dx = closestEnemy.x + closestEnemy.width/2 - playerCenterX;
-                    const dy = closestEnemy.y + closestEnemy.height/2 - playerCenterY;
-                    const angleToEnemy = Math.atan2(dy, dx);
+                    // Check corners and center of enemy hitbox
+                    const checkPoints = [
+                        { x: closestEnemy.x, y: closestEnemy.y }, // Top-left
+                        { x: closestEnemy.x + closestEnemy.width, y: closestEnemy.y }, // Top-right
+                        { x: closestEnemy.x, y: closestEnemy.y + closestEnemy.height }, // Bottom-left
+                        { x: closestEnemy.x + closestEnemy.width, y: closestEnemy.y + closestEnemy.height }, // Bottom-right
+                        { x: closestEnemy.x + closestEnemy.width/2, y: closestEnemy.y + closestEnemy.height/2 } // Center
+                    ];
+
+                    // Check if any point is within the arc
+                    let isInArc = false;
+                    for (const point of checkPoints) {
+                        const dx = point.x - playerCenterX;
+                        const dy = point.y - playerCenterY;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const angleToPoint = Math.atan2(dy, dx);
+                        
+                        let angleDiff = angleToPoint - gameState.player.rotation;
+                        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                        
+                        // Increased arc size and damage with more swords
+                        const scaledArcSize = weapon.arcSize * (1 + (count - 1) * 0.5);
+                        const scaledRange = weapon.range * (1 + (count - 1) * 0.5);
+                        
+                        if (Math.abs(angleDiff) <= scaledArcSize/2 && distance <= scaledRange) {
+                            isInArc = true;
+                            break;
+                        }
+                    }
                     
-                    let angleDiff = angleToEnemy - gameState.player.rotation;
-                    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-                    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-                    
-                    // Increased arc size and damage with more swords
-                    const scaledArcSize = weapon.arcSize * (1 + (count - 1) * 0.5);
                     const scaledDamage = weapon.damage * count;
                     
-                    if (Math.abs(angleDiff) <= scaledArcSize/2) {
+                    if (isInArc) {
                         // Apply one-hit kill if enabled
                         closestEnemy.health -= gameState.player.oneHitKill ? closestEnemy.maxHealth : scaledDamage;
                         closestEnemy.hitTime = now;
@@ -1511,12 +1578,13 @@
                 return;
             }
             
-            // Update player movement using keybinds
+            // Update player movement using keybinds with time scaling
+            const timeScale = gameState.timeScale || 1;
             const keybinds = gameState.settings.keybinds;
-            if (keys[keybinds.up]) gameState.player.y -= gameState.player.speed;
-            if (keys[keybinds.down]) gameState.player.y += gameState.player.speed;
-            if (keys[keybinds.left]) gameState.player.x -= gameState.player.speed;
-            if (keys[keybinds.right]) gameState.player.x += gameState.player.speed;
+            if (keys[keybinds.up]) gameState.player.y -= gameState.player.speed * timeScale;
+            if (keys[keybinds.down]) gameState.player.y += gameState.player.speed * timeScale;
+            if (keys[keybinds.left]) gameState.player.x -= gameState.player.speed * timeScale;
+            if (keys[keybinds.right]) gameState.player.x += gameState.player.speed * timeScale;
             
             // Automatic attacking
             attack();
@@ -1689,8 +1757,9 @@
                 
                 if (dist > 0) {
                     // Move enemy and handle screen wrapping
-                    enemy.x += (dx / dist) * enemy.speed;
-                    enemy.y += (dy / dist) * enemy.speed;
+                    const timeScale = gameState.timeScale || 1;
+                    enemy.x += (dx / dist) * enemy.speed * timeScale;
+                    enemy.y += (dy / dist) * enemy.speed * timeScale;
                     
                     // Wrap around screen edges
                     if (enemy.x < 0) enemy.x = CANVAS_WIDTH;
@@ -1750,7 +1819,7 @@
             if (!gameState.player.invulnerable && !gameState.isPaused) {
                 gameState.enemies.forEach(enemy => {
                     if (detectCollision(gameState.player, enemy)) {
-                        gameState.player.health -= enemy.damage;
+                        gameState.player.health = Math.max(0, gameState.player.health - enemy.damage);
                         gameState.player.invulnerable = true;
                         gameState.player.lastHit = Date.now();
                         
@@ -1758,10 +1827,123 @@
                             `HP: ${Math.round(gameState.player.health)}/${gameState.player.maxHealth}`;
                             
                         // Check for game over
-                        if (gameState.player.health <= 0) {
-                            gameLoopRunning = false;
-                            document.getElementById('floorsCleared').textContent = gameState.currentFloor;
-                            document.getElementById('gameOver').style.display = 'flex';
+                        if (gameState.player.health <= 0 && !gameState.deathSequence) {
+                            // Start death sequence
+                            gameState.deathSequence = true;
+                            gameState.deathTime = Date.now();
+                            gameState.timeScale = 1;
+                            
+                            // Add red overlay
+                            const overlay = document.getElementById('deathOverlay');
+                            overlay.style.backgroundColor = 'rgba(255, 0, 0, 0)';
+                            setTimeout(() => {
+                                overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.6)';
+                                
+                                // After brief red flash, show game over screen
+                                setTimeout(() => {
+                                    overlay.style.backgroundColor = 'transparent';
+                                    document.getElementById('floorsCleared').textContent = gameState.currentFloor;
+                                    const gameOver = document.getElementById('gameOver');
+                                    gameOver.style.display = 'flex';
+                                    
+                                    // Set up try again button
+                                    const tryAgainBtn = document.getElementById('tryAgain');
+                                    const quitToMenuBtn = document.getElementById('quitToMenu');
+                                    const doorTransition = document.querySelector('.gameover-transition');
+                                    const deathOverlay = document.getElementById('deathOverlay');
+
+                                    if (!tryAgainBtn || !quitToMenuBtn || !doorTransition || !gameOver || !deathOverlay) {
+                                        console.error('Required elements not found');
+                                        return;
+                                    }
+
+                                    tryAgainBtn.onclick = () => {
+                                        // Start door transition immediately
+                                        requestAnimationFrame(() => {
+                                            doorTransition.style.display = 'block';
+                                            doorTransition.style.backgroundColor = 'transparent';
+                                            doorTransition.offsetHeight; // Force reflow
+                                            doorTransition.classList.add('active');
+                                            
+                                            // Fade out game over screen while door transition is playing
+                                            gameOver.classList.remove('visible');
+                                            setTimeout(() => {
+                                                gameOver.style.display = 'none';
+                                            }, 500);
+                                            
+                                            // Add black background near the end of the transition
+                                            setTimeout(() => {
+                                                doorTransition.style.backgroundColor = 'black';
+                                                
+                                                    // Reset game state
+                                                    setTimeout(() => {
+                                                    // Reset the game state completely
+                                                    gameState.player.health = gameState.player.maxHealth;
+                                                    gameState.player.weapons = [];
+                                                    gameState.enemies = [];
+                                                    gameState.projectiles = [];
+                                                    gameState.deathSequence = false;
+                                                    gameState.currentFloor = 0;  // Start at 0 because it will be incremented to 1
+                                                    gameState.enemyHPMultiplier = 1;
+                                                    gameState.floorCleared = true;  // This will trigger floor 1 to be initialized
+                                                    gameLoopRunning = false;                                                    // Reset UI elements
+                                                    deathOverlay.style.backgroundColor = 'transparent';
+                                                    doorTransition.style.display = 'none';
+                                                    doorTransition.classList.remove('active');
+                                                    doorTransition.style.backgroundColor = 'transparent';
+                                                    
+                                                    // Show weapon selection screen
+                                                    document.getElementById('weaponSelect').style.display = 'flex';
+                                                    setupWeaponSelection(false);
+                                                    
+                                                    // Hide game container
+                                                    document.getElementById('gameContainer').style.display = 'none';
+                                                }, 500);
+                                            }, 1700);
+                                        });
+                                    };
+                                    
+                                    // Set up quit to menu button
+                                    quitToMenuBtn.onclick = () => {
+                                        gameOver.classList.remove('visible');
+                                        setTimeout(() => {
+                                            gameOver.style.display = 'none';
+                                            
+                                            // Reset the game state completely (same as Try Again)
+                                            gameState.player.health = gameState.player.maxHealth;
+                                            gameState.player.weapons = [];
+                                            gameState.enemies = [];
+                                            gameState.projectiles = [];
+                                            gameState.deathSequence = false;
+                                            gameState.currentFloor = 0;  // Start at 0 because it will be incremented to 1
+                                            gameState.enemyHPMultiplier = 1;
+                                            gameState.floorCleared = true;  // This will trigger floor 1 to be initialized
+                                            gameLoopRunning = false;
+                                            gameState.isPaused = false;
+                                            gameState.gameStarted = false;
+                                            
+                                            // Reset UI elements
+                                            deathOverlay.style.backgroundColor = 'transparent';
+                                            
+                                            // Return to main menu
+                                            returnToMainMenu();
+                                        }, 500);
+                                    };
+
+                                    setTimeout(() => {
+                                        gameOver.classList.add('visible');
+                                    }, 100);
+                                    gameLoopRunning = false;
+                                }, 400);
+                            }, 100);
+                        }
+                        
+                        // Slow down time during death sequence
+                        if (gameState.deathSequence && gameLoopRunning) {
+                            const timeSinceDeath = Date.now() - gameState.deathTime;
+                            if (timeSinceDeath < 2000) {  // First 2 seconds
+                                gameState.timeScale = Math.max(0.1, 1 - (timeSinceDeath / 2000));
+                            }
                         }
                     }
                 });
@@ -2147,9 +2329,7 @@
 
         // Initialize menus and start game
         setupMainMenu();
-        setupSkinMenu();
-
-        // Core game rendering functions
+        setupSkinMenu();        // Core game rendering functions
         function renderPlayer() {
             // Draw player body
             ctx.fillStyle = gameState.player.color || '#00F';
@@ -2241,7 +2421,7 @@
 
                 // Check for collision with player
                 if (detectCollision(enemy, gameState.player) && !gameState.player.permanentInvulnerability) {
-                    gameState.player.health -= enemy.damage || 10;
+                    gameState.player.health = Math.max(0, gameState.player.health - (enemy.damage || 10));
                 }
             });
 
