@@ -88,6 +88,9 @@ class Player extends GameObject {
                 0, 5, 25 + Math.random() * 25, "white", "rect"
             ));
         }
+    // Wrap horizontally
+    if (this.pos.x < 0) this.pos.x = canvas.width;
+    if (this.pos.x > canvas.width) this.pos.x = 0;
     }
     draw() {
         ctx.fillStyle = "white";
@@ -102,7 +105,12 @@ class Player extends GameObject {
 }
 
 class Bullet extends GameObject {
-    update() { this.pos.y -= BULLET_SPEED; }
+    update() {
+        this.pos.y -= BULLET_SPEED;
+        // Wrap horizontally
+        if (this.pos.x < 0) this.pos.x = canvas.width;
+        if (this.pos.x > canvas.width) this.pos.x = 0;
+    }
     draw() {
         ctx.fillStyle = "white";
         ctx.beginPath();
@@ -125,6 +133,9 @@ class EnemyPlane extends GameObject {
         this.offset++;
         this.pos.x = Math.sin(this.offset / this.frequency) * this.amplitude + this.centerX;
         this.pos.y += this.velocity;
+        // Wrap horizontally
+        if (this.pos.x < 0) this.pos.x = canvas.width;
+        if (this.pos.x > canvas.width) this.pos.x = 0;
     }
     draw() {
         ctx.save();
@@ -148,19 +159,30 @@ class Turret extends GameObject {
     constructor(x, y) {
         super(x, y);
         this.cooldown = 0;
+        this.pulse = 0; // Pulsate effect timer
     }
     update() {
         if (this.cooldown-- <= 0) {
             const dir = player.pos.sub(this.pos).normalize();
             enemyBullets.push(new EnemyBullet(this.pos.x, this.pos.y, dir.x * ENEMY_BULLET_SPEED, dir.y * ENEMY_BULLET_SPEED));
             this.cooldown = 90;
+            this.pulse = 15; // Start pulsate effect
         }
+        if (this.pulse > 0) this.pulse--;
         this.pos.y += 1;
+        // Wrap horizontally
+        if (this.pos.x < 0) this.pos.x = canvas.width;
+        if (this.pos.x > canvas.width) this.pos.x = 0;
     }
     draw() {
         ctx.fillStyle = "green";
+        let radius = 20;
+        if (this.pulse > 0) {
+            // Pulsate: increase radius, then shrink
+            radius += Math.sin((15 - this.pulse) / 15 * Math.PI) * 10;
+        }
         ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, 20, 0, Math.PI * 2);
+        ctx.arc(this.pos.x, this.pos.y, radius, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -170,7 +192,12 @@ class EnemyBullet extends GameObject {
         super(x, y);
         this.vel = new Vector(dx, dy);
     }
-    update() { this.pos = this.pos.add(this.vel); }
+    update() {
+        this.pos = this.pos.add(this.vel);
+        // Wrap horizontally
+        if (this.pos.x < 0) this.pos.x = canvas.width;
+        if (this.pos.x > canvas.width) this.pos.x = 0;
+    }
     draw() {
         ctx.fillStyle = "green";
         ctx.beginPath();
@@ -191,6 +218,9 @@ class Particle extends GameObject {
     update() {
         this.pos = this.pos.add(this.vel);
         this.lifetime--;
+        // Wrap horizontally
+        if (this.pos.x < 0) this.pos.x = canvas.width;
+        if (this.pos.x > canvas.width) this.pos.x = 0;
     }
     draw() {
         const alpha = Math.max(0, this.lifetime / PARTICLE_LIFETIME);
