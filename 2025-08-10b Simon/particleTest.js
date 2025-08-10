@@ -115,9 +115,9 @@
             count: 40,
             shape: 'circle',
             color: '#ff2222',
-            size: 5,
+            size: 10,
             speed: 180,
-            lifetime: 0.5,
+            lifetime: 1.0,
             direction,
             spread: Math.PI / 6
         });
@@ -137,9 +137,9 @@
             count: 40,
             shape: 'square',
             color: '#22ff22',
-            size: 5,
+            size: 10,
             speed: 180,
-            lifetime: 0.5,
+            lifetime: 1.0,
             direction,
             spread: Math.PI / 6
         });
@@ -159,9 +159,9 @@
             count: 40,
             shape: 'triangle',
             color: '#2222ff',
-            size: 5,
+            size: 10,
             speed: 180,
-            lifetime: 0.5,
+            lifetime: 1.0,
             direction,
             spread: Math.PI / 6
         });

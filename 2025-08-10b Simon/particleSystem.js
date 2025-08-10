@@ -1,11 +1,12 @@
 // Particle System for 2D Game Engine
 class Particle {
-    constructor({ x, y, shape, color, size, speed, direction, rotation, lifetime, rotationSpeed }) {
+    constructor({ x, y, shape, color, size, speed, direction, rotation, lifetime, rotationSpeed, shrinkInsteadOfFade }) {
         this.x = x;
         this.y = y;
         this.shape = shape; // 'circle', 'triangle', 'square'
         this.color = color;
         this.size = size;
+        this.initialSize = size;
         this.speed = speed;
         this.direction = direction; // radians
         this.rotation = rotation || 0; // radians
@@ -15,17 +16,26 @@ class Particle {
         this.vx = Math.cos(direction) * speed;
         this.vy = Math.sin(direction) * speed;
         this.rotationSpeed = (typeof rotationSpeed === 'number') ? rotationSpeed : (Math.random() * 2 - 1) * 2; // random between -2 and 2 rad/s
+        this.shrinkInsteadOfFade = !!shrinkInsteadOfFade;
     }
 
     update(dt) {
         this.x += this.vx * dt;
         this.y += this.vy * dt;
         this.age += dt;
-        this.alpha = Math.max(0, 1 - this.age / this.lifetime);
+        if (this.shrinkInsteadOfFade) {
+            this.size = Math.max(0, this.initialSize * (1 - this.age / this.lifetime));
+            this.alpha = 1;
+        } else {
+            this.alpha = Math.max(0, 1 - this.age / this.lifetime);
+        }
         this.rotation += this.rotationSpeed * dt;
     }
 
     isAlive() {
+        if (this.shrinkInsteadOfFade) {
+            return this.size > 0 && this.age < this.lifetime;
+        }
         return this.age < this.lifetime;
     }
 
@@ -130,20 +140,23 @@ class ParticleSystem {
     // Hit effect: directional explosion
     emitHitEffect({ x, y, count, shape, color, size, speed, lifetime, direction, spread }) {
         // direction: radians, spread: radians (e.g. Math.PI/6)
+        const adjustedSpread = spread * 1.5;
         for (let i = 0; i < count; i++) {
-            const angle = direction + (Math.random() - 0.5) * spread;
+            const angle = direction + (Math.random() - 0.5) * adjustedSpread;
             const randomSpeed = speed * (0.5 + Math.random());
-            const randomLifetime = lifetime * (0.7 + Math.random() * 0.6);
+            const randomLifetime = lifetime * (0.4 + Math.random() * 0.4); // random between 0.4x and 0.8x
+            const randomSize = size * (0.7 + Math.random() * 0.6); // random between 0.7x and 1.3x
             this.addParticle({
                 x,
                 y,
                 shape,
                 color,
-                size,
+                size: randomSize,
                 speed: randomSpeed,
                 direction: angle,
                 rotation: Math.random() * Math.PI * 2,
-                lifetime: randomLifetime
+                lifetime: randomLifetime,
+                shrinkInsteadOfFade: true
             });
         }
     }
