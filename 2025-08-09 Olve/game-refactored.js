@@ -10,7 +10,7 @@ import { ProjectileSystem } from './projectileSystem.js';
 import { PlayerController } from './playerController.js';
 import { GameLoop } from './gameLoop.js';
 import { ParticleEngine } from './particleEngine.js';
-import { KONAMI_CODE } from './constants.js';
+import { KONAMI_CODE, WEAPONS } from './constants.js';
 
 class DungeonCrawlerGame {
     constructor() {
@@ -486,7 +486,7 @@ class DungeonCrawlerGame {
         weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
         weaponSection.appendChild(weaponTitle);
 
-        const weapons = ['PIERCING_BOW', 'SWORD', 'SCYTHE', 'DRAGON_BOW', 'DRAGON_SWORD'];
+        const weapons = ['Piercing bow', 'Sword', 'Scythe', 'Dragon bow', 'Dragon sword'];
         
         // Add amount selector
         const amountControl = document.createElement('div');
@@ -508,22 +508,20 @@ class DungeonCrawlerGame {
         amountControl.appendChild(amountInput);
         weaponSection.appendChild(amountControl);
 
-        weapons.forEach(weaponId => {
+        weapons.forEach(weapon => {
             const weaponControl = document.createElement('div');
             weaponControl.style.cssText = 'margin-bottom: 10px; display: flex; align-items: center;';
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.id = weaponId + 'Check';
-            checkbox.checked = this.gameState.player.weapons.some(w => w.id === weaponId);
+            checkbox.id = weapon.replace(/\s+/g, '') + 'Check';
+            const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
+            checkbox.checked = this.gameState.player.weapons.some(w => w.id === weaponKey);
             checkbox.style.marginRight = '10px';
             
             const label = document.createElement('label');
-            label.htmlFor = weaponId + 'Check';
-            // Import WEAPONS from constants to get the display name
-            import('./constants.js').then(({ WEAPONS }) => {
-                label.textContent = WEAPONS[weaponId]?.name || weaponId;
-            });
+            label.htmlFor = weapon.replace(/\s+/g, '') + 'Check';
+            label.textContent = weapon;
             label.style.color = 'white';
             
             weaponControl.appendChild(checkbox);
@@ -543,17 +541,16 @@ class DungeonCrawlerGame {
             this.gameState.player.weapons = [];
             
             // Add selected weapons with their stack amounts
-            weapons.forEach(weaponId => {
-                const checkbox = document.getElementById(weaponId + 'Check');
+            weapons.forEach(weapon => {
+                const checkbox = document.getElementById(weapon.replace(/\s+/g, '') + 'Check');
                 if (checkbox.checked) {
                     const amount = parseInt(amountInput.value);
                     for (let i = 0; i < amount; i++) {
-                        // Import WEAPONS to get weapon data
-                        import('./constants.js').then(({ WEAPONS }) => {
-                            const weaponData = {...WEAPONS[weaponId]};
-                            weaponData.id = weaponId;
-                            this.gameState.player.weapons.push(weaponData);
-                        });
+                        const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
+                        // Use the WEAPONS constant directly instead of async import
+                        const weaponData = {...WEAPONS[weaponKey]};
+                        weaponData.id = weaponKey;
+                        this.gameState.player.weapons.push(weaponData);
                     }
                 }
             });

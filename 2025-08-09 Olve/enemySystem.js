@@ -95,8 +95,15 @@ export class EnemySystem {
 
         // Remove dead enemies and check for floor completion
         const initialEnemyCount = this.gameState.enemies.length;
+        let killedBoss = false;
+        
         const aliveEnemies = this.gameState.enemies.filter(enemy => {
             if (enemy.health <= 0) {
+                // Check if we killed a boss
+                if (enemy.isBoss) {
+                    killedBoss = true;
+                }
+                
                 // Create death particle effect
                 if (this.particleEngine) {
                     const centerX = enemy.x + enemy.width / 2;
@@ -116,11 +123,8 @@ export class EnemySystem {
         }
 
         // Check for boss defeat and weapon reward
-        if (hadEnemies && this.gameState.enemies.length === 0) {
-            const wasLastEnemyBoss = this.gameState.enemies.some(enemy => enemy.isBoss);
-            if (wasLastEnemyBoss) {
-                this.handleBossDefeat();
-            }
+        if (killedBoss) {
+            this.handleBossDefeat();
         }
     }
 
