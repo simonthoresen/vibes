@@ -5,6 +5,8 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
+let gameMode = null; // 'story' or 'endless'
+
 // Key binding configuration
 const keyBindings = {
   up: 'w',
@@ -50,6 +52,14 @@ function hideMenu(menu) {
   menu.style.display = "none";
 }
 
+function showVictoryScreen() {
+  gameStarted = false;
+  const victoryScreen = document.getElementById("victoryScreen");
+  victoryScreen.style.display = "block";
+  canvas.style.display = "none";
+  document.getElementById("xpBarContainer").style.display = "none";
+}
+
 const keys = {};
 let gamePaused = false;
 let gameStarted = false;
@@ -77,11 +87,13 @@ let mouseX = WIDTH / 2;
 let mouseY = HEIGHT / 2;
 
 const startScreen = document.getElementById("startScreen");
-const startButton = document.getElementById("startButton");
 const highscoreStartDisplay = document.getElementById("highscoreStartDisplay");
 
 let highscore = localStorage.getItem("obeliskHighscore") || 0;
 highscoreStartDisplay.innerText = highscore;
+
+const loreButton = document.getElementById("loreButton");
+const endlessButton = document.getElementById("endlessButton");
 
 const obelisk = {
   x: WIDTH / 2,
@@ -97,7 +109,7 @@ const player = {
   x: WIDTH / 2,
   y: HEIGHT / 2 - 100,
   radius: 15,
-  speed: 2,
+  speed: 0.5,
   fireRate: 500,
   lastShot: 0,
   level: 1,
@@ -113,6 +125,7 @@ const player = {
   shieldTimer: 0,
   shieldBlinkTimer: 0,
   hasHeatSeek: false,
+  xpMultiplier: 1,
 };
 
 let enemies = [];
@@ -250,7 +263,7 @@ window.addEventListener("keydown", (e) => {
     konamiIndex++;
     if (konamiIndex === konamiCode.length) {
       konamiIndex = 0;
-      showCheatMenu();
+      showPasswordPanel();
     }
   } else {
     konamiIndex = 0;
@@ -325,10 +338,27 @@ document.querySelectorAll('.keybind-button').forEach(button => {
 // Load saved key bindings when the game starts
 loadKeyBindings();
 
-startButton.addEventListener("click", () => {
+function startGame() {
+  gameStarted = true;
+  gameRunning = true;
+  canvas.style.display = "block";
+  document.getElementById("xpBarContainer").style.display = "block";
+  requestAnimationFrame(gameLoop);
+}
+
+loreButton.addEventListener("click", () => {
   if (!gameStarted) {
+    gameMode = 'story';
     startScreen.style.display = "none";
     startCutscene();
+  }
+});
+
+endlessButton.addEventListener("click", () => {
+  if (!gameStarted) {
+    gameMode = 'endless';
+    startScreen.style.display = "none";
+    startGame();
   }
 });
 
@@ -345,6 +375,8 @@ function startCutscene() {
   const img = document.getElementById("cutsceneImage");
   const text = document.getElementById("cutsceneText");
 
+  canvas.style.display = "none";
+  document.getElementById("xpBarContainer").style.display = "none";
   cutscene.style.display = "block";
   currentCutsceneSlide = 0;
   img.src = cutsceneData[0].img;
@@ -367,33 +399,152 @@ function setPlayerLevel(level) {
   updateXPBar();
 }
 
-function showCheatMenu() {
+function showPasswordPanel() {
   gamePaused = true;
   const menu = document.getElementById("levelUpMenu");
-  showMenu(menu, true); // Use helper function with darker overlay
+  showMenu(menu, true);
   menu.innerHTML = `
     <div style="position: relative;">
       <button style="position: absolute; right: -10px; top: -10px; background: #333; color: red; border: none; width: 24px; height: 24px; border-radius: 12px; cursor: pointer; font-weight: bold; line-height: 24px; padding: 0;" 
         onclick="hideMenu(document.getElementById('levelUpMenu')); gamePaused = false;">✖</button>
-      <h2 style='color: gold'>🎮 Cheat Menu 🎮</h2>
+      <h2 style='color: gold'>🔒 Enter Password 🔒</h2>
+    </div>
+    <div style="margin: 20px 0;">
+      <input type="password" id="cheatPassword" style="width: 200px; padding: 5px; background: #333; color: white; border: 1px solid gold;">
+      <button onclick="checkCheatPassword()" style="margin-left: 10px; padding: 5px 10px; background: #444; color: gold; border: 1px solid gold; cursor: pointer;">Submit</button>
     </div>`;
+}
 
-  // Create level selector
-  const levelDiv = document.createElement("div");
-  levelDiv.className = "upgrade";
-  levelDiv.innerHTML = `
-    <div class="upgrade-name">Set Level</div>
-    <div class="upgrade-description">
-      Current Level: <input type="number" id="levelSelect" min="1" max="20" value="${player.level}" style="width: 60px; margin: 0 10px;">
-      <button style="padding: 5px 10px;" onclick="setPlayerLevel(parseInt(document.getElementById('levelSelect').value))">Set</button>
+function checkCheatPassword() {
+  const password = document.getElementById("cheatPassword").value;
+  if (password === "Shadow milks power") {
+    hideMenu(document.getElementById("levelUpMenu"));
+    showCheatMenu();
+  } else {
+    const input = document.getElementById("cheatPassword");
+    input.style.border = "1px solid red";
+    input.value = "";
+    input.placeholder = "Incorrect password";
+    setTimeout(() => {
+      input.style.border = "1px solid gold";
+      input.placeholder = "";
+    }, 1000);
+  }
+}
+
+function showCheatMenu() {
+  gamePaused = true;
+  const menu = document.getElementById("levelUpMenu");
+  showMenu(menu, true); // Use helper function with darker overlay
+  
+  menu.style.width = '90%'; // Make menu wider
+  menu.style.maxWidth = '1200px'; // But not too wide
+  menu.style.padding = '20px';
+  menu.style.boxSizing = 'border-box';
+  menu.style.display = 'flex';
+  menu.style.flexDirection = 'column';
+  menu.style.gap = '20px';
+  
+  menu.innerHTML = `
+    <div style="position: relative; text-align: center; margin-bottom: 20px;">
+      <button style="position: absolute; right: -10px; top: -10px; background: #333; color: red; border: none; width: 24px; height: 24px; border-radius: 12px; cursor: pointer; font-weight: bold; line-height: 24px; padding: 0;" 
+        onclick="hideMenu(document.getElementById('levelUpMenu')); gamePaused = false;">✖</button>
+      <h2 style='color: gold; margin: 0;'>🎮 Cheat Menu 🎮</h2>
+    </div>
+
+    <!-- Level Selector Section -->
+    <div style="text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 0 auto; width: fit-content;">
+      <div style="color: gold; font-size: 18px; margin-bottom: 10px;">Set Player Level</div>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+        Current Level: 
+        <input type="number" id="levelSelect" min="1" max="20" value="${player.level}" 
+          style="width: 60px; padding: 5px; background: #333; color: white; border: 1px solid gold;">
+        <button onclick="setPlayerLevel(parseInt(document.getElementById('levelSelect').value))"
+          style="padding: 5px 15px; background: #444; color: gold; border: 1px solid gold; cursor: pointer;">
+          Set Level
+        </button>
+      </div>
+    </div>
+
+    <!-- Upgrades Buttons Container -->
+    <div style="display: flex; justify-content: center; gap: 20px;">
+      <!-- Normal Upgrades Button -->
+      <button id="normalUpgradesBtn" 
+        style="padding: 15px 30px; 
+        background: rgba(0,255,255,0.1); 
+        border: 2px solid cyan; 
+        color: cyan; 
+        font-size: 18px; 
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;">
+        💠 Normal Upgrades
+      </button>
+
+      <!-- Legendary Upgrades Button -->
+      <button id="legendaryUpgradesBtn" 
+        style="padding: 15px 30px; 
+        background: rgba(255,215,0,0.1); 
+        border: 2px solid gold; 
+        color: gold; 
+        font-size: 18px; 
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;">
+        ⭐ Legendary Upgrades
+      </button>
+    </div>
+
+    <!-- Upgrades Containers (Hidden by default) -->
+    <div id="normalUpgradesPanel" style="display: none; margin-top: 20px;">
+      <div style="background: rgba(0,255,255,0.1); padding: 15px; border-radius: 10px; border: 2px solid cyan;">
+        <h3 style='text-align: center; color: cyan; margin: 0 0 15px 0;'>Normal Upgrades</h3>
+        <div id="normalUpgradesContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;"></div>
+      </div>
+    </div>
+
+    <div id="legendaryUpgradesPanel" style="display: none; margin-top: 20px;">
+      <div style="background: rgba(255,215,0,0.1); padding: 15px; border-radius: 10px; border: 2px solid gold;">
+        <h3 style='text-align: center; color: gold; margin: 0 0 15px 0;'>Legendary Upgrades</h3>
+        <div id="legendaryUpgradesContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;"></div>
+      </div>
     </div>
   `;
-  menu.appendChild(levelDiv);
 
-  // Add normal upgrades section header
-  const normalHeader = document.createElement("div");
-  normalHeader.innerHTML = "<h3 style='margin: 20px 0 10px 0; color: cyan'>Normal Upgrades</h3>";
-  menu.appendChild(normalHeader);
+  // Get containers and buttons
+  const normalContainer = document.getElementById('normalUpgradesContainer');
+  const legendaryContainer = document.getElementById('legendaryUpgradesContainer');
+  const normalBtn = document.getElementById('normalUpgradesBtn');
+  const legendaryBtn = document.getElementById('legendaryUpgradesBtn');
+  const normalPanel = document.getElementById('normalUpgradesPanel');
+  const legendaryPanel = document.getElementById('legendaryUpgradesPanel');
+
+  // Add button hover effects
+  [normalBtn, legendaryBtn].forEach(btn => {
+    btn.onmouseover = () => {
+      btn.style.transform = 'scale(1.05)';
+      btn.style.filter = 'brightness(1.2)';
+    };
+    btn.onmouseout = () => {
+      btn.style.transform = 'scale(1)';
+      btn.style.filter = 'brightness(1)';
+    };
+  });
+
+  // Add click handlers
+  normalBtn.onclick = () => {
+    normalPanel.style.display = normalPanel.style.display === 'none' ? 'block' : 'none';
+    legendaryPanel.style.display = 'none';
+    normalBtn.style.background = normalPanel.style.display === 'none' ? 'rgba(0,255,255,0.1)' : 'rgba(0,255,255,0.3)';
+    legendaryBtn.style.background = 'rgba(255,215,0,0.1)';
+  };
+
+  legendaryBtn.onclick = () => {
+    legendaryPanel.style.display = legendaryPanel.style.display === 'none' ? 'block' : 'none';
+    normalPanel.style.display = 'none';
+    legendaryBtn.style.background = legendaryPanel.style.display === 'none' ? 'rgba(255,215,0,0.1)' : 'rgba(255,215,0,0.3)';
+    normalBtn.style.background = 'rgba(0,255,255,0.1)';
+  };
 
   // Get and display normal upgrades
   const normalUpgrades = [
@@ -413,13 +564,26 @@ function showCheatMenu() {
   normalUpgrades.forEach(upg => {
     const div = document.createElement("div");
     div.className = "upgrade";
-    div.innerHTML = `<div class="upgrade-name">${upg.name}</div>`;
+    div.style.padding = "8px";
+    div.style.cursor = "pointer";
+    div.style.transition = "all 0.2s";
+    div.style.background = "rgba(0,0,0,0.2)";
+    div.style.border = "1px solid cyan";
+    div.style.borderRadius = "5px";
+    div.style.textAlign = "center";
+    div.style.minHeight = "40px";
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.justifyContent = "center";
+    div.innerHTML = `<div class="upgrade-name" style="font-size: 13px; color: cyan; line-height: 1.2;">${upg.name}</div>`;
+    div.onmouseover = () => div.style.transform = "scale(1.02)";
+    div.onmouseout = () => div.style.transform = "scale(1)";
     div.onclick = () => {
       upg.apply();
-      div.style.backgroundColor = "rgba(0, 255, 0, 0.2)";
-      setTimeout(() => div.style.backgroundColor = "", 200);
+      div.style.backgroundColor = "rgba(0, 255, 255, 0.2)";
+      setTimeout(() => div.style.backgroundColor = "rgba(0,0,0,0.2)", 200);
     };
-    menu.appendChild(div);
+    normalContainer.appendChild(div);
   });
 
   // Add legendary upgrades section header
@@ -433,20 +597,33 @@ function showCheatMenu() {
     { name: "Ultra Magnet", apply: () => player.magnetStrength *= 20 },
     { name: "Mega Health +20", apply: () => { player.maxHealth += 20; player.health += 20; } },
     { name: "Double Damage", apply: () => player.bulletDamage *= 2 },
-    { name: "Rapid Fire", apply: () => player.fireRate *= 0.5 }
+    { name: "Rapid Fire", apply: () => player.fireRate *= 0.5 },
+    { name: "Double XP", apply: () => player.xpMultiplier *= 2 }
   ];
 
   legendaryUpgrades.forEach(upg => {
     const div = document.createElement("div");
     div.className = "upgrade";
+    div.style.padding = "8px";
+    div.style.cursor = "pointer";
+    div.style.transition = "all 0.2s";
+    div.style.background = "rgba(0,0,0,0.2)";
     div.style.border = "1px solid gold";
-    div.innerHTML = `<div class="upgrade-name" style="color: gold">⭐ ${upg.name}</div>`;
+    div.style.borderRadius = "5px";
+    div.style.textAlign = "center";
+    div.style.minHeight = "40px";
+    div.style.display = "flex";
+    div.style.alignItems = "center";
+    div.style.justifyContent = "center";
+    div.innerHTML = `<div class="upgrade-name" style="color: gold; font-size: 13px; line-height: 1.2;">⭐ ${upg.name}</div>`;
+    div.onmouseover = () => div.style.transform = "scale(1.02)";
+    div.onmouseout = () => div.style.transform = "scale(1)";
     div.onclick = () => {
       upg.apply();
       div.style.backgroundColor = "rgba(255, 215, 0, 0.2)";
-      setTimeout(() => div.style.backgroundColor = "", 200);
+      setTimeout(() => div.style.backgroundColor = "rgba(0,0,0,0.2)", 200);
     };
-    menu.appendChild(div);
+    legendaryContainer.appendChild(div);
   });
 
   // Note: Close button removed in favor of corner X and ESC key
@@ -497,6 +674,9 @@ canvas.addEventListener("mousemove", (e) => {
 function update(deltaTime) {
   if (gamePaused) return;
 
+  // Ensure deltaTime is reasonable (cap at 32ms to prevent huge jumps)
+  deltaTime = Math.min(deltaTime, 32);
+
   // Update shield timer
   if (player.shieldActive) {
     player.shieldTimer -= deltaTime;
@@ -521,7 +701,7 @@ function update(deltaTime) {
   shootProjectiles(deltaTime);
   spawnEnemies(deltaTime);
   updateEnemies(deltaTime);
-  updateBullets();
+  updateBullets(deltaTime);
   updateXPOrbs();
   checkCollisions();
 
@@ -546,7 +726,7 @@ function draw() {
 
 
 
-function movePlayer() {
+function movePlayer(deltaTime = 16.67) {
   let dx = 0;
   let dy = 0;
   if (keys[keyBindings.up]) dy -= 1;
@@ -557,8 +737,9 @@ function movePlayer() {
     const length = Math.hypot(dx, dy);
     dx /= length;
     dy /= length;
-    player.x += dx * player.speed;
-    player.y += dy * player.speed;
+    const timeScale = deltaTime / 16.67; // normalize to 60fps
+    player.x += dx * player.speed * timeScale;
+    player.y += dy * player.speed * timeScale;
   }
   player.x = Math.max(0, Math.min(WIDTH, player.x));
   player.y = Math.max(0, Math.min(HEIGHT, player.y));
@@ -622,7 +803,7 @@ function shootProjectiles(deltaTime) {
       x: player.x,
       y: player.y,
       angle,
-      speed: 4,
+      speed: 6,
       radius: player.bulletSize, // Use player's bullet size instead of fixed value
       damage: player.bulletDamage,
       isHeatSeeking: player.hasHeatSeek,
@@ -633,7 +814,9 @@ function shootProjectiles(deltaTime) {
   });
 }
 
-function updateBullets() {
+function updateBullets(deltaTime = 16.67) { // Default to 60fps if no deltaTime
+  const timeScale = deltaTime / 16.67; // Normalize to 60fps
+
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
 
@@ -691,9 +874,9 @@ function updateBullets() {
       }
     }
 
-    // Move bullet
-    b.x += Math.cos(b.angle) * b.speed;
-    b.y += Math.sin(b.angle) * b.speed;
+    // Move bullet with delta time compensation
+    b.x += Math.cos(b.angle) * b.speed * timeScale;
+    b.y += Math.sin(b.angle) * b.speed * timeScale;
   }
 }
 
@@ -736,14 +919,20 @@ function createEnemy() {
 }
 
 function spawnBoss() {
+  // Calculate level-based multipliers (gets stronger each boss fight)
+  const bossLevel = Math.floor(player.level / 5);
+  const healthMultiplier = 1 + (bossLevel * 0.5); // Each boss is 50% stronger than the last
+  const speedMultiplier = 1 + (bossLevel * 0.2); // Each boss is 20% faster than the last
+
   enemies.push({
     x: Math.random() * WIDTH,
     y: -40,
-    radius: 30,
-    speed: enemySpeed * 0.5,
-    health: 10 * enemyHealthMultiplier,
-    maxHealth: 10 * enemyHealthMultiplier,
+    radius: 35, // Slightly larger
+    speed: enemySpeed * 0.8 * speedMultiplier, // Faster than before but still manageable
+    health: 15 * enemyHealthMultiplier * healthMultiplier, // Much more health
+    maxHealth: 15 * enemyHealthMultiplier * healthMultiplier,
     isBoss: true,
+    damageMultiplier: 1 + (bossLevel * 0.3), // Bosses deal more damage as levels progress
   });
 }
 
@@ -808,11 +997,24 @@ function drawXPOrbs() {
 }
 
 function gainXP(amount) {
-  player.xp += amount;
+  // In story mode, don't gain XP after level 20
+  if (gameMode === 'story' && player.level >= 20) {
+    return;
+  }
+
+  const multipliedAmount = Math.floor(amount * player.xpMultiplier);
+  player.xp += multipliedAmount;
   updateXPBar();
   if (player.xp >= player.xpToLevel) {
     player.xp -= player.xpToLevel;
     player.level++;
+    
+    // Check for story mode completion
+    if (gameMode === 'story' && player.level >= 20) {
+      gameOver(true); // Pass true to indicate victory
+      return;
+    }
+    
     player.xpToLevel = Math.floor(player.xpToLevel * 1.4);
     if (player.level % 5 === 0) {
       inBossFight = true;
@@ -841,6 +1043,13 @@ function checkCollisions() {
         if (enemy.isBoss && enemy.health <= 0) {
           bossActive = false;
           inBossFight = false;
+          
+          // Victory condition for story mode level 20
+          if (gameMode === 'story' && player.level >= 20) {
+            showVictoryScreen();
+            return;
+          }
+          
           enemyHealthMultiplier *= 2;
           obeliskDamageMultiplier *= 2;
           showLegendaryUpgradeMenu();
@@ -851,7 +1060,9 @@ function checkCollisions() {
             player.shieldTime = player.killShieldDuration;
           }
           spawnDeathParticles(enemy.x, enemy.y);
-          xpOrbs.push({ x: enemy.x, y: enemy.y, value: 3 });
+          // Bosses give more XP, scaled with level
+          const xpValue = enemy.isBoss ? 10 + Math.floor(player.level / 5) * 5 : 3;
+          xpOrbs.push({ x: enemy.x, y: enemy.y, value: xpValue });
           enemies.splice(i, 1);
         }
         break;
@@ -861,22 +1072,31 @@ function checkCollisions() {
     const dx = obelisk.x - enemy.x;
     const dy = obelisk.y - enemy.y;
     if (Math.hypot(dx, dy) < obelisk.radius + enemy.radius) {
-      // Calculate damage after shield
-      let damage = Math.round(1 * obeliskDamageMultiplier);
-      if (obelisk.hasShield && obelisk.shieldDefense > 0) {
-        // Shield absorbs damage and is reduced
-        if (damage <= obelisk.shieldDefense) {
-          // Shield absorbs all damage
-          obelisk.shieldDefense -= damage;
-          damage = 0;
-        } else {
-          // Shield breaks and remaining damage goes through
-          damage -= obelisk.shieldDefense;
-          obelisk.shieldDefense = 0;
-          obelisk.hasShield = false;
+      if (enemy.isBoss) {
+        // If a boss hits the obelisk, instant game over
+        obelisk.health = 0;
+        gameStarted = false;
+        gameRunning = false;
+        canvas.style.display = "none"; // Hide the game canvas
+        gameOver(false);  // Show game over screen with defeat condition
+      } else {
+        // Regular enemies do normal damage
+        let damage = Math.round(1 * obeliskDamageMultiplier * (enemy.damageMultiplier || 1));
+        if (obelisk.hasShield && obelisk.shieldDefense > 0) {
+          // Shield absorbs damage and is reduced
+          if (damage <= obelisk.shieldDefense) {
+            // Shield absorbs all damage
+            obelisk.shieldDefense -= damage;
+            damage = 0;
+          } else {
+            // Shield breaks and remaining damage goes through
+            damage -= obelisk.shieldDefense;
+            obelisk.shieldDefense = 0;
+            obelisk.hasShield = false;
+          }
         }
+        obelisk.health -= damage;
       }
-      obelisk.health -= damage;
       enemies.splice(i, 1);
     }
 
@@ -976,34 +1196,78 @@ function showLegendaryUpgradeMenu() {
   menu.style.display = "block";
 }
 
-function gameOver() {
+function gameOver(victory = false) {
   const screen = document.getElementById("gameOverScreen");
   const currentLevelDisplay = document.getElementById("currentLevelDisplay");
   const finalHighscoreDisplay = document.getElementById("finalHighscoreDisplay");
+  const header = screen.querySelector("h2");
+  const message = document.getElementById("gameOverMessage");
+  
+  // Ensure the game over screen is visible
+  screen.style.display = "block";
+  canvas.style.display = "none";
 
-  // Show final level
-  currentLevelDisplay.innerText = player.level;
+  // Set the message based on game mode and outcome
+  if (gameMode === 'story') {
+    if (victory) {
+      header.innerText = "Victory!";
+      header.style.color = "#00ff00";
+      message.innerText = "You have defeated the Obelisk and saved the realm!";
+      currentLevelDisplay.innerText = player.level;
+    } else {
+      header.innerText = "Game Over";
+      header.style.color = "#ff0000";
+      message.innerText = "The darkness has prevailed... Try again!";
+      currentLevelDisplay.innerText = player.level;
+    }
+  } else {
+    header.innerText = "Game Over";
+    header.style.color = "#ffffff";
+    currentLevelDisplay.innerText = player.level;
+  }
 
   // Check and update highscore
-  if (player.level > highscore) {
+  const storedHighscore = localStorage.getItem("obeliskHighscore") || "0";
+  const currentHighscore = parseInt(storedHighscore);
+  
+  if (player.level > currentHighscore) {
+    // New highscore achieved!
     highscore = player.level;
     localStorage.setItem("obeliskHighscore", highscore);
+    finalHighscoreDisplay.style.color = "#ffd700"; // Gold color
+    finalHighscoreDisplay.innerText = highscore + " (New Record!)";
+  } else {
+    // Display current highscore
+    finalHighscoreDisplay.style.color = "#ffffff";
+    finalHighscoreDisplay.innerText = currentHighscore;
   }
-  finalHighscoreDisplay.innerText = highscore;
 
-  // Update text depending on win or game over
-  const header = screen.querySelector("h2");
+  // Get the restart button reference
   const restartButton = document.getElementById("restartButton");
-  const resumeButton = document.createElement("button");
-  resumeButton.className = "start-button";
-  resumeButton.id = "resumeFromVictory";
-  resumeButton.innerText = "Resume";
+  
+  // Main menu button handler
+  mainMenuBtn.onclick = () => {
+    screen.style.display = "none";
+    document.getElementById("startScreen").style.display = "block";
+    canvas.style.display = "none";
+    document.getElementById("xpBarContainer").style.display = "none";
+    gameStarted = false;
+    gameRunning = false;
+    // Reset all game state
+    player.level = 1;
+    player.xp = 0;
+    player.xpToLevel = 10;
+    enemies = [];
+    bullets = [];
+    xpOrbs = [];
+  };
 
-  // Create main menu button
-  const mainMenuButton = document.createElement("button");
-  mainMenuButton.className = "start-button";
-  mainMenuButton.id = "mainMenuButton";
+  // Buttons are already created in the HTML
   mainMenuButton.innerText = "Main Menu";
+  mainMenuButton.style.marginLeft = "10px";
+  mainMenuButton.style.display = "inline-block";
+  
+  // Set up main menu button click handler
   mainMenuButton.onclick = () => {
     // Hide game over screen and show start screen
     screen.style.display = "none";
@@ -1013,12 +1277,13 @@ function gameOver() {
     
     // Reset all game state variables
     gameStarted = false;
+    gameRunning = false;
     gamePaused = false;
     fadingIn = false;
     fadingOut = false;
     fadeOpacity = 0;
     
-    // Reset game objects
+    // Reset game objects and player stats
     player.x = WIDTH / 2;
     player.y = HEIGHT / 2 - 100;
     player.level = 1;
@@ -1029,7 +1294,12 @@ function gameOver() {
     player.multiShot = 0;
     player.magnetStrength = 0.05;
     player.fireRate = 500;
-    player.speed = 2;
+    player.speed = 0.8; // Keep the updated speed value
+    player.shieldActive = false;
+    player.shieldTimer = 0;
+    player.shieldBlinkTimer = 0;
+    player.hasHeatSeek = false;
+    player.xpMultiplier = 1;
     
     obelisk.x = WIDTH / 2;
     obelisk.y = HEIGHT / 2;
@@ -1056,15 +1326,19 @@ function gameOver() {
     requestAnimationFrame(gameLoop);
   };
   
+  // Game over buttons are now handled in HTML
+
   if (player.level >= 20) {
     header.innerText = "🎉 YOU WON 🎉";
-    restartButton.style.display = "none";
-
+    
     resumeButton.onclick = () => {
       screen.style.display = "none";
       gamePaused = false;
       requestAnimationFrame(gameLoop);
     };
+
+    buttonContainer.appendChild(resumeButton);
+    buttonContainer.appendChild(mainMenuButton);
 
     if (!document.getElementById("resumeFromVictory")) {
       screen.appendChild(resumeButton);
@@ -1077,20 +1351,21 @@ function gameOver() {
     if (existing) existing.remove();
   }
 
-  // Add main menu button if it doesn't exist
-  if (!document.getElementById("mainMenuButton")) {
-    screen.appendChild(mainMenuButton);
-  }
-
+  // Show the game over screen
   screen.style.display = "block";
 }
 
 let lastTime = performance.now();
 function gameLoop(currentTime) {
+  if (!gameStarted || !gameRunning || gamePaused) {
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
   const deltaTime = currentTime - lastTime;
   lastTime = currentTime;
 
-  if (gameStarted) {
+  if (gameStarted && gameRunning && !gamePaused) {
     if (fadingOut) {
       fadeOpacity += 0.02;
       if (fadeOpacity >= 1) {
@@ -1109,6 +1384,7 @@ function gameLoop(currentTime) {
     if (!fadingOut && !fadingIn) {
       update(deltaTime);
     }
+    movePlayer(deltaTime);
     draw();
     drawFadeOverlay();
   }
@@ -1128,18 +1404,13 @@ document.getElementById("nextCutscene").addEventListener("click", () => {
     document.getElementById("cutsceneText").innerText = data.text;
   } else {
     document.getElementById("cutscene").style.display = "none";
-    canvas.style.display = "block";
-    document.getElementById("xpBarContainer").style.display = "block";
-    gameStarted = true;
-    fadingOut = true;
+    startGame();
   }
 });
+
 document.getElementById("skipCutscene").addEventListener("click", () => {
   document.getElementById("cutscene").style.display = "none";
-  canvas.style.display = "block";
-  document.getElementById("xpBarContainer").style.display = "block";
-  gameStarted = true;
-  fadingOut = true;
+  startGame();
 });
 
 requestAnimationFrame(gameLoop);
@@ -1210,43 +1481,90 @@ function drawFadeOverlay() {
 
 window.onload = () => {
   document.getElementById("restartButton").onclick = () => {
+    // Hide screens
+    document.getElementById("gameOverScreen").style.display = "none";
+    startScreen.style.display = "none";
+    canvas.style.display = "block";
+    document.getElementById("xpBarContainer").style.display = "block";
+    
+    // Reset game state
+    gameStarted = true;
+    gameRunning = true;
+    gamePaused = false;
+    fadingIn = false;
+    fadingOut = false;
+    fadeOpacity = 0;
+    
+    // Reset player stats and position
+    player.x = WIDTH / 2;
+    player.y = HEIGHT / 2 - 100;
+    player.level = 1;
+    player.xp = 0;
+    player.xpToLevel = 10;
+    player.health = player.maxHealth = 5;
+    player.bulletDamage = 1;
+    player.multiShot = 0;
+    player.magnetStrength = 0.05;
+    player.fireRate = 500;
+    player.speed = 0.8;
+    player.hasHeatSeek = false;
+    player.shieldActive = false;
+    player.shieldTimer = 0;
+    player.shieldBlinkTimer = 0;
+    player.xpMultiplier = 1;
+    player.bulletSize = 4;
+    
+    // Reset obelisk
+    obelisk.x = WIDTH / 2;
+    obelisk.y = HEIGHT / 2;
+    obelisk.health = obelisk.maxHealth = 10;
+    obelisk.hasShield = false;
+    obelisk.shieldDefense = 0;
+    
+    // Clear all arrays
+    enemies = [];
+    bullets = [];
+    xpOrbs = [];
+    
+    // Reset enemy settings
+    enemySpeed = 0.3;
+    enemySpawnInterval = 900;
+    enemySpawnTimer = 0;
+    bossActive = false;
+    bossSpawned = false;
+    inBossFight = false;
+    enemyHealthMultiplier = 1;
+    obeliskDamageMultiplier = 1;
+    
+    // Reset UI
+    updateXPBar();
+    
+    // Start game loop
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+}
+
+// Handle menu button
+document.getElementById("menuButton").onclick = () => {
+  // Hide game over screen
   document.getElementById("gameOverScreen").style.display = "none";
-  startScreen.style.display = "none";
-  gameStarted = true;
+  // Show start screen
+  startScreen.style.display = "block";
+  // Reset game state
+  gameStarted = false;
+  gameRunning = false;
+  gamePaused = false;
   fadingIn = false;
   fadingOut = false;
+  fadeOpacity = 0;
+};
 
-  // Reset player stats
-  player.level = 1;
-  player.xp = 0;
-  player.xpToLevel = 10;
-  player.health = player.maxHealth = 5;
-  player.bulletDamage = 1;
-  player.multiShot = 0;
-  player.magnetStrength = 0.05;
-  player.fireRate = 500;
-  player.speed = 2;
-
-  obelisk.health = obelisk.maxHealth = 10;
-
-  enemies = [];
-  bullets = [];
-  xpOrbs = [];
-
-  enemySpeed = 0.3;
-  enemySpawnInterval = 900;
-  enemySpawnTimer = 0;
-
-  bossActive = false;
-  bossSpawned = false;
-  inBossFight = false;
-  enemyHealthMultiplier = 1;
-  obeliskDamageMultiplier = 1;
-
-  updateXPBar();
+// Handle victory restart button
+document.getElementById("victoryRestartButton").onclick = () => {
+  location.reload();
+};
 
   // Restart the game loop
   lastTime = performance.now();
   requestAnimationFrame(gameLoop);
-};
 };
