@@ -16,12 +16,23 @@ export const WEAPONS = {
     },
     SCYTHE: {
         name: 'Scythe',
-        damage: 35,
-        range: TILE_SIZE * 0.5,
+        damage: 50,
+        range: TILE_SIZE * 1,
         cooldown: 200,
         color: '#800080',
         type: 'spinning',
         orbitRadius: TILE_SIZE * 2.5
+    },
+    DRAGON_SCYTHE: {
+        name: 'Dragon Scythe',
+        damage: 50,
+        range: TILE_SIZE * 1,
+        cooldown: 150,
+        color: '#ff4500',
+        type: 'spinning',
+        orbitRadius: TILE_SIZE * 4,
+        spinSpeed: 2,
+        oscillating: true
     },
     DRAGON_SWORD: {
         name: 'Dragon Sword',

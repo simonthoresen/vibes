@@ -125,9 +125,30 @@ export class WeaponSystem {
         // Multiple scythes at different angles
         for (let i = 0; i < count; i++) {
             const phaseOffset = (i * 2 * Math.PI) / count;
-            const angle = now * Math.PI * 2 / 1000 + phaseOffset;
-            const scytheX = playerCenterX + Math.cos(angle) * weapon.orbitRadius;
-            const scytheY = playerCenterY + Math.sin(angle) * weapon.orbitRadius;
+            
+            // Check if this is a dragon scythe for special behavior
+            const isDragonScythe = weapon.oscillating && weapon.spinSpeed;
+            
+            let angle, currentOrbitRadius;
+            
+            if (isDragonScythe) {
+                // Dragon scythe: faster spin and oscillating distance
+                const spinSpeed = weapon.spinSpeed || 1;
+                angle = now * Math.PI * 2 / 1000 * spinSpeed + phaseOffset;
+                
+                // Oscillate the orbit radius (back and forth movement)
+                const oscillationSpeed = 0.002; // Speed of oscillation
+                const oscillationAmount = weapon.orbitRadius * 0.4; // How much it moves back and forth
+                const baseRadius = weapon.orbitRadius * 0.8; // Base distance
+                currentOrbitRadius = baseRadius + Math.sin(now * oscillationSpeed) * oscillationAmount;
+            } else {
+                // Regular scythe behavior
+                angle = now * Math.PI * 2 / 1000 + phaseOffset;
+                currentOrbitRadius = weapon.orbitRadius;
+            }
+            
+            const scytheX = playerCenterX + Math.cos(angle) * currentOrbitRadius;
+            const scytheY = playerCenterY + Math.sin(angle) * currentOrbitRadius;
 
             this.gameState.enemies.forEach(enemy => {
                 const enemyCenterX = enemy.x + enemy.width / 2;

@@ -552,7 +552,7 @@ class DungeonCrawlerGame {
         weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
         weaponSection.appendChild(weaponTitle);
 
-        const weapons = ['Piercing bow', 'Sword', 'Scythe', 'Dragon bow', 'Dragon sword'];
+        const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe'];
         
         // Add amount selector
         const amountControl = document.createElement('div');

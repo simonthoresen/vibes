@@ -48,6 +48,21 @@ export class Renderer {
         this.dragonBowImage.onload = () => {
             this.dragonBowImageLoaded = true;
         };
+        
+        // Load scythe sprites
+        this.scytheImage = new Image();
+        this.scytheImage.src = 'images/normal-scythe.png';
+        this.scytheImageLoaded = false;
+        this.scytheImage.onload = () => {
+            this.scytheImageLoaded = true;
+        };
+
+        this.dragonScytheImage = new Image();
+        this.dragonScytheImage.src = 'images/dragon-scythe.png';
+        this.dragonScytheImageLoaded = false;
+        this.dragonScytheImage.onload = () => {
+            this.dragonScytheImageLoaded = true;
+        };
     }
 
     clear() {
@@ -308,21 +323,100 @@ export class Renderer {
     drawSpinningWeapon(weapon, count, playerCenterX, playerCenterY) {
         for (let i = 0; i < count; i++) {
             const phaseOffset = (i * 2 * Math.PI) / count;
-            const angle = Date.now() * Math.PI * 2 / 1000 + phaseOffset;
-            const scytheX = playerCenterX + Math.cos(angle) * weapon.orbitRadius;
-            const scytheY = playerCenterY + Math.sin(angle) * weapon.orbitRadius;
-
-            this.ctx.beginPath();
-            this.ctx.arc(scytheX, scytheY, weapon.range, 0, Math.PI * 2);
-            this.ctx.fillStyle = weapon.color;
-            this.ctx.fill();
             
-            // Add glow effect
-            this.ctx.shadowColor = weapon.color;
-            this.ctx.shadowBlur = 10;
-            this.ctx.strokeStyle = weapon.color;
-            this.ctx.stroke();
-            this.ctx.shadowBlur = 0;
+            // Check if this is a dragon scythe for special behavior
+            const isDragonScythe = weapon.oscillating && weapon.spinSpeed;
+            
+            let angle, currentOrbitRadius;
+            
+            if (isDragonScythe) {
+                // Dragon scythe: faster spin and oscillating distance
+                const spinSpeed = weapon.spinSpeed || 1;
+                angle = Date.now() * Math.PI * 2 / 1000 * spinSpeed + phaseOffset;
+                
+                // Oscillate the orbit radius (back and forth movement)
+                const oscillationSpeed = 0.002; // Speed of oscillation
+                const oscillationAmount = weapon.orbitRadius * 0.4; // How much it moves back and forth
+                const baseRadius = weapon.orbitRadius * 0.8; // Base distance
+                currentOrbitRadius = baseRadius + Math.sin(Date.now() * oscillationSpeed) * oscillationAmount;
+            } else {
+                // Regular scythe behavior
+                angle = Date.now() * Math.PI * 2 / 1000 + phaseOffset;
+                currentOrbitRadius = weapon.orbitRadius;
+            }
+            
+            const scytheX = playerCenterX + Math.cos(angle) * currentOrbitRadius;
+            const scytheY = playerCenterY + Math.sin(angle) * currentOrbitRadius;
+
+            // Check which type of scythe and if sprites are loaded
+            const isRegularScythe = weapon.color === '#800080' && !isDragonScythe;
+            const isDragonScytheSprite = isDragonScythe;
+            
+            if (isRegularScythe && this.scytheImageLoaded) {
+                // Draw regular scythe sprite
+                this.ctx.save();
+                
+                // Move to scythe position
+                this.ctx.translate(scytheX, scytheY);
+                
+                // Proper rotation calculation - keep it within 0 to 2π range
+                const rotationSpeed = 0.03; // 3x faster rotation (was 0.01)
+                const currentRotation = (Date.now() * rotationSpeed) % (2 * Math.PI);
+                this.ctx.rotate(currentRotation);
+                
+                // Debug: Log rotation in a readable range
+                if (Math.floor(Date.now() / 1000) % 2 === 0 && Date.now() % 100 < 16) {
+                    console.log('Scythe rotation (radians):', currentRotation);
+                }
+                
+                // Draw scythe sprite centered and sized to match the collider
+                const scytheSize = weapon.range * 2; // Smaller sprite size to match collision area
+                this.ctx.drawImage(
+                    this.scytheImage,
+                    -scytheSize / 2,
+                    -scytheSize / 2,
+                    scytheSize,
+                    scytheSize
+                );
+                
+                this.ctx.restore();
+            } else if (isDragonScytheSprite && this.dragonScytheImageLoaded) {
+                // Draw dragon scythe sprite
+                this.ctx.save();
+                
+                // Move to scythe position
+                this.ctx.translate(scytheX, scytheY);
+                
+                // Proper rotation calculation - keep it within 0 to 2π range
+                const rotationSpeed = 0.03; // 3x faster rotation (was 0.01)
+                const currentRotation = (Date.now() * rotationSpeed) % (2 * Math.PI);
+                this.ctx.rotate(currentRotation);
+                
+                // Draw dragon scythe sprite centered and sized to match the collider
+                const scytheSize = weapon.range * 2; // Smaller sprite size
+                this.ctx.drawImage(
+                    this.dragonScytheImage,
+                    -scytheSize / 2,
+                    -scytheSize / 2,
+                    scytheSize,
+                    scytheSize
+                );
+                
+                this.ctx.restore();
+            } else {
+                // Draw circle for dragon scythe or if sprite not loaded
+                this.ctx.beginPath();
+                this.ctx.arc(scytheX, scytheY, weapon.range, 0, Math.PI * 2);
+                this.ctx.fillStyle = weapon.color;
+                this.ctx.fill();
+                
+                // Add glow effect
+                this.ctx.shadowColor = weapon.color;
+                this.ctx.shadowBlur = isDragonScythe ? 15 : 10; // Bigger glow for dragon scythe
+                this.ctx.strokeStyle = weapon.color;
+                this.ctx.stroke();
+                this.ctx.shadowBlur = 0;
+            }
         }
     }
 

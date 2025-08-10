@@ -23,6 +23,17 @@
                 type: 'spinning',
                 orbitRadius: TILE_SIZE * 2.5
             },
+            DRAGON_SCYTHE: {
+                name: 'Dragon Scythe',
+                damage: 50,
+                range: TILE_SIZE * 0.8,
+                cooldown: 150,
+                color: '#ff4500',
+                type: 'spinning',
+                orbitRadius: TILE_SIZE * 4,
+                spinSpeed: 2,
+                oscillating: true
+            },
             DRAGON_SWORD: {
                 name: 'Dragon Sword',
                 damage: 40,
@@ -666,6 +677,7 @@
 
         // Function to show cheat menu
         function showCheatMenu() {
+            console.log('showCheatMenu function called!'); // Debug log
             const cheatMenu = document.createElement('div');
             cheatMenu.id = 'cheatMenu';
             cheatMenu.style.cssText = `
@@ -721,7 +733,10 @@
             weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
             weaponSection.appendChild(weaponTitle);
 
-            const weapons = ['Piercing bow', 'Sword', 'Scythe', 'Dragon bow', 'Dragon sword'];
+            const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe'];
+            console.log('Weapons array:', weapons); // Debug log to see the full array
+            console.log('Weapons array length:', weapons.length); // Debug log
+            console.log('Last weapon:', weapons[weapons.length - 1]); // Debug log
             
             // Add amount selector
             const amountControl = document.createElement('div');
@@ -763,6 +778,7 @@
             });
             
             weapons.forEach(weapon => {
+                console.log('Processing weapon:', weapon); // Debug log
                 const weaponControl = document.createElement('div');
                 weaponControl.style.cssText = 'margin-bottom: 10px; display: flex; align-items: center;';
                 
@@ -780,6 +796,7 @@
                 weaponControl.appendChild(checkbox);
                 weaponControl.appendChild(label);
                 weaponSection.appendChild(weaponControl);
+                console.log('Added weapon control for:', weapon); // Debug log
             });
 
             // Floor selection section
@@ -975,6 +992,8 @@
                         const amount = parseInt(amountInput.value);
                         for (let i = 0; i < amount; i++) {
                             const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
+                            console.log('Looking for weapon:', weapon, '-> key:', weaponKey);
+                            console.log('WEAPONS[weaponKey] exists:', !!WEAPONS[weaponKey]);
                             const weaponData = {...WEAPONS[weaponKey]};
                             weaponData.id = weaponKey;
                             gameState.player.weapons.push(weaponData);
@@ -1025,6 +1044,12 @@
                 } else {
                     konamiIndex = 0;
                 }
+            }
+            
+            // Simple cheat menu shortcut for testing (F1 key)
+            if (key === 'f1') {
+                console.log('F1 pressed - opening cheat menu');
+                showCheatMenu();
             }
             
             // Handle keybinding
