@@ -26,7 +26,7 @@ export class MenuManager {
         const content = this.createMenuContent();
         const title = this.createTitle('Dungeon Crawler');
         
-        const startButton = this.createButton('Start Game', () => this.startGame());
+        const startButton = this.createButton('Start Game', () => this.startGame(), true);
         const settingsButton = this.createButton('Settings', () => this.showSettings());
         const skinsButton = this.createSkinsButton();
 
@@ -106,7 +106,7 @@ export class MenuManager {
         return title;
     }
 
-    createButton(text, onClick) {
+    createButton(text, onClick, isStart = false) {
         const button = document.createElement('button');
         button.textContent = text;
         button.style.cssText = `
@@ -123,7 +123,7 @@ export class MenuManager {
         `;
         
         button.onclick = onClick;
-        this.addButtonHoverEffects(button);
+        this.addButtonHoverEffects(button, isStart);
         return button;
     }
 
@@ -198,7 +198,7 @@ export class MenuManager {
     addButtonHoverEffects(button, isStart = false) {
         button.addEventListener('mouseenter', () => {
             button.style.transform = 'scale(1.05)';
-            button.style.backgroundColor = isStart ? '#2a5' : '#444';
+            button.style.backgroundColor = isStart ? '#4CAF50' : '#444';
         });
         
         button.addEventListener('mouseleave', () => {

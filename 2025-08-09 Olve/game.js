@@ -16,7 +16,7 @@
             },
             SCYTHE: {
                 name: 'Scythe',
-                damage: 35,
+                damage: 50,
                 range: TILE_SIZE * 0.5,
                 cooldown: 200,
                 color: '#800080',
@@ -37,7 +37,7 @@
                 damage: 20,
                 range: TILE_SIZE * 8,
                 cooldown: 800,
-                projectileSpeed: 8,
+                projectileSpeed: 16,
                 color: '#8b4513',
                 type: 'ranged',
                 piercing: true
@@ -47,7 +47,7 @@
                 damage: 30,
                 range: TILE_SIZE * 8,
                 cooldown: 400,
-                projectileSpeed: 12,
+                projectileSpeed: 20,
                 color: '#f77',
                 type: 'ranged',
                 piercing: true
