@@ -219,7 +219,8 @@ export class MenuManager {
 
     selectSkin(skin, skinOption) {
         this.gameState.player.skin = skin;
-        
+        // Save skin to localStorage
+        localStorage.setItem('selectedSkin', skin.name);
         // Update visual selection
         document.querySelectorAll('#skinMenu .skin-option').forEach(opt => {
             opt.style.border = '3px solid transparent';

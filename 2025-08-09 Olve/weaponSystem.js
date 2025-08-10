@@ -243,26 +243,52 @@ export class WeaponSystem {
     setupWeaponSelection(isBossReward = false) {
         const weaponOptions = document.getElementById('weaponOptions');
         const container = document.getElementById('weaponSelect');
-        
         if (!weaponOptions || !container) return;
 
         weaponOptions.innerHTML = '';
         const title = document.querySelector('.weapon-container h2');
-        
         if (title) {
             title.textContent = isBossReward ? 'Choose an Additional Weapon' : 'Choose Your Starting Weapon';
         }
 
+        // Fade-in and background for starting weapon selection only
+        if (!isBossReward) {
+            container.style.background = "#000";
+            container.style.transition = "background 1s";
+            // Add fade overlay if not present
+            let fadeOverlay = document.getElementById('fadeOverlay');
+            if (!fadeOverlay) {
+                fadeOverlay = document.createElement('div');
+                fadeOverlay.id = 'fadeOverlay';
+                fadeOverlay.style.position = 'fixed';
+                fadeOverlay.style.top = '0';
+                fadeOverlay.style.left = '0';
+                fadeOverlay.style.width = '100vw';
+                fadeOverlay.style.height = '100vh';
+                fadeOverlay.style.background = '#000';
+                fadeOverlay.style.zIndex = '2000';
+                fadeOverlay.style.opacity = '1';
+                fadeOverlay.style.transition = 'opacity 1.2s';
+                document.body.appendChild(fadeOverlay);
+            }
+            setTimeout(() => {
+                container.style.background = "url('images/long_dark_corridor.png') center center / cover no-repeat";
+                fadeOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    if (fadeOverlay.parentNode) fadeOverlay.parentNode.removeChild(fadeOverlay);
+                }, 1300);
+            }, 100);
+        } else {
+            container.style.background = 'rgba(0,0,0,0.9)';
+        }
         container.style.display = 'flex';
-        
+
         // Get available weapons
         let weaponsList = Object.entries(WEAPONS);
-        
         // Filter dragon weapons for starting selection
         if (!isBossReward && Math.random() > 0.05) {
             weaponsList = weaponsList.filter(([id]) => !id.includes('DRAGON'));
         }
-        
         // Shuffle and take first 3
         this.shuffleArray(weaponsList);
         weaponsList.slice(0, 3).forEach(([id, weapon]) => {

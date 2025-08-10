@@ -103,12 +103,58 @@ class DungeonCrawlerGame {
 
     handleWeaponSelected(detail) {
         const { weapon, isBossReward } = detail;
-        
         if (!isBossReward) {
-            // Starting weapon selected - initialize game
-            this.gameState.gameStarted = true;
-            this.showGameContainer();
-            this.gameLoop.start();
+            // Starting weapon selected - show zoom/fade effect, then start game
+            const container = document.getElementById('weaponSelect');
+            // Create overlay for zoom/fade
+            let zoomFadeOverlay = document.getElementById('zoomFadeOverlay');
+            if (!zoomFadeOverlay) {
+                zoomFadeOverlay = document.createElement('div');
+                zoomFadeOverlay.id = 'zoomFadeOverlay';
+                zoomFadeOverlay.style.position = 'fixed';
+                zoomFadeOverlay.style.top = '0';
+                zoomFadeOverlay.style.left = '0';
+                zoomFadeOverlay.style.width = '100vw';
+                zoomFadeOverlay.style.height = '100vh';
+                zoomFadeOverlay.style.background = "url('images/long_dark_corridor.png') center center / cover no-repeat";
+                zoomFadeOverlay.style.zIndex = '3000';
+                zoomFadeOverlay.style.transition = 'transform 1.2s, opacity 1.2s';
+                zoomFadeOverlay.style.transform = 'scale(1)';
+                zoomFadeOverlay.style.opacity = '0';
+                document.body.appendChild(zoomFadeOverlay);
+            }
+            // Show overlay and animate zoom in
+            setTimeout(() => {
+                zoomFadeOverlay.style.opacity = '1';
+                zoomFadeOverlay.style.transform = 'scale(1)';
+                // Add a slight delay before zooming in
+                setTimeout(() => {
+                    zoomFadeOverlay.style.transform = 'scale(1)';
+                    setTimeout(() => {
+                        zoomFadeOverlay.style.transform = 'scale(2)';
+                        setTimeout(() => {
+                            // Fade in to black before playing sound and fading out into the game
+                            zoomFadeOverlay.style.transition = 'background 0.6s, opacity 1.2s, transform 1.2s';
+                            zoomFadeOverlay.style.background = '#000';
+                            setTimeout(() => {
+                                // Play start beep sound
+                                const beep = new Audio('sounds/195912__acpascal__start-beep.wav');
+                                beep.volume = 1.0;
+                                beep.play();
+                                beep.onended = () => {
+                                    zoomFadeOverlay.style.opacity = '0';
+                                    setTimeout(() => {
+                                        if (zoomFadeOverlay.parentNode) zoomFadeOverlay.parentNode.removeChild(zoomFadeOverlay);
+                                        this.gameState.gameStarted = true;
+                                        this.showGameContainer();
+                                        this.gameLoop.start();
+                                    }, 700);
+                                };
+                            }, 600); // Hold black for 600ms before playing sound
+                        }, 900);
+                    }, 350); // 350ms delay before zooming in
+                }, 100);
+            }, 100);
         } else {
             // Boss reward weapon - continue game
             this.gameLoop.start();

@@ -25,7 +25,7 @@ export class GameState {
 
     createPlayer() {
         const savedSkinsUnlocked = localStorage.getItem('skinsUnlocked') === 'true';
-        
+        const savedSkinName = localStorage.getItem('selectedSkin');
         return {
             x: 400, // CANVAS_WIDTH / 2
             y: 300, // CANVAS_HEIGHT / 2
@@ -41,7 +41,7 @@ export class GameState {
             invulnerabilityDuration: 1000,
             lastHit: 0,
             rotation: 0,
-            skin: PLAYER_SKINS[0],
+            skin: PLAYER_SKINS.find(s => s.name === savedSkinName) || PLAYER_SKINS[0],
             highestFloor: 0,
             skinsUnlocked: savedSkinsUnlocked,
             cheatsEnabled: false,
