@@ -82,20 +82,20 @@
     // Turret is in cellW/2, cellH/2
     const cxTurret = cellW / 2;
     const cyTurret = cellH / 2;
-    // FWD is negative Y, so subtract 90 degrees (Math.PI/2) to rotate FWD toward mouse
-    turretRotation = Math.atan2(my - cyTurret, mx - cxTurret) - Math.PI / 2;
+    // FRONT is negative Y, so subtract 90 degrees (Math.PI/2) and add Math.PI to rotate FRONT toward mouse
+    turretRotation = Math.atan2(my - cyTurret, mx - cxTurret) - Math.PI / 2 + Math.PI;
 
     // Enemy fighter is in cellW*1.5, cellH/2
     const cxEnemy = cellW * 1.5;
     const cyEnemy = cellH / 2;
-    // FWD is negative Y, so subtract 90 degrees (Math.PI/2) to rotate FWD toward mouse
-    enemyRotation = Math.atan2(my - cyEnemy, mx - cxEnemy) - Math.PI / 2;
+    // FRONT is negative Y, so subtract 90 degrees (Math.PI/2) and add Math.PI to rotate FRONT toward mouse
+    enemyRotation = Math.atan2(my - cyEnemy, mx - cxEnemy) - Math.PI / 2 + Math.PI;
 
     // Player fighter is in cellW/2, cellH*1.5
     const cxPlayer = cellW / 2;
     const cyPlayer = cellH * 1.5;
-    // FWD is negative Y, so subtract 90 degrees (Math.PI/2) to rotate FWD toward mouse
-    playerRotation = Math.atan2(my - cyPlayer, mx - cxPlayer) - Math.PI / 2;
+    // FRONT is negative Y, so subtract 90 degrees (Math.PI/2) and add Math.PI to rotate FRONT toward mouse
+    playerRotation = Math.atan2(my - cyPlayer, mx - cxPlayer) - Math.PI / 2 + Math.PI;
     }
 
     function exit() {

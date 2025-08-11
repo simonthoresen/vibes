@@ -18,11 +18,11 @@ class Sprite {
         ctx.rotate(this.rotation);
         ctx.scale(this.scale, this.scale);
         // Example: render as a filled rectangle (override in subclasses or custom draw)
-        ctx.fillStyle = '#888';
-        ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
+    ctx.fillStyle = '#888';
+    // ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height); // Only outline for debug
 
         if (window.SpriteDebugMode) {
-            // Draw bounding box
+            // Draw bounding box (outline only)
             ctx.save();
             ctx.strokeStyle = '#FFFF00'; // bright yellow
             ctx.lineWidth = 2;
@@ -39,14 +39,22 @@ class Sprite {
             ctx.font = 'bold 18px Arial';
             ctx.fillText('+', 0, 0);
             ctx.font = 'bold 14px Arial';
-            // Forward (decreasing y)
-            ctx.fillText('FORWARD', 0, -this.height/2 - 16);
-            // Backward (increasing y)
-            ctx.fillText('BACK', 0, this.height/2 + 16);
-            // Right (increasing x)
-            ctx.fillText('RIGHT', this.width/2 + 24, 0);
-            // Left (decreasing x)
-            ctx.fillText('LEFT', -this.width/2 - 24, 0);
+            // FRONT (up, decreasing y)
+            ctx.fillText('FRONT', 0, -this.height/2 - 10);
+            // BACK (down, increasing y)
+            ctx.fillText('BACK', 0, this.height/2 + 10);
+            // RIGHT (logically right of front, increasing x)
+            ctx.save();
+            ctx.translate(this.width/2 + 10, 0);
+            ctx.rotate(Math.PI / 2); // 90 degrees clockwise
+            ctx.fillText('RIGHT', 0, 0);
+            ctx.restore();
+            // LEFT (logically left of front, decreasing x)
+            ctx.save();
+            ctx.translate(-this.width/2 - 10, 0);
+            ctx.rotate(3 * Math.PI / 2); // 270 degrees clockwise
+            ctx.fillText('LEFT', 0, 0);
+            ctx.restore();
             ctx.restore();
         }
         ctx.restore();
