@@ -1,6 +1,6 @@
 // Particle System for 2D Game Engine
 class Particle {
-    constructor({ x, y, shape, color, size, speed, direction, rotation, lifetime, rotationSpeed, shrinkInsteadOfFade }) {
+    constructor({ x, y, shape, color, size, speed, direction, rotation, lifetime, rotationSpeed, shrinkInsteadOfFade, zLayer }) {
         this.x = x;
         this.y = y;
         this.shape = shape; // 'circle', 'triangle', 'square'
@@ -17,6 +17,7 @@ class Particle {
         this.vy = Math.sin(direction) * speed;
         this.rotationSpeed = (typeof rotationSpeed === 'number') ? rotationSpeed : (Math.random() * 2 - 1) * 2; // random between -2 and 2 rad/s
         this.shrinkInsteadOfFade = !!shrinkInsteadOfFade;
+    this.zLayer = typeof zLayer === 'number' ? zLayer : 0;
     }
 
     update(dt) {
@@ -68,19 +69,21 @@ class Particle {
 }
 
 class ParticleEmitter {
-    constructor({ x, y, emissionRate, shape, color, size, direction, speed, lifetime, radius }) {
-        this.x = x;
-        this.y = y;
-        this.emissionRate = emissionRate; // particles/sec
-        this.shape = shape;
-        this.color = color;
-        this.size = size;
-        this.direction = direction;
-        this.speed = speed;
-        this.lifetime = lifetime;
-        this.radius = radius || 0;
-        this.timeSinceLast = 0;
-    }
+    constructor({ x, y, emissionRate, shape, color, size, direction, speed, lifetime, radius, shrinkInsteadOfFade, zLayer }) {
+            this.x = x;
+            this.y = y;
+            this.emissionRate = emissionRate; // particles/sec
+            this.shape = shape;
+            this.color = color;
+            this.size = size;
+            this.direction = direction;
+            this.speed = speed;
+            this.lifetime = lifetime;
+            this.radius = radius || 0;
+            this.shrinkInsteadOfFade = shrinkInsteadOfFade || false;
+            this.zLayer = typeof zLayer === 'number' ? zLayer : 0;
+            this.timeSinceLast = 0;
+        }
 
     emit(particleSystem, dt) {
         this.timeSinceLast += dt;
@@ -91,16 +94,22 @@ class ParticleEmitter {
                 const dist = Math.random() * this.radius;
                 const px = this.x + Math.cos(angle) * dist;
                 const py = this.y + Math.sin(angle) * dist;
+                let colorValue = this.color;
+                if (typeof colorValue === 'function') {
+                    colorValue = colorValue();
+                }
                 particleSystem.addParticle({
                     x: px,
                     y: py,
                     shape: this.shape,
-                    color: this.color,
+                    color: colorValue,
                     size: this.size,
                     speed: this.speed,
                     direction: angle,
                     rotation: Math.random() * Math.PI * 2,
-                    lifetime: this.lifetime
+                    lifetime: this.lifetime,
+                    shrinkInsteadOfFade: this.shrinkInsteadOfFade,
+                    zLayer: this.zLayer
                 });
             }
             this.timeSinceLast -= particlesToEmit / this.emissionRate;
@@ -178,7 +187,9 @@ class ParticleSystem {
     }
 
     draw(ctx) {
-        for (const p of this.particles) {
+        // Sort particles by zLayer before drawing
+        const sorted = this.particles.slice().sort((a, b) => a.zLayer - b.zLayer);
+        for (const p of sorted) {
             p.draw(ctx);
         }
     }
