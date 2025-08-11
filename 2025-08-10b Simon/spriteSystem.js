@@ -36,17 +36,17 @@ class Sprite {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             // Draw '+' at sprite's local origin
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText('+', 0, 0);
             ctx.font = 'bold 18px Arial';
+            ctx.fillText('+', 0, 0);
+            ctx.font = 'bold 14px Arial';
             // Forward (decreasing y)
-            ctx.fillText('FWD', 0, -this.height/2 - 20);
+            ctx.fillText('FORWARD', 0, -this.height/2 - 16);
             // Backward (increasing y)
-            ctx.fillText('BCK', 0, this.height/2 + 20);
+            ctx.fillText('BACK', 0, this.height/2 + 16);
             // Right (increasing x)
-            ctx.fillText('RGT', this.width/2 + 30, 0);
+            ctx.fillText('RIGHT', this.width/2 + 24, 0);
             // Left (decreasing x)
-            ctx.fillText('LFT', -this.width/2 - 30, 0);
+            ctx.fillText('LEFT', -this.width/2 - 24, 0);
             ctx.restore();
         }
         ctx.restore();
