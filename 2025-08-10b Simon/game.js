@@ -19,7 +19,8 @@ window.stateManager = (function() {
 const menuState = (function() {
     let canvas, ctx;
     let buttons = [
-        { text: 'Particle Test', x: 0, y: 0, w: 320, h: 80, onClick: () => window.stateManager.setState('particleTest') }
+        { text: 'Particle Test', x: 0, y: 0, w: 320, h: 80, onClick: () => window.stateManager.setState('particleTest') },
+        { text: 'Sprite Test', x: 0, y: 0, w: 320, h: 80, onClick: () => window.stateManager.setState('spriteTest') }
     ];
     function enter() {
         canvas = document.getElementById('gameCanvas');
@@ -33,8 +34,10 @@ const menuState = (function() {
     function positionButtons() {
         const cx = canvas.width/2;
         const cy = canvas.height/2;
-        buttons[0].x = cx - buttons[0].w/2;
-        buttons[0].y = cy - buttons[0].h/2;
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].x = cx - buttons[i].w/2;
+            buttons[i].y = cy - buttons[i].h/2 + i * (buttons[i].h + 20);
+        }
     }
     function onMouseDown(e) {
         const rect = canvas.getBoundingClientRect();
@@ -78,7 +81,8 @@ window.onload = function() {
     // Register states
     window.stateManager.register('menu', menuState);
     window.stateManager.register('particleTest', window.particleTestState);
-    window.stateManager.setState('particleTest');
+    window.stateManager.register('spriteTest', window.spriteTestState);
+    window.stateManager.setState('spriteTest');
 
     let lastTime = performance.now();
     function gameLoop(now) {
