@@ -1,4 +1,4 @@
-        // Game constants
+// Game constants
         const CANVAS_WIDTH = 800;
         const CANVAS_HEIGHT = 600;
         const TILE_SIZE = 32;
@@ -441,10 +441,10 @@
             // Start transition
             doorTransition.classList.add('active');
             
-            // Add black background near the end of the zoom
+            // Add black background much sooner for a quicker fade
             setTimeout(() => {
                 doorTransition.style.backgroundColor = 'black';
-            }, 1700);
+            }, 700); // was 1700
             
             // After transition completes
             setTimeout(() => {
@@ -1910,6 +1910,7 @@
             // Update weapons
             gameState.player.weapons.forEach(weapon => {
                 if (weapon.cooldown > 0) {
+
                     weapon.cooldown--;
                 }
             });
