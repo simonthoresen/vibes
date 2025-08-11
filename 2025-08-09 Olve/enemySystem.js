@@ -3,6 +3,11 @@ import { ENEMY_TYPES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 export class EnemySystem {
     constructor(gameState) {
         this.gameState = gameState;
+        this.particleEngine = null; // Will be set by the main game
+    }
+
+    setParticleEngine(particleEngine) {
+        this.particleEngine = particleEngine;
     }
 
     spawnFloorEnemies() {
@@ -89,9 +94,28 @@ export class EnemySystem {
         this.checkPlayerCollisions();
 
         // Remove dead enemies and check for floor completion
-        const aliveEnemies = this.gameState.enemies.filter(enemy => enemy.health > 0);
-        const hadEnemies = this.gameState.enemies.length > 0;
+        const initialEnemyCount = this.gameState.enemies.length;
+        let killedBoss = false;
         
+        const aliveEnemies = this.gameState.enemies.filter(enemy => {
+            if (enemy.health <= 0) {
+                // Check if we killed a boss
+                if (enemy.isBoss) {
+                    killedBoss = true;
+                }
+                
+                // Create death particle effect
+                if (this.particleEngine) {
+                    const centerX = enemy.x + enemy.width / 2;
+                    const centerY = enemy.y + enemy.height / 2;
+                    this.particleEngine.createEnemyDeathEffect(centerX, centerY, enemy.color);
+                }
+                return false;
+            }
+            return true;
+        });
+        
+        const hadEnemies = initialEnemyCount > 0;
         this.gameState.enemies = aliveEnemies;
         
         if (hadEnemies && this.gameState.enemies.length === 0) {
@@ -99,11 +123,8 @@ export class EnemySystem {
         }
 
         // Check for boss defeat and weapon reward
-        if (hadEnemies && this.gameState.enemies.length === 0) {
-            const wasLastEnemyBoss = this.gameState.enemies.some(enemy => enemy.isBoss);
-            if (wasLastEnemyBoss) {
-                this.handleBossDefeat();
-            }
+        if (killedBoss) {
+            this.handleBossDefeat();
         }
     }
 
@@ -181,6 +202,13 @@ export class EnemySystem {
         this.gameState.player.health = Math.max(0, this.gameState.player.health - damage);
         this.gameState.player.invulnerable = true;
         this.gameState.player.lastHit = Date.now();
+        
+        // Create player damage particle effect
+        if (this.particleEngine) {
+            const centerX = this.gameState.player.x + this.gameState.player.width / 2;
+            const centerY = this.gameState.player.y + this.gameState.player.height / 2;
+            this.particleEngine.createPlayerDamageEffect(centerX, centerY);
+        }
         
         console.log(`Player health after damage: ${this.gameState.player.health}`);
         

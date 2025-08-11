@@ -9,7 +9,8 @@ import { EnemySystem } from './enemySystem.js';
 import { ProjectileSystem } from './projectileSystem.js';
 import { PlayerController } from './playerController.js';
 import { GameLoop } from './gameLoop.js';
-import { KONAMI_CODE } from './constants.js';
+import { ParticleEngine } from './particleEngine.js';
+import { KONAMI_CODE, WEAPONS } from './constants.js';
 
 class DungeonCrawlerGame {
     constructor() {
@@ -31,17 +32,22 @@ class DungeonCrawlerGame {
 
         // Initialize game systems
         this.menuManager = new MenuManager(this.gameState);
-        this.weaponSystem = new WeaponSystem(this.gameState);
+        this.particleEngine = new ParticleEngine();
+        this.weaponSystem = new WeaponSystem(this.gameState, this.particleEngine);
         this.enemySystem = new EnemySystem(this.gameState);
-        this.projectileSystem = new ProjectileSystem(this.gameState);
+        this.projectileSystem = new ProjectileSystem(this.gameState, this.particleEngine);
         this.playerController = new PlayerController(this.gameState, this.inputManager);
+
+        // Connect particle engine to systems that need it
+        this.enemySystem.setParticleEngine(this.particleEngine);
 
         // Initialize game loop with all systems
         const systems = [
             this.playerController,
             this.weaponSystem,
             this.enemySystem,
-            this.projectileSystem
+            this.projectileSystem,
+            this.particleEngine
         ];
         this.gameLoop = new GameLoop(this.gameState, systems, this.renderer);
     }
@@ -73,7 +79,7 @@ class DungeonCrawlerGame {
         // Make methods available globally for HTML onclick handlers
         window.resumeGame = () => this.resumeGame();
         window.toggleSettings = () => this.toggleSettings();
-        window.returnToMainMenu = () => this.quitToMainMenu();
+        window.returnToMainMenu = () => this.quitToMenuImmediate();
         window.closeSettings = () => this.closeSettings();
 
         // Setup pause menu buttons (legacy approach using IDs)
@@ -84,7 +90,7 @@ class DungeonCrawlerGame {
 
         if (resumeBtn) resumeBtn.onclick = () => this.resumeGame();
         if (settingsBtn) settingsBtn.onclick = () => this.openSettings();
-        if (quitBtn) quitBtn.onclick = () => this.quitToMenu();
+        if (quitBtn) quitBtn.onclick = () => this.quitToMenuImmediate();
         if (cheatBtn) cheatBtn.onclick = () => this.openCheatMenu();
     }
 
@@ -97,12 +103,58 @@ class DungeonCrawlerGame {
 
     handleWeaponSelected(detail) {
         const { weapon, isBossReward } = detail;
-        
         if (!isBossReward) {
-            // Starting weapon selected - initialize game
-            this.gameState.gameStarted = true;
-            this.showGameContainer();
-            this.gameLoop.start();
+            // Starting weapon selected - show zoom/fade effect, then start game
+            const container = document.getElementById('weaponSelect');
+            // Create overlay for zoom/fade
+            let zoomFadeOverlay = document.getElementById('zoomFadeOverlay');
+            if (!zoomFadeOverlay) {
+                zoomFadeOverlay = document.createElement('div');
+                zoomFadeOverlay.id = 'zoomFadeOverlay';
+                zoomFadeOverlay.style.position = 'fixed';
+                zoomFadeOverlay.style.top = '0';
+                zoomFadeOverlay.style.left = '0';
+                zoomFadeOverlay.style.width = '100vw';
+                zoomFadeOverlay.style.height = '100vh';
+                zoomFadeOverlay.style.background = "url('images/long_dark_corridor.png') center center / cover no-repeat";
+                zoomFadeOverlay.style.zIndex = '3000';
+                zoomFadeOverlay.style.transition = 'transform 1.2s, opacity 1.2s';
+                zoomFadeOverlay.style.transform = 'scale(1)';
+                zoomFadeOverlay.style.opacity = '0';
+                document.body.appendChild(zoomFadeOverlay);
+            }
+            // Show overlay and animate zoom in
+            setTimeout(() => {
+                zoomFadeOverlay.style.opacity = '1';
+                zoomFadeOverlay.style.transform = 'scale(1)';
+                // Add a slight delay before zooming in
+                setTimeout(() => {
+                    zoomFadeOverlay.style.transform = 'scale(1)';
+                    setTimeout(() => {
+                        zoomFadeOverlay.style.transform = 'scale(2)';
+                        setTimeout(() => {
+                            // Fade in to black before playing sound and fading out into the game
+                            zoomFadeOverlay.style.transition = 'background 0.6s, opacity 1.2s, transform 1.2s';
+                            zoomFadeOverlay.style.background = '#000';
+                            setTimeout(() => {
+                                // Play start beep sound
+                                const beep = new Audio('sounds/195912__acpascal__start-beep.wav');
+                                beep.volume = 1.0;
+                                beep.play();
+                                beep.onended = () => {
+                                    zoomFadeOverlay.style.opacity = '0';
+                                    setTimeout(() => {
+                                        if (zoomFadeOverlay.parentNode) zoomFadeOverlay.parentNode.removeChild(zoomFadeOverlay);
+                                        this.gameState.gameStarted = true;
+                                        this.showGameContainer();
+                                        this.gameLoop.start();
+                                    }, 700);
+                                };
+                            }, 600); // Hold black for 600ms before playing sound
+                        }, 900);
+                    }, 350); // 350ms delay before zooming in
+                }, 100);
+            }, 100);
         } else {
             // Boss reward weapon - continue game
             this.gameLoop.start();
@@ -207,6 +259,24 @@ class DungeonCrawlerGame {
             this.hideGameContainer();
             this.showMainMenu();
         });
+    }
+
+    quitToMenuImmediate() {
+        // Immediate quit from pause menu (no transition like the original)
+        this.gameLoop.stop();
+        this.hidePauseMenu();
+        this.hideGameOverScreen();
+        this.hideGameContainer();
+        this.showMainMenu();
+        
+        // Reset game state
+        this.gameState.reset();
+        this.playerController.reset();
+        this.projectileSystem.clear();
+        this.particleEngine.clear();
+        this.gameState.isPaused = false;
+        this.gameState.gameStarted = false;
+        this.gameState.gameCompleted = false;
     }
 
     pushEnemiesAwayFromPlayer() {
@@ -323,12 +393,60 @@ class DungeonCrawlerGame {
     }
 
     quitToMainMenu() {
-        this.showDoorTransition(() => {
-            this.resetGameState();
+        // Create custom zoom-out transition with game-over-background.png
+        const customTransition = document.createElement('div');
+        customTransition.style.position = 'fixed';
+        customTransition.style.top = '0';
+        customTransition.style.left = '0';
+        customTransition.style.width = '100%';
+        customTransition.style.height = '100%';
+        customTransition.style.background = 'url("images/game-over-background.png") center/cover no-repeat';
+        customTransition.style.zIndex = '2002';
+        customTransition.style.transform = 'scale(1)';
+        customTransition.style.transition = 'transform 1.5s ease';
+        document.body.appendChild(customTransition);
+        
+        // Create black overlay for fade effect
+        const blackOverlay = document.createElement('div');
+        blackOverlay.style.position = 'fixed';
+        blackOverlay.style.top = '0';
+        blackOverlay.style.left = '0';
+        blackOverlay.style.width = '100%';
+        blackOverlay.style.height = '100%';
+        blackOverlay.style.backgroundColor = 'black';
+        blackOverlay.style.opacity = '0';
+        blackOverlay.style.zIndex = '2003';
+        blackOverlay.style.transition = 'opacity 0.8s ease';
+        document.body.appendChild(blackOverlay);
+        
+        // Start both zoom out and fade to black immediately
+        customTransition.offsetHeight;
+        requestAnimationFrame(() => {
+            customTransition.style.transform = 'scale(0.1)'; // 1.5s duration
+            blackOverlay.style.opacity = '1'; // 0.8s duration
+        });
+        
+        // At 0.8s when screen is fully black, hide game over screen and reset game state
+        setTimeout(() => {
             this.hideGameOverScreen();
+            this.resetGameState();
             this.hideGameContainer();
             this.showMainMenu();
-        });
+        }, 800);
+        
+        // Complete transition and cleanup at 1.5s, then fade out black to reveal main menu
+        setTimeout(() => {
+            document.body.removeChild(customTransition);
+            
+            // Start fading out the black overlay to reveal the main menu
+            blackOverlay.style.transition = 'opacity 0.7s ease';
+            blackOverlay.style.opacity = '0';
+            
+            // Remove black overlay after fade completes
+            setTimeout(() => {
+                document.body.removeChild(blackOverlay);
+            }, 700);
+        }, 1500);
     }
 
     resetGameState() {
@@ -336,6 +454,7 @@ class DungeonCrawlerGame {
         this.gameState.reset();
         this.playerController.reset();
         this.projectileSystem.clear();
+        this.particleEngine.clear();
     }
 
     showCompletionScreen() {
@@ -479,7 +598,7 @@ class DungeonCrawlerGame {
         weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
         weaponSection.appendChild(weaponTitle);
 
-        const weapons = ['PIERCING_BOW', 'SWORD', 'SCYTHE', 'DRAGON_BOW', 'DRAGON_SWORD'];
+        const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe'];
         
         // Add amount selector
         const amountControl = document.createElement('div');
@@ -501,22 +620,20 @@ class DungeonCrawlerGame {
         amountControl.appendChild(amountInput);
         weaponSection.appendChild(amountControl);
 
-        weapons.forEach(weaponId => {
+        weapons.forEach(weapon => {
             const weaponControl = document.createElement('div');
             weaponControl.style.cssText = 'margin-bottom: 10px; display: flex; align-items: center;';
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.id = weaponId + 'Check';
-            checkbox.checked = this.gameState.player.weapons.some(w => w.id === weaponId);
+            checkbox.id = weapon.replace(/\s+/g, '') + 'Check';
+            const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
+            checkbox.checked = this.gameState.player.weapons.some(w => w.id === weaponKey);
             checkbox.style.marginRight = '10px';
             
             const label = document.createElement('label');
-            label.htmlFor = weaponId + 'Check';
-            // Import WEAPONS from constants to get the display name
-            import('./constants.js').then(({ WEAPONS }) => {
-                label.textContent = WEAPONS[weaponId]?.name || weaponId;
-            });
+            label.htmlFor = weapon.replace(/\s+/g, '') + 'Check';
+            label.textContent = weapon;
             label.style.color = 'white';
             
             weaponControl.appendChild(checkbox);
@@ -536,17 +653,16 @@ class DungeonCrawlerGame {
             this.gameState.player.weapons = [];
             
             // Add selected weapons with their stack amounts
-            weapons.forEach(weaponId => {
-                const checkbox = document.getElementById(weaponId + 'Check');
+            weapons.forEach(weapon => {
+                const checkbox = document.getElementById(weapon.replace(/\s+/g, '') + 'Check');
                 if (checkbox.checked) {
                     const amount = parseInt(amountInput.value);
                     for (let i = 0; i < amount; i++) {
-                        // Import WEAPONS to get weapon data
-                        import('./constants.js').then(({ WEAPONS }) => {
-                            const weaponData = {...WEAPONS[weaponId]};
-                            weaponData.id = weaponId;
-                            this.gameState.player.weapons.push(weaponData);
-                        });
+                        const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
+                        // Use the WEAPONS constant directly instead of async import
+                        const weaponData = {...WEAPONS[weaponKey]};
+                        weaponData.id = weaponKey;
+                        this.gameState.player.weapons.push(weaponData);
                     }
                 }
             });

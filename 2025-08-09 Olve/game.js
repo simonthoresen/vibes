@@ -16,12 +16,23 @@
             },
             SCYTHE: {
                 name: 'Scythe',
-                damage: 35,
+                damage: 50,
                 range: TILE_SIZE * 0.5,
                 cooldown: 200,
                 color: '#800080',
                 type: 'spinning',
                 orbitRadius: TILE_SIZE * 2.5
+            },
+            DRAGON_SCYTHE: {
+                name: 'Dragon Scythe',
+                damage: 50,
+                range: TILE_SIZE * 0.8,
+                cooldown: 150,
+                color: '#ff4500',
+                type: 'spinning',
+                orbitRadius: TILE_SIZE * 4,
+                spinSpeed: 2,
+                oscillating: true
             },
             DRAGON_SWORD: {
                 name: 'Dragon Sword',
@@ -37,7 +48,7 @@
                 damage: 20,
                 range: TILE_SIZE * 8,
                 cooldown: 800,
-                projectileSpeed: 8,
+                projectileSpeed: 16,
                 color: '#8b4513',
                 type: 'ranged',
                 piercing: true
@@ -47,7 +58,7 @@
                 damage: 30,
                 range: TILE_SIZE * 8,
                 cooldown: 400,
-                projectileSpeed: 12,
+                projectileSpeed: 20,
                 color: '#f77',
                 type: 'ranged',
                 piercing: true
@@ -59,7 +70,7 @@
             SKELETON: {
                 health: 30,
                 damage: 5,
-                speed: 2,
+                speed: 159,
                 color: '#8B8B8B',
                 width: TILE_SIZE,
                 height: TILE_SIZE,
@@ -68,7 +79,7 @@
             SLIME: {
                 health: 60,
                 damage: 15,
-                speed: 1,
+                speed: 140,
                 color: '#00AA00',
                 width: TILE_SIZE,
                 height: TILE_SIZE * 0.75,
@@ -77,7 +88,7 @@
             DRAGON: {
                 health: 1200,  // 20x slime health
                 damage: 50,    // Can kill in 2 hits (player has 100 hp)
-                speed: 1,
+                speed: 0.15,
                 color: '#FF0000',
                 width: TILE_SIZE * 3,
                 height: TILE_SIZE * 3,
@@ -123,7 +134,7 @@
                 y: CANVAS_HEIGHT / 2,
                 width: TILE_SIZE,
                 height: TILE_SIZE,
-                speed: 3,
+                speed: 160,
                 health: 100,
                 maxHealth: 100,
                 weapons: [],
@@ -161,7 +172,8 @@
             gameStarted: false,  // Track if game has started
             showMainMenu: true,  // Show main menu by default
             showSkinMenu: false,  // Skin selection menu state
-            gameCompleted: false  // Track if player has beaten floor 100
+            gameCompleted: false,  // Track if player has beaten floor 100
+            timeScale: 1  // Ensure movement speed works correctly
         };
 
         // Input handling
@@ -665,6 +677,7 @@
 
         // Function to show cheat menu
         function showCheatMenu() {
+            console.log('showCheatMenu function called!'); // Debug log
             const cheatMenu = document.createElement('div');
             cheatMenu.id = 'cheatMenu';
             cheatMenu.style.cssText = `
@@ -720,7 +733,10 @@
             weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
             weaponSection.appendChild(weaponTitle);
 
-            const weapons = ['Piercing bow', 'Sword', 'Scythe', 'Dragon bow', 'Dragon sword'];
+            const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe'];
+            console.log('Weapons array:', weapons); // Debug log to see the full array
+            console.log('Weapons array length:', weapons.length); // Debug log
+            console.log('Last weapon:', weapons[weapons.length - 1]); // Debug log
             
             // Add amount selector
             const amountControl = document.createElement('div');
@@ -762,6 +778,7 @@
             });
             
             weapons.forEach(weapon => {
+                console.log('Processing weapon:', weapon); // Debug log
                 const weaponControl = document.createElement('div');
                 weaponControl.style.cssText = 'margin-bottom: 10px; display: flex; align-items: center;';
                 
@@ -779,6 +796,7 @@
                 weaponControl.appendChild(checkbox);
                 weaponControl.appendChild(label);
                 weaponSection.appendChild(weaponControl);
+                console.log('Added weapon control for:', weapon); // Debug log
             });
 
             // Floor selection section
@@ -974,6 +992,8 @@
                         const amount = parseInt(amountInput.value);
                         for (let i = 0; i < amount; i++) {
                             const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
+                            console.log('Looking for weapon:', weapon, '-> key:', weaponKey);
+                            console.log('WEAPONS[weaponKey] exists:', !!WEAPONS[weaponKey]);
                             const weaponData = {...WEAPONS[weaponKey]};
                             weaponData.id = weaponKey;
                             gameState.player.weapons.push(weaponData);
@@ -1024,6 +1044,12 @@
                 } else {
                     konamiIndex = 0;
                 }
+            }
+            
+            // Simple cheat menu shortcut for testing (F1 key)
+            if (key === 'f1') {
+                console.log('F1 pressed - opening cheat menu');
+                showCheatMenu();
             }
             
             // Handle keybinding
@@ -1504,7 +1530,7 @@
                                     }
 
                                     tryAgainBtn.onclick = () => {
-                                        // Start door transition immediately
+                                        // Start door transition immediately using the game over door
                                         requestAnimationFrame(() => {
                                             doorTransition.style.display = 'block';
                                             doorTransition.style.backgroundColor = 'transparent';
@@ -1551,51 +1577,63 @@
                                     
                                     // Set up quit to menu button
                                     quitToMenuBtn.onclick = () => {
-                                        // Start door transition immediately
+                                        console.log("QUIT TO MENU CLICKED - Custom transition");
+                                        // Create a custom transition element for quit to menu
+                                        const customTransition = document.createElement('div');
+                                        customTransition.style.position = 'fixed';
+                                        customTransition.style.top = '0';
+                                        customTransition.style.left = '0';
+                                        customTransition.style.width = '100%';
+                                        customTransition.style.height = '100%';
+                                        customTransition.style.background = 'url("images/game-over-background.png") center/cover no-repeat';
+                                        customTransition.style.zIndex = '2002';
+                                        customTransition.style.transform = 'scale(1)';
+                                        customTransition.style.opacity = '1';
+                                        customTransition.style.transition = 'transform 1.5s ease, opacity 1.5s ease';
+                                        document.body.appendChild(customTransition);
+                                        console.log("Custom transition element created and added");
+                                        
+                                        // Force reflow and start zoom out
+                                        customTransition.offsetHeight;
                                         requestAnimationFrame(() => {
-                                            doorTransition.style.display = 'block';
-                                            doorTransition.style.backgroundColor = 'transparent';
-                                            doorTransition.offsetHeight; // Force reflow
-                                            doorTransition.classList.add('active');
-                                            
-                                            // Fade out game over screen while door transition is playing
-                                            gameOver.classList.remove('visible');
-                                            setTimeout(() => {
-                                                gameOver.style.display = 'none';
-                                            }, 500);
-                                            
-                                            // Add black background near the end of the transition
-                                            setTimeout(() => {
-                                                doorTransition.style.backgroundColor = 'black';
-                                                
-                                                    // Reset game state
-                                                    setTimeout(() => {
-                                                    // Reset the game state completely
-                                                    gameState.player.health = gameState.player.maxHealth;
-                                                    gameState.player.weapons = [];
-                                                    gameState.enemies = [];
-                                                    gameState.projectiles = [];
-                                                    gameState.deathSequence = false;
-                                                    gameState.currentFloor = 0;  // Start at 0 because it will be incremented to 1
-                                                    gameState.enemyHPMultiplier = 1;
-                                                    gameState.floorCleared = true;  // This will trigger floor 1 to be initialized
-                                                    gameLoopRunning = false;
-                                                    gameState.isPaused = false;
-                                                    gameState.gameStarted = false;
-                                                    gameState.gameCompleted = false;
-                                                    
-                                                    // Reset UI elements
-                                                    deathOverlay.style.backgroundColor = 'transparent';
-                                                    doorTransition.style.display = 'none';
-                                                    doorTransition.classList.remove('active');
-                                                    doorTransition.style.backgroundColor = 'transparent';
-                                                    
-                                                    // Hide game container and show main menu
-                                                    document.getElementById('gameContainer').style.display = 'none';
-                                                    document.getElementById('mainMenu').style.display = 'flex';
-                                                }, 500);
-                                            }, 1700);
+                                            console.log("Starting zoom out animation");
+                                            customTransition.style.transform = 'scale(0.1)';
+                                            customTransition.style.opacity = '0';
                                         });
+                                        
+                                        // Fade out game over screen
+                                        gameOver.classList.remove('visible');
+                                        setTimeout(() => {
+                                            gameOver.style.display = 'none';
+                                        }, 500);
+                                        
+                                        // Complete transition in 1.5s, then reset game state
+                                        setTimeout(() => {
+                                            console.log("Transition complete, resetting game");
+                                            // Remove custom transition element
+                                            document.body.removeChild(customTransition);
+                                            
+                                            // Reset the game state completely
+                                            gameState.player.health = gameState.player.maxHealth;
+                                            gameState.player.weapons = [];
+                                            gameState.enemies = [];
+                                            gameState.projectiles = [];
+                                            gameState.deathSequence = false;
+                                            gameState.currentFloor = 0;  // Start at 0 because it will be incremented to 1
+                                            gameState.enemyHPMultiplier = 1;
+                                            gameState.floorCleared = true;  // This will trigger floor 1 to be initialized
+                                            gameLoopRunning = false;
+                                            gameState.isPaused = false;
+                                            gameState.gameStarted = false;
+                                            gameState.gameCompleted = false;
+                                            
+                                            // Reset UI elements
+                                            deathOverlay.style.backgroundColor = 'transparent';
+                                            
+                                            // Hide game container and show main menu
+                                            document.getElementById('gameContainer').style.display = 'none';
+                                            document.getElementById('mainMenu').style.display = 'flex';
+                                        }, 1500);
                                     };
 
                                     setTimeout(() => {

@@ -60,6 +60,12 @@ export class GameLoop {
         this.renderer.drawEnemies(this.gameState.enemies);
         this.renderer.drawProjectiles(this.gameState.projectiles);
         this.renderer.drawPlayer(this.gameState.player);
+        
+        // Render particles on top
+        const particleEngine = this.systems.find(system => system.constructor.name === 'ParticleEngine');
+        if (particleEngine) {
+            this.renderer.drawParticles(particleEngine);
+        }
     }
 
     handleFloorProgression() {

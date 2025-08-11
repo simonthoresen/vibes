@@ -1,8 +1,9 @@
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class ProjectileSystem {
-    constructor(gameState) {
+    constructor(gameState, particleEngine = null) {
         this.gameState = gameState;
+        this.particleEngine = particleEngine;
     }
 
     update() {
@@ -39,9 +40,23 @@ export class ProjectileSystem {
     }
 
     hitEnemy(enemy, projectile) {
+        const enemyWillDie = enemy.health - projectile.damage <= 0;
+        
         enemy.health -= projectile.damage;
         enemy.hitTime = Date.now();
         projectile.hitEnemies.add(enemy);
+        
+        // Create particle effect for projectile hits (if enemy doesn't die)
+        if (this.particleEngine && !enemyWillDie) {
+            const centerX = enemy.x + enemy.width / 2;
+            const centerY = enemy.y + enemy.height / 2;
+            
+            if (enemy.isBoss) {
+                this.particleEngine.createBossHitEffect(centerX, centerY, enemy.color);
+            } else {
+                this.particleEngine.createEnemyHitEffect(centerX, centerY, enemy.color);
+            }
+        }
     }
 
     isInBounds(projectile) {

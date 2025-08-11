@@ -1,8 +1,9 @@
 import { WEAPONS } from './constants.js';
 
 export class WeaponSystem {
-    constructor(gameState) {
+    constructor(gameState, particleEngine = null) {
         this.gameState = gameState;
+        this.particleEngine = particleEngine;
     }
 
     update(deltaTime) {
@@ -124,9 +125,30 @@ export class WeaponSystem {
         // Multiple scythes at different angles
         for (let i = 0; i < count; i++) {
             const phaseOffset = (i * 2 * Math.PI) / count;
-            const angle = now * Math.PI * 2 / 1000 + phaseOffset;
-            const scytheX = playerCenterX + Math.cos(angle) * weapon.orbitRadius;
-            const scytheY = playerCenterY + Math.sin(angle) * weapon.orbitRadius;
+            
+            // Check if this is a dragon scythe for special behavior
+            const isDragonScythe = weapon.oscillating && weapon.spinSpeed;
+            
+            let angle, currentOrbitRadius;
+            
+            if (isDragonScythe) {
+                // Dragon scythe: faster spin and oscillating distance
+                const spinSpeed = weapon.spinSpeed || 1;
+                angle = now * Math.PI * 2 / 1000 * spinSpeed + phaseOffset;
+                
+                // Oscillate the orbit radius (back and forth movement)
+                const oscillationSpeed = 0.002; // Speed of oscillation
+                const oscillationAmount = weapon.orbitRadius * 0.4; // How much it moves back and forth
+                const baseRadius = weapon.orbitRadius * 0.8; // Base distance
+                currentOrbitRadius = baseRadius + Math.sin(now * oscillationSpeed) * oscillationAmount;
+            } else {
+                // Regular scythe behavior
+                angle = now * Math.PI * 2 / 1000 + phaseOffset;
+                currentOrbitRadius = weapon.orbitRadius;
+            }
+            
+            const scytheX = playerCenterX + Math.cos(angle) * currentOrbitRadius;
+            const scytheY = playerCenterY + Math.sin(angle) * currentOrbitRadius;
 
             this.gameState.enemies.forEach(enemy => {
                 const enemyCenterX = enemy.x + enemy.width / 2;
@@ -189,8 +211,8 @@ export class WeaponSystem {
             y,
             dx: Math.cos(angle) * weapon.projectileSpeed,
             dy: Math.sin(angle) * weapon.projectileSpeed,
-            width: 8,
-            height: 8,
+            width: 30,
+            height: 30,
             damage: this.gameState.player.oneHitKill ? 9999 : weapon.damage,
             color: weapon.color,
             piercing: weapon.piercing,
@@ -200,33 +222,73 @@ export class WeaponSystem {
 
     damageEnemy(enemy, weapon, hitTime) {
         const damage = this.gameState.player.oneHitKill ? enemy.maxHealth || 9999 : weapon.damage;
+        const enemyWillDie = enemy.health - damage <= 0;
+        
         enemy.health -= damage;
         enemy.hitTime = hitTime;
+        
+        // Create particle effect for hit (if enemy doesn't die, death effect will be handled elsewhere)
+        if (this.particleEngine && !enemyWillDie) {
+            const centerX = enemy.x + enemy.width / 2;
+            const centerY = enemy.y + enemy.height / 2;
+            
+            if (enemy.isBoss) {
+                this.particleEngine.createBossHitEffect(centerX, centerY, enemy.color);
+            } else {
+                this.particleEngine.createEnemyHitEffect(centerX, centerY, enemy.color);
+            }
+        }
     }
 
     setupWeaponSelection(isBossReward = false) {
         const weaponOptions = document.getElementById('weaponOptions');
         const container = document.getElementById('weaponSelect');
-        
         if (!weaponOptions || !container) return;
 
         weaponOptions.innerHTML = '';
         const title = document.querySelector('.weapon-container h2');
-        
         if (title) {
             title.textContent = isBossReward ? 'Choose an Additional Weapon' : 'Choose Your Starting Weapon';
         }
 
+        // Fade-in and background for starting weapon selection only
+        if (!isBossReward) {
+            container.style.background = "#000";
+            container.style.transition = "background 1s";
+            // Add fade overlay if not present
+            let fadeOverlay = document.getElementById('fadeOverlay');
+            if (!fadeOverlay) {
+                fadeOverlay = document.createElement('div');
+                fadeOverlay.id = 'fadeOverlay';
+                fadeOverlay.style.position = 'fixed';
+                fadeOverlay.style.top = '0';
+                fadeOverlay.style.left = '0';
+                fadeOverlay.style.width = '100vw';
+                fadeOverlay.style.height = '100vh';
+                fadeOverlay.style.background = '#000';
+                fadeOverlay.style.zIndex = '2000';
+                fadeOverlay.style.opacity = '1';
+                fadeOverlay.style.transition = 'opacity 1.2s';
+                document.body.appendChild(fadeOverlay);
+            }
+            setTimeout(() => {
+                container.style.background = "url('images/long_dark_corridor.png') center center / cover no-repeat";
+                fadeOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    if (fadeOverlay.parentNode) fadeOverlay.parentNode.removeChild(fadeOverlay);
+                }, 1300);
+            }, 100);
+        } else {
+            container.style.background = 'rgba(0,0,0,0.9)';
+        }
         container.style.display = 'flex';
-        
+
         // Get available weapons
         let weaponsList = Object.entries(WEAPONS);
-        
         // Filter dragon weapons for starting selection
         if (!isBossReward && Math.random() > 0.05) {
             weaponsList = weaponsList.filter(([id]) => !id.includes('DRAGON'));
         }
-        
         // Shuffle and take first 3
         this.shuffleArray(weaponsList);
         weaponsList.slice(0, 3).forEach(([id, weapon]) => {
