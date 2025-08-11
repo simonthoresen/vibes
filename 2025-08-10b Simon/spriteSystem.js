@@ -39,10 +39,10 @@ class Sprite {
             ctx.font = 'bold 24px Arial';
             ctx.fillText('+', 0, 0);
             ctx.font = 'bold 18px Arial';
-            // Forward (increasing y)
-            ctx.fillText('FWD', 0, this.height/2 + 20);
-            // Backward (decreasing y)
-            ctx.fillText('BCK', 0, -this.height/2 - 20);
+            // Forward (decreasing y)
+            ctx.fillText('FWD', 0, -this.height/2 - 20);
+            // Backward (increasing y)
+            ctx.fillText('BCK', 0, this.height/2 + 20);
             // Right (increasing x)
             ctx.fillText('RGT', this.width/2 + 30, 0);
             // Left (decreasing x)

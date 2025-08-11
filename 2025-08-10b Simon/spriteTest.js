@@ -20,64 +20,36 @@
         }
     };
     let turretRotation = 0;
+    let enemyRotation = 0;
 
+    let cellW, cellH;
     function enter(stateManager) {
         turretRotation = 0;
         canvas = document.getElementById('gameCanvas');
         ctx = canvas.getContext('2d');
         spriteManager = new window.SpriteManager();
         spriteManager.clear();
-        class TurretSprite extends window.Sprite {
-            constructor(opts) {
-                super(opts);
-            }
-            draw(ctx) {
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.rotation);
-                ctx.scale(this.scale, this.scale);
-                // Draw brown circle
-                ctx.fillStyle = '#8B5A2B';
-                ctx.beginPath();
-                ctx.arc(0, 0, this.width/2, 0, Math.PI * 2);
-                ctx.fill();
-                // Draw dark brown triangle, centered
-                ctx.fillStyle = '#4B2E09';
-                ctx.beginPath();
-                ctx.moveTo(0, 40); // bottom point (flipped)
-                ctx.lineTo(32, -32); // top right (flipped)
-                ctx.lineTo(-32, -32); // top left (flipped)
-                ctx.closePath();
-                ctx.fill();
-                // Draw debug graphics
-                if (window.SpriteDebugMode) {
-                    // Call base debug rendering
-                    ctx.save();
-                    ctx.strokeStyle = '#FFFF00';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
-                    ctx.font = 'bold 24px Arial';
-                    ctx.fillStyle = '#FFFF00';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('+', 0, 0);
-                    ctx.font = 'bold 18px Arial';
-                    ctx.fillText('FWD', 0, this.height/2 + 20);
-                    ctx.fillText('BCK', 0, -this.height/2 - 20);
-                    ctx.fillText('RGT', this.width/2 + 30, 0);
-                    ctx.fillText('LFT', -this.width/2 - 30, 0);
-                    ctx.restore();
-                }
-                ctx.restore();
-            }
-        }
-        spriteManager.addSprite(new TurretSprite({
+        // 2x2 grid cell positions
+        cellW = canvas.width / 2;
+        cellH = canvas.height / 2;
+        // Upper left: turret
+        spriteManager.addSprite(new window.TurretSprite({
             type: 'turret',
-            x: canvas.width/2,
-            y: canvas.height/2,
+            x: cellW / 2,
+            y: cellH / 2,
             width: 128,
             height: 128,
             rotation: turretRotation,
+            scale: 1
+        }));
+        // Upper right: enemy fighter
+        spriteManager.addSprite(new window.EnemyFighterSprite({
+            type: 'enemyFighter',
+            x: cellW * 1.5,
+            y: cellH / 2,
+            width: 128,
+            height: 128,
+            rotation: enemyRotation,
             scale: 1
         }));
         canvas.addEventListener('mousedown', onMouseDown);
@@ -88,9 +60,17 @@
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
-        const cx = canvas.width/2;
-        const cy = canvas.height/2;
-        turretRotation = Math.atan2(my - cy, mx - cx) - Math.PI/2;
+        // Turret is in cellW/2, cellH/2
+        const cxTurret = cellW / 2;
+        const cyTurret = cellH / 2;
+    // FWD is negative Y, so subtract 90 degrees (Math.PI/2) to rotate FWD toward mouse
+    turretRotation = Math.atan2(my - cyTurret, mx - cxTurret) - Math.PI / 2;
+
+        // Enemy fighter is in cellW*1.5, cellH/2
+        const cxEnemy = cellW * 1.5;
+        const cyEnemy = cellH / 2;
+    // FWD is negative Y, so subtract 90 degrees (Math.PI/2) to rotate FWD toward mouse
+    enemyRotation = Math.atan2(my - cyEnemy, mx - cxEnemy) - Math.PI / 2;
     }
 
     function exit() {
@@ -111,10 +91,24 @@
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Update turret rotation before drawing
+        // Update turret and enemy fighter rotation before drawing
         if (spriteManager.sprites.length > 0) {
             spriteManager.sprites[0].rotation = turretRotation;
         }
+        if (spriteManager.sprites.length > 1) {
+            spriteManager.sprites[1].rotation = enemyRotation;
+        }
+        // Draw grid
+        ctx.save();
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cellW, 0);
+        ctx.lineTo(cellW, canvas.height);
+        ctx.moveTo(0, cellH);
+        ctx.lineTo(canvas.width, cellH);
+        ctx.stroke();
+        ctx.restore();
         spriteManager.draw(ctx);
         backButton.draw(ctx);
     }

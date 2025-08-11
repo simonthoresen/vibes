@@ -44,5 +44,53 @@ class TurretSprite extends window.Sprite {
     }
 }
 
+class EnemyFighterSprite extends window.Sprite {
+    constructor(opts) {
+        super(opts);
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.scale(this.scale, this.scale);
+    // Draw wide, short dark red triangle (base plane), moved slightly backwards
+    ctx.fillStyle = '#8B0000';
+    ctx.beginPath();
+    ctx.moveTo(0, 28); // bottom (was 36)
+    ctx.lineTo(60, -32); // right (was -24)
+    ctx.lineTo(-60, -32); // left (was -24)
+    ctx.closePath();
+    ctx.fill();
+        // Draw narrow, tall lighter red triangle (top plane)
+        ctx.fillStyle = '#FF3333';
+        ctx.beginPath();
+        ctx.moveTo(0, 48); // bottom
+        ctx.lineTo(28, -48); // right
+        ctx.lineTo(-28, -48); // left
+        ctx.closePath();
+        ctx.fill();
+        // Debug graphics
+        if (window.SpriteDebugMode) {
+            ctx.save();
+            ctx.strokeStyle = '#FFFF00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
+            ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = '#FFFF00';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+', 0, 0);
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('FWD', 0, this.height/2 + 20);
+            ctx.fillText('BCK', 0, -this.height/2 - 20);
+            ctx.fillText('RGT', this.width/2 + 30, 0);
+            ctx.fillText('LFT', -this.width/2 - 30, 0);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+}
+
 window.TurretSprite = TurretSprite;
+window.EnemyFighterSprite = EnemyFighterSprite;
 // Add more sprite types here as needed
