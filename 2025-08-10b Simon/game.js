@@ -19,6 +19,7 @@ window.stateManager = (function() {
 const menuState = (function() {
     let canvas, ctx;
     let buttons = [
+        { text: 'Map Test', x: 0, y: 0, w: 320, h: 80, onClick: () => window.stateManager.setState('mapTest') },
         { text: 'Particle Test', x: 0, y: 0, w: 320, h: 80, onClick: () => window.stateManager.setState('particleTest') },
         { text: 'Sprite Test', x: 0, y: 0, w: 320, h: 80, onClick: () => window.stateManager.setState('spriteTest') }
     ];
@@ -80,9 +81,10 @@ window.onload = function() {
 
     // Register states
     window.stateManager.register('menu', menuState);
+    window.stateManager.register('mapTest', window.mapTestState);
     window.stateManager.register('particleTest', window.particleTestState);
     window.stateManager.register('spriteTest', window.spriteTestState);
-    window.stateManager.setState('spriteTest');
+    window.stateManager.setState('mapTest');
 
     let lastTime = performance.now();
     function gameLoop(now) {

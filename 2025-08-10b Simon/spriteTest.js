@@ -71,6 +71,16 @@
             scale: 1,
             particleSystem: particleSystem
         }));
+            // Bottom right: player car
+            spriteManager.addSprite(new window.PlayerCarSprite({
+                type: 'playerCar',
+                x: cellW * 1.5,
+                y: cellH * 1.5,
+                width: 128,
+                height: 128,
+                rotation: 0,
+                scale: 1
+            }));
         canvas.addEventListener('mousedown', onMouseDown);
         canvas.addEventListener('mousemove', onMouseMove);
     }
@@ -96,6 +106,14 @@
     const cyPlayer = cellH * 1.5;
     // FRONT is negative Y, so subtract 90 degrees (Math.PI/2) and add Math.PI to rotate FRONT toward mouse
     playerRotation = Math.atan2(my - cyPlayer, mx - cxPlayer) - Math.PI / 2 + Math.PI;
+
+        // Player car is in cellW*1.5, cellH*1.5
+        const cxCar = cellW * 1.5;
+        const cyCar = cellH * 1.5;
+        // Car points forward (negative Y), rotate toward mouse
+        if (spriteManager && spriteManager.sprites.length > 3) {
+            spriteManager.sprites[3].rotation = Math.atan2(my - cyCar, mx - cxCar) - Math.PI / 2 + Math.PI;
+        }
     }
 
     function exit() {
@@ -131,6 +149,11 @@
         if (spriteManager.sprites.length > 2) {
             spriteManager.sprites[2].rotation = playerRotation;
         }
+            // Update player car rotation
+            if (spriteManager.sprites.length > 3) {
+                // Already set in onMouseMove, but ensure it's not undefined
+                // spriteManager.sprites[3].rotation = carRotation;
+            }
         // Draw grid
         ctx.save();
         ctx.strokeStyle = '#333';
@@ -142,10 +165,11 @@
         ctx.lineTo(canvas.width, cellH);
         ctx.stroke();
         ctx.restore();
-        spriteManager.draw(ctx);
+        // Draw particles first so zLayer -1 particles render below sprites
         if (particleSystem) {
             particleSystem.draw(ctx);
         }
+        spriteManager.draw(ctx);
         backButton.draw(ctx);
     }
 
