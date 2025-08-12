@@ -389,14 +389,4 @@ export class WeaponSystem {
         }
         this.gameState.enemySpeedMultiplier = (this.gameState.enemySpeedMultiplier || 1) * 2;
     }
-
-    scaleWeaponStatsAfterBoss() {
-        // For each weapon the player has, increase damage by its base and halve cooldown (double speed)
-        this.gameState.player.weapons.forEach(weapon => {
-            if (!weapon._baseDamage) weapon._baseDamage = weapon.damage;
-            if (!weapon._baseCooldown) weapon._baseCooldown = weapon.cooldown;
-            weapon.damage += weapon._baseDamage;
-            weapon.cooldown /= 2;
-        });
-    }
 }

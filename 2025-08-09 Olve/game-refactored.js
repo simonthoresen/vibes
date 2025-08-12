@@ -164,10 +164,9 @@ class DungeonCrawlerGame {
     handleBossDefeated() {
         this.gameLoop.stop();
         this.weaponSystem.setupWeaponSelection(true);
+        
         // Double enemy HP after boss fight
         this.weaponSystem.scaleEnemyStatsAfterBoss();
-        // Scale weapon stats after boss fight
-        this.weaponSystem.scaleWeaponStatsAfterBoss();
     }
 
     handleGameOver() {
