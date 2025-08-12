@@ -846,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Example for enemy creation:
 // ...existing code...
     // When setting enemy speed:
-    enemy.speed = baseSpeed * this.gameState.enemyHPMultiplier;
+    // enemy.speed = baseSpeed * this.gameState.enemyHPMultiplier;
 // ...existing code...
 // If you have a function or loop where you set enemy.health *= this.gameState.enemyHPMultiplier;
 // Add:
