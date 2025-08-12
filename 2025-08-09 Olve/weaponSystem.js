@@ -375,4 +375,28 @@ export class WeaponSystem {
         const event = new CustomEvent(eventName, { detail });
         document.dispatchEvent(event);
     }
+
+    // When scaling enemy HP after boss fight, also scale speed
+    scaleEnemyStatsAfterBoss() {
+        this.gameState.enemyHPMultiplier *= 2;
+        // Scale speed for all current and future enemies, including bosses
+        this.gameState.enemies.forEach(enemy => {
+            enemy.speed *= 2;
+        });
+        // Also scale base speed for future bosses if you use a base value
+        if (this.gameState.bossBaseSpeed) {
+            this.gameState.bossBaseSpeed *= 2;
+        }
+        this.gameState.enemySpeedMultiplier = (this.gameState.enemySpeedMultiplier || 1) * 2;
+    }
+
+    scaleWeaponStatsAfterBoss() {
+        // For each weapon the player has, increase damage by its base and halve cooldown (double speed)
+        this.gameState.player.weapons.forEach(weapon => {
+            if (!weapon._baseDamage) weapon._baseDamage = weapon.damage;
+            if (!weapon._baseCooldown) weapon._baseCooldown = weapon.cooldown;
+            weapon.damage += weapon._baseDamage;
+            weapon.cooldown /= 2;
+        });
+    }
 }

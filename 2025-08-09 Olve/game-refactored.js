@@ -164,6 +164,10 @@ class DungeonCrawlerGame {
     handleBossDefeated() {
         this.gameLoop.stop();
         this.weaponSystem.setupWeaponSelection(true);
+        // Double enemy HP after boss fight
+        this.weaponSystem.scaleEnemyStatsAfterBoss();
+        // Scale weapon stats after boss fight
+        this.weaponSystem.scaleWeaponStatsAfterBoss();
     }
 
     handleGameOver() {
@@ -598,7 +602,7 @@ class DungeonCrawlerGame {
         weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
         weaponSection.appendChild(weaponTitle);
 
-        const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe'];
+        const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe'];
         
         // Add amount selector
         const amountControl = document.createElement('div');

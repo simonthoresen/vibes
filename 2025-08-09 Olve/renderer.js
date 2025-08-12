@@ -63,6 +63,22 @@ export class Renderer {
         this.dragonScytheImage.onload = () => {
             this.dragonScytheImageLoaded = true;
         };
+        
+        // Load nature scythe sprite
+        this.natureScytheImage = new Image();
+        this.natureScytheImage.src = 'images/Nature-scythe.png';
+        this.natureScytheImageLoaded = false;
+        this.natureScytheImage.onload = () => {
+            this.natureScytheImageLoaded = true;
+        };
+        
+        // Load crystal scythe sprite
+        this.crystalScytheImage = new Image();
+        this.crystalScytheImage.src = 'images/Crystal-scythe.png';
+        this.crystalScytheImageLoaded = false;
+        this.crystalScytheImage.onload = () => {
+            this.crystalScytheImageLoaded = true;
+        };
     }
 
     clear() {
@@ -349,10 +365,43 @@ export class Renderer {
             const scytheY = playerCenterY + Math.sin(angle) * currentOrbitRadius;
 
             // Check which type of scythe and if sprites are loaded
+            const isCrystalScythe = weapon.name === 'Crystal Scythe';
+            const isNatureScythe = weapon.name === 'Nature Scythe';
             const isRegularScythe = weapon.color === '#800080' && !isDragonScythe;
             const isDragonScytheSprite = isDragonScythe;
-            
-            if (isRegularScythe && this.scytheImageLoaded) {
+            if (isCrystalScythe && this.crystalScytheImageLoaded) {
+                // Draw crystal scythe sprite
+                this.ctx.save();
+                this.ctx.translate(scytheX, scytheY);
+                const rotationSpeed = 0.03;
+                const currentRotation = (Date.now() * rotationSpeed) % (2 * Math.PI);
+                this.ctx.rotate(currentRotation);
+                const scytheSize = weapon.range * 2;
+                this.ctx.drawImage(
+                    this.crystalScytheImage,
+                    -scytheSize / 2,
+                    -scytheSize / 2,
+                    scytheSize,
+                    scytheSize
+                );
+                this.ctx.restore();
+            } else if (isNatureScythe && this.natureScytheImageLoaded) {
+                // Draw nature scythe sprite
+                this.ctx.save();
+                this.ctx.translate(scytheX, scytheY);
+                const rotationSpeed = 0.03;
+                const currentRotation = (Date.now() * rotationSpeed) % (2 * Math.PI);
+                this.ctx.rotate(currentRotation);
+                const scytheSize = weapon.range * 2;
+                this.ctx.drawImage(
+                    this.natureScytheImage,
+                    -scytheSize / 2,
+                    -scytheSize / 2,
+                    scytheSize,
+                    scytheSize
+                );
+                this.ctx.restore();
+            } else if (isRegularScythe && this.scytheImageLoaded) {
                 // Draw regular scythe sprite
                 this.ctx.save();
                 

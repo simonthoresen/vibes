@@ -25,7 +25,7 @@ export const WEAPONS = {
     },
     DRAGON_SCYTHE: {
         name: 'Dragon Scythe',
-        damage: 50,
+        damage: 100,
         range: TILE_SIZE * 1,
         cooldown: 150,
         color: '#ff4500',
@@ -62,6 +62,29 @@ export const WEAPONS = {
         color: '#f77',
         type: 'ranged',
         piercing: true
+    },
+    NATURE_SCYTHE: {
+        name: 'Nature Scythe',
+        damage: 50,
+        range: TILE_SIZE * 1, // same as other scythes
+        cooldown: 200, // same as Scythe
+        color: '#3cb371', // mediumseagreen
+        type: 'spinning',
+        orbitRadius: TILE_SIZE * 4, // same as Dragon Scythe
+        spinSpeed: 1, // half the speed of Dragon Scythe
+        oscillating: true,
+        sprite: 'Nature-scythe.png'
+    },
+    CRYSTAL_SCYTHE: {
+        name: 'Crystal Scythe',
+        damage: 100,
+        range: TILE_SIZE * 1, // same as other scythes
+        cooldown: 200, // same as Scythe
+        color: '#00e6ff', // cyan/light blue
+        type: 'spinning',
+        orbitRadius: TILE_SIZE * 4, // same as Dragon Scythe
+        // No spinSpeed or oscillating, so it spins like a regular scythe
+        sprite: 'Crystal-scythe.png'
     }
 };
 
