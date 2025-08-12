@@ -164,9 +164,6 @@ class DungeonCrawlerGame {
     handleBossDefeated() {
         this.gameLoop.stop();
         this.weaponSystem.setupWeaponSelection(true);
-        
-        // Double enemy HP after boss fight
-        this.weaponSystem.scaleEnemyStatsAfterBoss();
     }
 
     handleGameOver() {
@@ -601,7 +598,7 @@ class DungeonCrawlerGame {
         weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
         weaponSection.appendChild(weaponTitle);
 
-        const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe'];
+        const weapons = ['Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe'];
         
         // Add amount selector
         const amountControl = document.createElement('div');
@@ -747,7 +744,7 @@ class DungeonCrawlerGame {
             this.gameState.player.permanentInvulnerability = !this.gameState.player.permanentInvulnerability;
             this.gameState.player.invulnerable = this.gameState.player.permanentInvulnerability;
             invincibilityButton.style.backgroundColor = this.gameState.player.permanentInvulnerability ? '#2a5' : '#333';
-            invincibilityButton.textContent = this.gameState.player.permanentInvulnerability ? 'Permanent Invincibility: ON' : 'Toggle Permanent Invincibility';
+            invincibilityButton.textContent = this.gameState.player.permanentInvulnerabilities ? 'Permanent Invincibility: ON' : 'Toggle Permanent Invincibility';
         };
 
         return invincibilityButton;
@@ -844,3 +841,14 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Failed to initialize game:', error);
     }
 });
+
+// When spawning or updating enemies, scale their speed by gameState.enemyHPMultiplier
+// Example for enemy creation:
+// ...existing code...
+    // When setting enemy speed:
+    enemy.speed = baseSpeed * this.gameState.enemyHPMultiplier;
+// ...existing code...
+// If you have a function or loop where you set enemy.health *= this.gameState.enemyHPMultiplier;
+// Add:
+// enemy.speed *= this.gameState.enemyHPMultiplier;
+// ...existing code...
