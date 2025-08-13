@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Mind</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/menu.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Title Screen -->
+        <div id="title-screen" class="screen active">
+            <h1>The Mind</h1>
+            <p class="description">
+                A game about different people in different times and places, they are not necessarily connected to each other. 
+                Every person has their own story, worries and motives. Some stories may be sweet and nice, others might be weird and worrying.
+            </p>
+            <button id="start-button">Play</button>
+        </div>
+
+        <!-- Character Selection Screen -->
+        <div id="character-select" class="screen">
+            <button id="back-to-menu" class="back-button">Back to Menu</button>
+            <div class="character-carousel">
+                <button class="nav-arrow left">←</button>
+                <div class="character-preview prev">
+                    <div class="character-image"></div>
+                </div>
+                <div class="character-display current">
+                    <h2 class="character-name"></h2>
+                    <div class="character-image"></div>
+                    <p class="character-description"></p>
+                    <p class="trigger-warning"></p>
+                </div>
+                <div class="character-preview next">
+                    <div class="character-image"></div>
+                </div>
+                <button class="nav-arrow right">→</button>
+            </div>
+            <div class="save-buttons">
+                <button id="new-game">New Game</button>
+                <button id="load-game">Load Game</button>
+            </div>
+        </div>
+
+        <!-- Game World -->
+        <div id="game-world" class="screen">
+            <canvas id="game-canvas"></canvas>
+        </div>
+
+        <!-- Pause Menu -->
+        <div id="pause-menu" class="screen">
+            <div class="menu-content">
+                <button id="resume">Resume</button>
+                <button id="save-game">Save Game</button>
+                <button id="settings">Settings</button>
+                <button id="to-main-menu">Main Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Scripts -->
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    
+    <!-- Core Systems -->
+    <script src="scripts/systems/SaveSystem.js"></script>
+    <script src="scripts/systems/InputSystem.js"></script>
+    <script src="scripts/systems/AudioSystem.js"></script>
+    
+    <!-- Character System -->
+    <script src="scripts/characters/Character.js"></script>
+    <script src="scripts/characters/CharacterData.js"></script>
+    
+    <!-- UI System -->
+    <script src="scripts/ui/MenuManager.js"></script>
+    <script src="scripts/ui/CharacterSelect.js"></script>
+    
+    <!-- Game Logic -->
+    <script src="scripts/game/GameWorld.js"></script>
+    <script src="scripts/game/Player.js"></script>
+    <script src="scripts/game/Camera.js"></script>
+    
+    <!-- Main Game -->
+    <script src="scripts/Game.js"></script>
+    <script src="scripts/main.js"></script>
+</body>
+</html>

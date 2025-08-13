@@ -1,0 +1,136 @@
+/* Menu Styles */
+
+/* Title Screen */
+#title-screen {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+}
+
+#title-screen h1 {
+    font-size: 48px;
+    margin-bottom: 30px;
+}
+
+#title-screen .description {
+    max-width: 600px;
+    line-height: 1.6;
+    margin-bottom: 40px;
+}
+
+/* Character Selection */
+#character-select {
+    flex-direction: column;
+    position: relative;
+}
+
+.back-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+}
+
+.character-carousel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30px;
+    width: 100%;
+    position: relative;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.character-display.current {
+    width: 400px;
+    text-align: center;
+    z-index: 2;
+    position: relative;
+}
+
+.character-preview {
+    width: 200px;
+    opacity: 0.5;
+    filter: brightness(0.6);
+    transform: scale(0.8);
+    transition: all 0.3s ease;
+    z-index: 1;
+    margin: 0 -100px;
+}
+
+.character-preview .character-image {
+    width: 150px;
+    height: 150px;
+    margin: 10px auto;
+}
+
+.character-display.current .character-image {
+    width: 200px;
+    height: 200px;
+    margin: 20px auto;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.character-image {
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.nav-arrow {
+    font-size: 24px;
+    padding: 10px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-arrow.left {
+    left: -20px;
+}
+
+.nav-arrow.right {
+    right: -20px;
+}
+
+.character-name {
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+.character-description {
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.trigger-warning {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+/* Pause Menu */
+#pause-menu {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.menu-content {
+    background-color: black;
+    border: 2px solid white;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+}
