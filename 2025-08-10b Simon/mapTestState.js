@@ -90,6 +90,8 @@ const mapTestState = (function() {
 
         // Make 3-tile-wide strokes through each layer that clear the tiles at those positions
         for (let l = 0; l < testMap.layers.length; l++) {
+            // Skip strokes for the bottom layer (background)
+            if (l === 0) continue;
             // Diagonal stroke (3 wide)
             for (let t = 0; t < mapSize; t++) {
                 for (let w = -1; w <= 1; w++) {
@@ -130,7 +132,7 @@ const mapTestState = (function() {
             }
         }
 
-        // Camera starts centered on the map
+        // Camera starts centered on the map and canvas
         camera = {
             x: (testMap.width * testMap.tileWidth) / 2 - canvas.width / 2,
             y: (testMap.height * testMap.tileHeight) / 2 - canvas.height / 2
@@ -143,14 +145,16 @@ const mapTestState = (function() {
 
     let cameraAngle = 0;
     function update(dt) {
-        // Camera rotates slowly around the center of the map
+        // Camera rotates slowly around the center of the map, keeping map centered in canvas
         if (camera && testMap) {
             cameraAngle += dt * 0.2; // Slow rotation
             const radius = 96;
-            const centerX = (testMap.width * testMap.tileWidth) / 2;
-            const centerY = (testMap.height * testMap.tileHeight) / 2;
-            camera.x = centerX + Math.cos(cameraAngle) * radius - canvas.width / 2;
-            camera.y = centerY + Math.sin(cameraAngle) * radius - canvas.height / 2;
+            const mapCenterX = (testMap.width * testMap.tileWidth) / 2;
+            const mapCenterY = (testMap.height * testMap.tileHeight) / 2;
+            const offsetX = Math.cos(cameraAngle) * radius;
+            const offsetY = Math.sin(cameraAngle) * radius;
+            camera.x = mapCenterX - canvas.width / 2 + offsetX;
+            camera.y = mapCenterY - canvas.height / 2 + offsetY;
         }
     }
 
