@@ -87,7 +87,37 @@ const CharacterData = {
             imageUrl: 'images/Chibi/CraneC.png',
             triggerWarning: null,
             worldConfig: {
-                // Specific world configuration for Crane
+                backgrounds: {
+                    hospital: 'images/Crane/Crane background 1.jpg'
+                },
+                transitions: {
+                    fadeIn: {
+                        type: 'fade',
+                        duration: 1000,
+                        from: '#000000',
+                        to: 'transparent'
+                    },
+                    fadeOut: {
+                        type: 'fade',
+                        duration: 1000,
+                        from: 'transparent',
+                        to: '#000000'
+                    }
+                },
+                initialScene: 'intro',
+                scenes: {
+                    intro: {
+                        background: 'hospital',
+                        onEnter: ['fadeIn'],
+                        onExit: ['fadeOut'],
+                        actions: [
+                            {
+                                type: 'wait',
+                                duration: 1000
+                            }
+                        ]
+                    }
+                }
             }
         }
     ],

@@ -4,8 +4,7 @@
 
 ## Game Style
 - The game uses typewriter font throughout all interfaces and text
-- Top-down view camera that follows the player character
-- Camera stops at world boundaries to prevent viewing the void
+- The game is a visual novel game
 
 ## Controls
 - Use the **Arrow Keys** or **WASD** to move your character

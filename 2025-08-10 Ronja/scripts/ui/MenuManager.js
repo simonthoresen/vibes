@@ -65,27 +65,39 @@ class MenuManager {
         });
     }
 
-    showScreen(screenId) {
-        // Hide all screens
+    showScreen(screenName) {
+        // Hide all screens first
         this.screens.forEach(screen => {
-            screen.classList.remove('active');
+            if (screenName === 'game' && screen.id === 'game-world') {
+                // Keep game world visible for game screen
+                screen.classList.add('active');
+                screen.style.display = 'block';
+            } else {
+                screen.classList.remove('active');
+                screen.style.display = 'none';
+            }
         });
 
-        // Show requested screen
-        const screen = this.screens.get(screenId);
+        // Show the requested screen
+        const screen = this.screens.get(screenName);
         if (screen) {
             screen.classList.add('active');
-            this.currentScreen = screenId;
+            screen.style.display = screenName === 'game' ? 'block' : 'flex';
+            this.currentScreen = screenName;
         }
     }
 
     togglePauseMenu() {
         const pauseMenu = this.screens.get('pause-menu');
-        pauseMenu.classList.toggle('active');
+        if (pauseMenu) {
+            pauseMenu.classList.toggle('active');
+        }
     }
 
     hidePauseMenu() {
         const pauseMenu = this.screens.get('pause-menu');
-        pauseMenu.classList.remove('active');
+        if (pauseMenu) {
+            pauseMenu.classList.remove('active');
+        }
     }
 }
