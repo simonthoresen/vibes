@@ -1,90 +1,68 @@
-// Map system for platformer games with multi-layer, parallax, and z-order support
+// Map system with multi-layer, parallax, and shared tilesheet
 
 class MapLayer {
-    constructor({ z = 0, parallax = 1, data = null, name = "" } = {}) {
-        this.z = z; // z-value for rendering order
-        this.parallax = parallax; // parallax factor (lower = slower)
-        this.data = data; // tile/sprite data for this layer
-        this.name = name;
+    constructor(width, height, parallax = 1) {
+        this.width = width;
+        this.height = height;
+        this.parallax = parallax; // Lower = slower movement
+        // 2D array of tile indices (null for empty/transparent)
+        this.tiles = Array.from({ length: height }, () => Array(width).fill(null));
     }
 }
 
-class GameMap {
-    constructor({ width, height, layers = [] } = {}) {
+class Map {
+    constructor(width, height, tilesheetSrc) {
         this.width = width;
         this.height = height;
-        this.layers = layers; // Array of MapLayer objects
+        this.layers = [];
+        this.tilesheet = new Image();
+        this.tilesheet.src = tilesheetSrc;
+        // Tilesheet properties (set these as needed)
+        this.tileWidth = 32;
+        this.tileHeight = 32;
+        this.tilesPerRow = 8;
     }
 
-    addLayer(layer) {
+    addLayer(parallax = 1) {
+        const layer = new MapLayer(this.width, this.height, parallax);
         this.layers.push(layer);
-        // Sort layers by z-value (ascending)
-        this.layers.sort((a, b) => a.z - b.z);
+        return layer;
     }
 
     render(ctx, camera) {
-        // Render layers in order, applying parallax
-        for (const layer of this.layers) {
-            this.renderLayer(ctx, layer, camera);
-        }
-    }
-
-    renderLayer(ctx, layer, camera) {
-        // Example: render layer data with parallax
-        // You should replace this with your actual tile/sprite rendering logic
-        const offsetX = camera.x * layer.parallax;
-        const offsetY = camera.y * layer.parallax;
-        if (layer.data && typeof layer.data.render === "function") {
-            layer.data.render(ctx, offsetX, offsetY);
-        }
-    }
-}
-
-// Example usage:
-// const map = new GameMap({ width: 100, height: 50 });
-// map.addLayer(new MapLayer({ z: 0, parallax: 0.5, data: backgroundTiles }));
-// map.addLayer(new MapLayer({ z: 1, parallax: 1, data: foregroundTiles }));
-// map.render(ctx, camera);
-
-// Utility: Render sprites and particles by z-layer, respecting map layers
-function renderSpritesAndParticlesByMapLayers(ctx, camera, map, spriteManager, particleSystem) {
-    // For each layer, render sprites and particles with matching z-value
-    for (const layer of map.layers) {
-        // Parallax offset for this layer
-        const offsetX = camera.x * layer.parallax;
-        const offsetY = camera.y * layer.parallax;
-
-        // Draw layer background/tile data if present
-        if (layer.data && typeof layer.data.render === "function") {
-            layer.data.render(ctx, offsetX, offsetY);
-        }
-
-        // Draw sprites in this z-layer
-        if (spriteManager && spriteManager.sprites) {
-            for (const sprite of spriteManager.sprites) {
-                if (typeof sprite.z === "number" ? sprite.z === layer.z : layer.z === 0) {
-                    ctx.save();
-                    ctx.translate(-offsetX, -offsetY); // Parallax compensation
-                    sprite.draw(ctx);
-                    ctx.restore();
-                }
-            }
-        }
-
-        // Draw particles in this z-layer
-        if (particleSystem && particleSystem.particles) {
-            for (const particle of particleSystem.particles) {
-                if (typeof particle.zLayer === "number" ? particle.zLayer === layer.z : layer.z === 0) {
-                    ctx.save();
-                    ctx.translate(-offsetX, -offsetY); // Parallax compensation
-                    particle.draw(ctx);
-                    ctx.restore();
+        ctx.imageSmoothingEnabled = false;
+        const mapPixelWidth = this.width * this.tileWidth;
+        const mapPixelHeight = this.height * this.tileHeight;
+        const centerX = mapPixelWidth / 2 - ctx.canvas.width / 2;
+        const centerY = mapPixelHeight / 2 - ctx.canvas.height / 2;
+        const camOffsetX = Math.floor(camera.x - centerX);
+        const camOffsetY = Math.floor(camera.y - centerY);
+        for (let i = 0; i < this.layers.length; i++) {
+            const layer = this.layers[i];
+            // Parallax offset relative to map center
+            const offsetX = camOffsetX * layer.parallax;
+            const offsetY = camOffsetY * layer.parallax;
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    const tileIndex = layer.tiles[y][x];
+                    if (tileIndex === null) continue; // Transparent
+                    // Calculate tile position in tilesheet
+                    const sx = (tileIndex % this.tilesPerRow) * this.tileWidth;
+                    const sy = Math.floor(tileIndex / this.tilesPerRow) * this.tileHeight;
+                    // Calculate screen position (integer math)
+                    const dx = x * this.tileWidth - offsetX;
+                    const dy = y * this.tileHeight - offsetY;
+                    ctx.drawImage(
+                        this.tilesheet,
+                        sx, sy, this.tileWidth, this.tileHeight,
+                        dx, dy, this.tileWidth, this.tileHeight
+                    );
                 }
             }
         }
     }
 }
 
-window.GameMap = GameMap;
+window.Map = Map;
 window.MapLayer = MapLayer;
-window.renderSpritesAndParticlesByMapLayers = renderSpritesAndParticlesByMapLayers;
+
