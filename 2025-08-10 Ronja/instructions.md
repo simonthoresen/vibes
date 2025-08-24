@@ -5,6 +5,11 @@
 ## Game Style
 - The game uses typewriter font throughout all interfaces and text
 - The game is a visual novel game
+- Character dialogue appears in a text box:
+  - Position: Bottom of the screen with margins on all sides
+  - Size: Approximately 1/5 of the screen height
+  - Style: Black background with white outline
+  - Layout: Centered horizontally, not touching screen edges
 
 ## Controls
 - Use the **Arrow Keys** or **WASD** to move your character
