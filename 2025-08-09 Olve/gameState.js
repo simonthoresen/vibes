@@ -20,7 +20,8 @@ export class GameState {
         this.openWorld = this.createOpenWorldState();
         this.settings = {
             keybinds: { ...DEFAULT_KEYBINDS },
-            showPauseBtn: true
+            showPauseBtn: true,
+            scrollableCheatMenu: false
         };
     }
 

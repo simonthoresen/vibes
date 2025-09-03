@@ -151,6 +151,16 @@ class DungeonCrawlerGame {
             };
         }
 
+        // Settings toggle for scrollable cheat menu
+        const scrollableCheatMenuSetting = document.getElementById('scrollableCheatMenuSetting');
+        if (scrollableCheatMenuSetting) {
+            // Set initial state from gameState
+            scrollableCheatMenuSetting.checked = !!this.gameState.settings.scrollableCheatMenu;
+            scrollableCheatMenuSetting.onchange = (e) => {
+                this.gameState.settings.scrollableCheatMenu = scrollableCheatMenuSetting.checked;
+            };
+        }
+
         // Update pause button visibility on game start
         this.updatePauseBtnVisibility();
 
@@ -676,13 +686,29 @@ class DungeonCrawlerGame {
         `;
 
         const content = document.createElement('div');
-        content.style.cssText = `
-            background-color: rgba(20, 20, 20, 0.95);
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            min-width: 300px;
-        `;
+        
+        // Check if scrollable mode is enabled
+        if (this.gameState.settings.scrollableCheatMenu) {
+            content.style.cssText = `
+                background-color: rgba(20, 20, 20, 0.95);
+                padding: 20px;
+                border-radius: 15px;
+                text-align: center;
+                max-width: 90vw;
+                max-height: 90vh;
+                overflow-y: auto;
+                overflow-x: hidden;
+                width: 400px;
+            `;
+        } else {
+            content.style.cssText = `
+                background-color: rgba(20, 20, 20, 0.95);
+                padding: 40px;
+                border-radius: 15px;
+                text-align: center;
+                min-width: 300px;
+            `;
+        }
 
         const title = document.createElement('h1');
         title.textContent = 'Cheat Menu';
