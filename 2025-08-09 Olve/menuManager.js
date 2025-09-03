@@ -129,7 +129,7 @@ export class MenuManager {
 
     createSkinsButton() {
         const skinsButton = this.createButton(
-            this.gameState.player.skinsUnlocked ? 'Change Skin' : 'Skins (Unlock at Floor 100)',
+            this.gameState.player.skinsUnlocked ? 'Change Skin' : 'Skins (Reach Floor 100)',
             () => {
                 if (this.gameState.player.skinsUnlocked) {
                     this.showSkinMenu();
@@ -143,6 +143,31 @@ export class MenuManager {
         }
 
         return skinsButton;
+    }
+
+    updateSkinsButton() {
+        // Find the skins button in the main menu (it's the 4th button)
+        const mainMenu = document.getElementById('mainMenu');
+        if (!mainMenu) return;
+        
+        const buttons = mainMenu.querySelectorAll('button');
+        const skinsButton = buttons[2]; // 3rd button (0-indexed): Start, Settings, Skins
+        
+        if (skinsButton) {
+            // Update text based on current unlock status
+            skinsButton.textContent = this.gameState.player.skinsUnlocked ? 'Change Skin' : 'Skins (Reach Floor 100)';
+            
+            // Update styling and functionality
+            if (this.gameState.player.skinsUnlocked) {
+                skinsButton.style.opacity = '1';
+                skinsButton.style.cursor = 'pointer';
+                skinsButton.onclick = () => this.showSkinMenu();
+            } else {
+                skinsButton.style.opacity = '0.5';
+                skinsButton.style.cursor = 'not-allowed';
+                skinsButton.onclick = () => {}; // Do nothing when clicked
+            }
+        }
     }
 
     createSkinsGrid() {
@@ -250,6 +275,7 @@ export class MenuManager {
 
     showMainMenu() {
         this.showElement('mainMenu');
+        this.updateSkinsButton();
     }
 
     hideMainMenu() {
