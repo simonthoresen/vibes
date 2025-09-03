@@ -30,9 +30,6 @@ const html = `<!DOCTYPE html>
 <style>
   body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; line-height: 1.6; }
   h1 { margin-bottom: 1rem; }
-  li { list-style: none; }
-  a { text-decoration: none; }
-  a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
