@@ -118,6 +118,9 @@ class DungeonCrawlerGame {
 
         // UI events
         this.setupUIEventHandlers();
+        
+        // Page visibility events for auto-pause
+        this.setupPageVisibilityHandlers();
     }
 
     setupUIEventHandlers() {
@@ -167,6 +170,28 @@ class DungeonCrawlerGame {
         if (settingsBtn) settingsBtn.onclick = () => this.openSettings();
         if (quitBtn) quitBtn.onclick = () => this.quitToMenuImmediate();
         if (cheatBtn) cheatBtn.onclick = () => this.openCheatMenu();
+    }
+
+    setupPageVisibilityHandlers() {
+        // Handle tab switching to auto-pause the game
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Tab became hidden - pause the game if it's running
+                if (this.gameState.gameStarted && !this.gameState.isPaused && this.gameLoop && this.gameLoop.isRunning) {
+                    this.pauseGame();
+                }
+            }
+            // Note: We don't auto-resume when tab becomes visible - player must manually resume
+        });
+
+        // Also handle window blur/focus events as fallback for older browsers
+        window.addEventListener('blur', () => {
+            if (!document.hidden) { // Only if visibility API didn't trigger
+                if (this.gameState.gameStarted && !this.gameState.isPaused && this.gameLoop && this.gameLoop.isRunning) {
+                    this.pauseGame();
+                }
+            }
+        });
     }
 
     handleGameStart() {
