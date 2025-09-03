@@ -23,6 +23,24 @@
             border: 2px solid #333;
             background-color: #2a2a2a;
         }
+        #pauseBtn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            z-index: 1200;
+            background: #333;
+            color: white;
+            border: 2px solid #444;
+            padding: 12px 22px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        #pauseBtn:hover {
+            background: #444;
+            transform: scale(1.05);
+        }
         #weaponSelect {
             position: fixed;
             top: 0;
@@ -327,6 +345,10 @@
                 <span>Move Right</span>
                 <button class="keybind-button" data-action="right">D</button>
             </div>
+            <div class="keybind-row">
+                <span>Show Pause Button</span>
+                <input type="checkbox" id="showPauseBtnSetting" />
+            </div>
             <button class="pause-button" onclick="closeSettings()">Back</button>
         </div>
     </div>
@@ -346,6 +368,7 @@
         </div>
     </div>
     <div id="gameContainer" style="display: none;">
+        <button id="pauseBtn">⏸</button>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="gameStats">
             <div id="health">HP: 100/100</div>

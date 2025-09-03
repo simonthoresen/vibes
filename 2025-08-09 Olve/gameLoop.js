@@ -77,10 +77,9 @@ export class GameLoop {
             // Update highest floor and check for unlocks
             this.updatePlayerProgress();
 
-            // Check for game completion
-            if (this.gameState.currentFloor === 100 && !this.gameState.gameCompleted) {
-                this.handleGameCompletion();
-                return;
+            // Check for skin unlock at floor 100 (but don't complete the game)
+            if (this.gameState.currentFloor === 100 && !this.gameState.player.skinsUnlocked) {
+                this.unlockSkins();
             }
             
             // Show floor transition
@@ -94,10 +93,6 @@ export class GameLoop {
     updatePlayerProgress() {
         if (this.gameState.currentFloor > this.gameState.player.highestFloor) {
             this.gameState.player.highestFloor = this.gameState.currentFloor;
-            
-            if (this.gameState.currentFloor >= 100 && !this.gameState.player.skinsUnlocked) {
-                this.unlockSkins();
-            }
         }
     }
 
@@ -106,7 +101,7 @@ export class GameLoop {
         localStorage.setItem('skinsUnlocked', 'true');
         
         // Show unlock message
-        this.showUnlockMessage('Skins Unlocked!');
+        this.showUnlockMessage('Skins Unlocked! You can now change your character skin in the main menu.');
     }
 
     handleGameCompletion() {

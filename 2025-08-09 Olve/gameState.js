@@ -19,7 +19,8 @@ export class GameState {
         this.projectiles = [];
         this.openWorld = this.createOpenWorldState();
         this.settings = {
-            keybinds: { ...DEFAULT_KEYBINDS }
+            keybinds: { ...DEFAULT_KEYBINDS },
+            showPauseBtn: true
         };
     }
 

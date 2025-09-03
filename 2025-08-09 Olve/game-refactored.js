@@ -22,6 +22,16 @@ class DungeonCrawlerGame {
         // Initialize core systems
         this.gameState = new GameState();
         this.inputManager = new InputManager();
+        // Default: show pause button unless user disables
+        if (typeof this.gameState.settings.showPauseBtn === 'undefined') {
+            this.gameState.settings.showPauseBtn = true;
+        }
+        
+        // Initialize background audio
+        this.backgroundAudio = null;
+        this.gameplayMusic = null;
+        this.initializeBackgroundAudio();
+        this.initializeGameplayMusic();
         
         // Get canvas and initialize renderer
         const canvas = document.getElementById('gameCanvas');
@@ -52,6 +62,48 @@ class DungeonCrawlerGame {
         this.gameLoop = new GameLoop(this.gameState, systems, this.renderer);
     }
 
+    initializeBackgroundAudio() {
+        this.backgroundAudio = new Audio('sounds/cave-dripping-water.wav');
+        this.backgroundAudio.loop = true;
+        this.backgroundAudio.volume = 1.0; // Set to 100% volume
+    }
+
+    initializeGameplayMusic() {
+        this.gameplayMusic = new Audio('sounds/Banya-BeethovenVirusFullVersion.mp3');
+        this.gameplayMusic.loop = true;
+        this.gameplayMusic.volume = 0.5; // Set to 50% volume
+    }
+
+    startBackgroundAudio() {
+        if (this.backgroundAudio) {
+            this.backgroundAudio.play().catch(error => {
+                console.log('Background audio failed to play:', error);
+            });
+        }
+    }
+
+    stopBackgroundAudio() {
+        if (this.backgroundAudio) {
+            this.backgroundAudio.pause();
+            this.backgroundAudio.currentTime = 0;
+        }
+    }
+
+    startGameplayMusic() {
+        if (this.gameplayMusic) {
+            this.gameplayMusic.play().catch(error => {
+                console.log('Gameplay music failed to play:', error);
+            });
+        }
+    }
+
+    stopGameplayMusic() {
+        if (this.gameplayMusic) {
+            this.gameplayMusic.pause();
+            this.gameplayMusic.currentTime = 0;
+        }
+    }
+
     setupEventListeners() {
         // Menu events
         document.addEventListener('game-start', () => this.handleGameStart());
@@ -76,6 +128,29 @@ class DungeonCrawlerGame {
             }
         });
 
+        // Pause button click
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (pauseBtn) {
+            pauseBtn.onclick = () => this.togglePause();
+            console.log('Pause button click handler attached');
+        } else {
+            console.log('Pause button not found during setup');
+        }
+
+        // Settings toggle for pause button
+        const showPauseBtnSetting = document.getElementById('showPauseBtnSetting');
+        if (showPauseBtnSetting) {
+            // Set initial state from gameState
+            showPauseBtnSetting.checked = !!this.gameState.settings.showPauseBtn;
+            showPauseBtnSetting.onchange = (e) => {
+                this.gameState.settings.showPauseBtn = showPauseBtnSetting.checked;
+                this.updatePauseBtnVisibility();
+            };
+        }
+
+        // Update pause button visibility on game start
+        this.updatePauseBtnVisibility();
+
         // Make methods available globally for HTML onclick handlers
         window.resumeGame = () => this.resumeGame();
         window.toggleSettings = () => this.toggleSettings();
@@ -98,6 +173,7 @@ class DungeonCrawlerGame {
         this.showDoorTransition(() => {
             this.hideMainMenu();
             this.weaponSystem.setupWeaponSelection(false);
+            this.updatePauseBtnVisibility();
         });
     }
 
@@ -140,13 +216,21 @@ class DungeonCrawlerGame {
                                 // Play start beep sound
                                 const beep = new Audio('sounds/195912__acpascal__start-beep.wav');
                                 beep.volume = 1.0;
-                                beep.play();
+                                beep.play().catch(() => {
+                                    // Audio failed to play, skip sound and continue
+                                    if (zoomFadeOverlay.parentNode) zoomFadeOverlay.parentNode.removeChild(zoomFadeOverlay);
+                                    this.gameState.gameStarted = true;
+                                    this.showGameContainer();
+                                    this.updatePauseBtnVisibility();
+                                    this.gameLoop.start();
+                                });
                                 beep.onended = () => {
                                     zoomFadeOverlay.style.opacity = '0';
                                     setTimeout(() => {
                                         if (zoomFadeOverlay.parentNode) zoomFadeOverlay.parentNode.removeChild(zoomFadeOverlay);
                                         this.gameState.gameStarted = true;
                                         this.showGameContainer();
+                                        this.updatePauseBtnVisibility();
                                         this.gameLoop.start();
                                     }, 700);
                                 };
@@ -202,6 +286,7 @@ class DungeonCrawlerGame {
     }
 
     togglePause() {
+        console.log('togglePause called - gameLoop.isRunning:', this.gameLoop.isRunning, 'gameOverVisible:', this.isGameOverVisible());
         if (!this.gameLoop.isRunning || this.isGameOverVisible()) {
             return;
         }
@@ -211,6 +296,7 @@ class DungeonCrawlerGame {
         } else {
             this.pauseGame();
         }
+        this.updatePauseBtnVisibility();
     }
 
     pauseGame() {
@@ -225,6 +311,7 @@ class DungeonCrawlerGame {
         
         this.gameState.isPaused = true;
         this.showPauseMenu();
+        this.updatePauseBtnVisibility();
     }
 
     resumeGame() {
@@ -234,6 +321,7 @@ class DungeonCrawlerGame {
         
         this.gameState.isPaused = false;
         this.hidePauseMenu();
+        this.updatePauseBtnVisibility();
     }
 
     toggleSettings() {
@@ -369,6 +457,8 @@ class DungeonCrawlerGame {
         }
 
         this.setupGameOverButtons();
+        this.startBackgroundAudio(); // Start background audio for game over screen
+        this.stopGameplayMusic(); // Stop gameplay music for game over screen
     }
 
     setupGameOverButtons() {
@@ -494,14 +584,45 @@ class DungeonCrawlerGame {
         if (element) element.style.display = 'none';
     }
 
-    showMainMenu() { this.showElement('mainMenu'); }
-    hideMainMenu() { this.hideElement('mainMenu'); }
-    showGameContainer() { this.showElement('gameContainer'); }
-    hideGameContainer() { this.hideElement('gameContainer'); }
+    showMainMenu() { 
+        this.showElement('mainMenu'); 
+        this.startBackgroundAudio();
+    }
+    hideMainMenu() { 
+        this.hideElement('mainMenu'); 
+        this.stopBackgroundAudio();
+    }
+    showGameContainer() { 
+        this.showElement('gameContainer'); 
+        this.updatePauseBtnVisibility();
+        this.stopBackgroundAudio(); // Stop background audio when game starts
+        this.startGameplayMusic(); // Start gameplay music
+    }
+    hideGameContainer() { this.hideElement('gameContainer'); this.updatePauseBtnVisibility(); this.stopGameplayMusic(); }
     showPauseMenu() { this.showElement('pauseMenu'); }
     hidePauseMenu() { this.hideElement('pauseMenu'); }
     showGameOverElement() { this.showElement('gameOver'); }
-    hideGameOverScreen() { this.hideElement('gameOver'); }
+    hideGameOverScreen() { 
+        this.hideElement('gameOver'); 
+        this.stopBackgroundAudio();
+    }
+
+    updatePauseBtnVisibility() {
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (!pauseBtn) {
+            console.log('Pause button not found');
+            return;
+        }
+        console.log('Updating pause button visibility - gameStarted:', this.gameState.gameStarted, 'isPaused:', this.gameState.isPaused, 'showPauseBtn:', this.gameState.settings.showPauseBtn);
+        // Only show if enabled in settings and game is running
+        if (this.gameState.settings.showPauseBtn && this.gameState.gameStarted && !this.gameState.isPaused) {
+            pauseBtn.style.display = 'block';
+            console.log('Showing pause button');
+        } else {
+            pauseBtn.style.display = 'none';
+            console.log('Hiding pause button');
+        }
+    }
 
     isPauseMenuVisible() {
         const menu = document.getElementById('pauseMenu');
@@ -572,6 +693,9 @@ class DungeonCrawlerGame {
         // Unlock skins button
         const unlockSkinsButton = this.createUnlockSkinsButton(buttonStyle);
 
+        // Re-lock skins button
+        const relockSkinsButton = this.createRelockSkinsButton(buttonStyle);
+
         // One-hit kill button
         const oneHitKillButton = this.createOneHitKillButton(buttonStyle);
 
@@ -583,6 +707,7 @@ class DungeonCrawlerGame {
         content.appendChild(floorSection);
         content.appendChild(invincibilityButton);
         content.appendChild(unlockSkinsButton);
+        content.appendChild(relockSkinsButton);
         content.appendChild(oneHitKillButton);
         content.appendChild(closeButton);
         cheatMenu.appendChild(content);
@@ -767,14 +892,43 @@ class DungeonCrawlerGame {
             unlockSkinsButton.textContent = 'All Skins Unlocked!';
             
             // Update skins button in main menu if it exists
-            const skinsButton = document.querySelector('#mainMenu button:nth-child(4)');
-            if (skinsButton) {
-                skinsButton.textContent = 'Change Skin';
-                skinsButton.style.opacity = '1';
+            if (this.menuManager) {
+                this.menuManager.updateSkinsButton();
             }
         };
 
         return unlockSkinsButton;
+    }
+
+    createRelockSkinsButton(buttonStyle) {
+        const relockSkinsButton = document.createElement('button');
+        relockSkinsButton.textContent = 'Re-lock Skins';
+        relockSkinsButton.style.cssText = buttonStyle;
+        
+        this.addButtonHoverEffect(relockSkinsButton);
+        
+        relockSkinsButton.onclick = () => {
+            this.gameState.player.cheatsEnabled = true;
+            this.gameState.player.skinsUnlocked = false;
+            localStorage.setItem('skinsUnlocked', 'false');
+            relockSkinsButton.style.backgroundColor = '#2a5';
+            relockSkinsButton.textContent = 'Skins Re-locked!';
+            
+            // Update skins button in main menu if it exists
+            if (this.menuManager) {
+                this.menuManager.updateSkinsButton();
+            }
+            
+            // Visual feedback timeout
+            setTimeout(() => {
+                if (!relockSkinsButton.matches(':hover')) {
+                    relockSkinsButton.style.backgroundColor = '#333';
+                }
+                relockSkinsButton.textContent = 'Re-lock Skins';
+            }, 1000);
+        };
+
+        return relockSkinsButton;
     }
 
     createOneHitKillButton(buttonStyle) {
@@ -837,6 +991,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Make game instance available globally for debugging
         window.game = game;
+        
+        // Start background audio for initial main menu
+        game.startBackgroundAudio();
     } catch (error) {
         console.error('Failed to initialize game:', error);
     }
