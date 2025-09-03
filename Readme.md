@@ -6,4 +6,4 @@
     1. ```$ git config --global user.name "John Doe"```
     1. ```$ git config --global user.email "john@hotmail.com"```
 1. Clone repository in VS Code to a local folder. Easiest way to do this is through VS Code by clicking on the third button down on the left hand side of the app. This opens the repository panel where you can choose "clone a repository". Choose GitHub, and then select ```vibes```.
-
+1. Once you have committed and pushed an update, you can find it running at [https://simonthoresen.github.io/vibes/].
