@@ -147,6 +147,7 @@ class DungeonCrawlerGame {
             showPauseBtnSetting.checked = !!this.gameState.settings.showPauseBtn;
             showPauseBtnSetting.onchange = (e) => {
                 this.gameState.settings.showPauseBtn = showPauseBtnSetting.checked;
+                this.gameState.saveSettings();
                 this.updatePauseBtnVisibility();
             };
         }
@@ -158,6 +159,7 @@ class DungeonCrawlerGame {
             scrollableCheatMenuSetting.checked = !!this.gameState.settings.scrollableCheatMenu;
             scrollableCheatMenuSetting.onchange = (e) => {
                 this.gameState.settings.scrollableCheatMenu = scrollableCheatMenuSetting.checked;
+                this.gameState.saveSettings();
             };
         }
 
@@ -597,6 +599,7 @@ class DungeonCrawlerGame {
 
     setKeybind(action, key) {
         this.gameState.settings.keybinds[action] = key.toLowerCase();
+        this.gameState.saveSettings();
     }
 
     updateKeybindDisplay() {

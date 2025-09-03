@@ -18,11 +18,42 @@ export class GameState {
         this.enemies = [];
         this.projectiles = [];
         this.openWorld = this.createOpenWorldState();
-        this.settings = {
+        this.settings = this.loadSettings();
+    }
+
+    loadSettings() {
+        // Load settings from localStorage or use defaults
+        const savedSettings = localStorage.getItem('gameSettings');
+        const defaultSettings = {
             keybinds: { ...DEFAULT_KEYBINDS },
             showPauseBtn: true,
             scrollableCheatMenu: false
         };
+
+        if (savedSettings) {
+            try {
+                const parsed = JSON.parse(savedSettings);
+                // Merge with defaults to ensure all settings exist
+                return {
+                    ...defaultSettings,
+                    ...parsed,
+                    keybinds: { ...defaultSettings.keybinds, ...(parsed.keybinds || {}) }
+                };
+            } catch (error) {
+                console.log('Failed to parse saved settings, using defaults:', error);
+                return defaultSettings;
+            }
+        }
+        
+        return defaultSettings;
+    }
+
+    saveSettings() {
+        try {
+            localStorage.setItem('gameSettings', JSON.stringify(this.settings));
+        } catch (error) {
+            console.log('Failed to save settings:', error);
+        }
     }
 
     createPlayer() {
