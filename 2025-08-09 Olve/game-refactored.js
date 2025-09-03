@@ -75,7 +75,7 @@ class DungeonCrawlerGame {
     }
 
     startBackgroundAudio() {
-        if (this.backgroundAudio) {
+        if (this.backgroundAudio && this.gameState.settings.menuSounds) {
             this.backgroundAudio.play().catch(error => {
                 console.log('Background audio failed to play:', error);
             });
@@ -90,7 +90,7 @@ class DungeonCrawlerGame {
     }
 
     startGameplayMusic() {
-        if (this.gameplayMusic) {
+        if (this.gameplayMusic && this.gameState.settings.gameMusic) {
             this.gameplayMusic.play().catch(error => {
                 console.log('Gameplay music failed to play:', error);
             });
@@ -163,8 +163,70 @@ class DungeonCrawlerGame {
             };
         }
 
+        // Settings toggle for menu sounds
+        const menuSoundsSetting = document.getElementById('menuSoundsSetting');
+        if (menuSoundsSetting) {
+            menuSoundsSetting.checked = !!this.gameState.settings.menuSounds;
+            menuSoundsSetting.onchange = (e) => {
+                this.gameState.settings.menuSounds = menuSoundsSetting.checked;
+                this.gameState.saveSettings();
+                // Immediately affect background audio if it's currently playing
+                if (!this.gameState.settings.menuSounds && this.backgroundAudio && !this.backgroundAudio.paused) {
+                    this.backgroundAudio.pause();
+                } else if (this.gameState.settings.menuSounds && this.backgroundAudio && this.backgroundAudio.paused && 
+                          (this.gameState.showMainMenu || this.isGameOverVisible())) {
+                    this.backgroundAudio.play().catch(e => console.log('Could not resume background audio:', e));
+                }
+            };
+        }
+
+        // Settings toggle for game over sounds
+        const gameOverSoundsSetting = document.getElementById('gameOverSoundsSetting');
+        if (gameOverSoundsSetting) {
+            gameOverSoundsSetting.checked = !!this.gameState.settings.gameOverSounds;
+            gameOverSoundsSetting.onchange = (e) => {
+                this.gameState.settings.gameOverSounds = gameOverSoundsSetting.checked;
+                this.gameState.saveSettings();
+                // Immediately affect background audio if we're on game over screen
+                if (!this.gameState.settings.gameOverSounds && this.backgroundAudio && !this.backgroundAudio.paused && this.isGameOverVisible()) {
+                    this.backgroundAudio.pause();
+                } else if (this.gameState.settings.gameOverSounds && this.backgroundAudio && this.backgroundAudio.paused && this.isGameOverVisible()) {
+                    this.backgroundAudio.play().catch(e => console.log('Could not resume background audio:', e));
+                }
+            };
+        }
+
+        // Settings toggle for game sounds
+        const gameSoundsSetting = document.getElementById('gameSoundsSetting');
+        if (gameSoundsSetting) {
+            gameSoundsSetting.checked = !!this.gameState.settings.gameSounds;
+            gameSoundsSetting.onchange = (e) => {
+                this.gameState.settings.gameSounds = gameSoundsSetting.checked;
+                this.gameState.saveSettings();
+            };
+        }
+
+        // Settings toggle for game music
+        const gameMusicSetting = document.getElementById('gameMusicSetting');
+        if (gameMusicSetting) {
+            gameMusicSetting.checked = !!this.gameState.settings.gameMusic;
+            gameMusicSetting.onchange = (e) => {
+                this.gameState.settings.gameMusic = gameMusicSetting.checked;
+                this.gameState.saveSettings();
+                // Immediately affect music playback
+                if (!this.gameState.settings.gameMusic && this.gameplayMusic && !this.gameplayMusic.paused) {
+                    this.gameplayMusic.pause();
+                } else if (this.gameState.settings.gameMusic && this.gameplayMusic && this.gameplayMusic.paused && this.gameState.gameStarted && !this.gameState.showMainMenu) {
+                    this.gameplayMusic.play().catch(e => console.log('Could not resume music:', e));
+                }
+            };
+        }
+
         // Update pause button visibility on game start
         this.updatePauseBtnVisibility();
+        
+        // Update storage status indicator
+        this.updateStorageStatus();
 
         // Make methods available globally for HTML onclick handlers
         window.resumeGame = () => this.resumeGame();
@@ -494,7 +556,9 @@ class DungeonCrawlerGame {
         }
 
         this.setupGameOverButtons();
-        this.startBackgroundAudio(); // Start background audio for game over screen
+        if (this.gameState.settings.gameOverSounds) {
+            this.startBackgroundAudio(); // Start background audio for game over screen
+        }
         this.stopGameplayMusic(); // Stop gameplay music for game over screen
     }
 
@@ -659,6 +723,25 @@ class DungeonCrawlerGame {
         } else {
             pauseBtn.style.display = 'none';
             console.log('Hiding pause button');
+        }
+    }
+
+    updateStorageStatus() {
+        const statusElement = document.getElementById('storageStatus');
+        if (statusElement) {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            if (this.gameState.storageAvailable) {
+                statusElement.textContent = 'Storage Status: Settings will be saved';
+                statusElement.style.color = '#4CAF50'; // Green
+            } else {
+                if (isIOS) {
+                    statusElement.textContent = 'Storage Status: Disabled (Try turning off Private Browsing)';
+                } else {
+                    statusElement.textContent = 'Storage Status: Settings will not persist (Private browsing?)';
+                }
+                statusElement.style.color = '#ff9800'; // Orange warning
+            }
         }
     }
 

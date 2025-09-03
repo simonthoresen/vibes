@@ -207,7 +207,8 @@ export class WeaponSystem {
 
     createProjectile(weapon, x, y, angle) {
         // Play bow shooting sound for bow weapons
-        if (weapon.name && (weapon.name.includes('Bow') || weapon.name.includes('bow'))) {
+        if (weapon.name && (weapon.name.includes('Bow') || weapon.name.includes('bow')) && 
+            this.gameState.settings && this.gameState.settings.gameSounds) {
             const bowSound = new Audio('sounds/bow-shooting.wav');
             bowSound.volume = 0.7; // Set volume to 70%
             bowSound.play().catch(error => {
