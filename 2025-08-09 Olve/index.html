@@ -307,6 +307,47 @@
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
+
+        /* Virtual Joystick Styles */
+        .virtual-joystick {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            pointer-events: auto;
+        }
+
+        .joystick-base {
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
+            cursor: pointer;
+        }
+
+        .joystick-knob {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: none;
+            pointer-events: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Virtual joystick will be controlled by JavaScript */
     </style>
 </head>
 <body>
@@ -372,6 +413,10 @@
             <div id="storageStatus" class="storage-status" style="margin-top: 10px; font-size: 12px; color: #ccc;">
                 Storage Status: Checking...
             </div>
+            <div class="keybind-row">
+                <span>Virtual Joystick</span>
+                <input type="checkbox" id="virtualJoystickSetting" />
+            </div>
             <button class="pause-button" onclick="closeSettings()">Back</button>
         </div>
     </div>
@@ -390,13 +435,17 @@
             </div>
         </div>
     </div>
-    <div id="gameContainer" style="display: none;">
-        <button id="pauseBtn">Pause</button>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="gameStats">
-            <div id="health">HP: 100/100</div>
+            <div id="gameContainer" class="game-container">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <button id="pauseBtn" class="pause-button-game">PAUSE</button>
+            
+            <!-- Virtual Joystick -->
+            <div id="virtualJoystick" class="virtual-joystick" style="display: none;">
+                <div class="joystick-base">
+                    <div class="joystick-knob" id="joystickKnob"></div>
+                </div>
+            </div>
         </div>
-    </div>
         <script type="module" src="game-refactored.js"></script>
     </body>
 </html>

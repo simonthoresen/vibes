@@ -21,6 +21,7 @@ export class PlayerController {
         const keybinds = this.gameState.settings.keybinds;
         const speed = this.gameState.player.speed * timeScale;
 
+        // Handle keyboard input
         if (this.inputManager.isKeyPressed(keybinds.up)) {
             this.gameState.player.y -= speed;
         }
@@ -32,6 +33,14 @@ export class PlayerController {
         }
         if (this.inputManager.isKeyPressed(keybinds.right)) {
             this.gameState.player.x += speed;
+        }
+
+        // Handle virtual joystick input
+        if (this.gameState.settings.virtualJoystick && this.inputManager.isMoving()) {
+            const virtualInput = this.inputManager.getVirtualInput();
+            console.log('Using virtual input for movement:', virtualInput);
+            this.gameState.player.x += virtualInput.deltaX * speed * 1.5; // Slightly faster for touch
+            this.gameState.player.y += virtualInput.deltaY * speed * 1.5;
         }
     }
 

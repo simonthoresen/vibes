@@ -222,11 +222,29 @@ class DungeonCrawlerGame {
             };
         }
 
+        // Settings toggle for virtual joystick
+        const virtualJoystickSetting = document.getElementById('virtualJoystickSetting');
+        if (virtualJoystickSetting) {
+            virtualJoystickSetting.checked = !!this.gameState.settings.virtualJoystick;
+            console.log('Virtual joystick setting initialized:', this.gameState.settings.virtualJoystick);
+            virtualJoystickSetting.onchange = (e) => {
+                this.gameState.settings.virtualJoystick = virtualJoystickSetting.checked;
+                this.gameState.saveSettings();
+                console.log('Virtual joystick setting changed to:', virtualJoystickSetting.checked);
+                this.updateVirtualJoystickVisibility();
+            };
+        } else {
+            console.log('Virtual joystick setting element not found');
+        }
+
         // Update pause button visibility on game start
         this.updatePauseBtnVisibility();
         
         // Update storage status indicator
         this.updateStorageStatus();
+
+        // Initialize virtual joystick
+        this.initializeVirtualJoystick();
 
         // Make methods available globally for HTML onclick handlers
         window.resumeGame = () => this.resumeGame();
@@ -697,12 +715,24 @@ class DungeonCrawlerGame {
     showGameContainer() { 
         this.showElement('gameContainer'); 
         this.updatePauseBtnVisibility();
+        this.updateVirtualJoystickVisibility();
         this.stopBackgroundAudio(); // Stop background audio when game starts
         this.startGameplayMusic(); // Start gameplay music
     }
-    hideGameContainer() { this.hideElement('gameContainer'); this.updatePauseBtnVisibility(); this.stopGameplayMusic(); }
-    showPauseMenu() { this.showElement('pauseMenu'); }
-    hidePauseMenu() { this.hideElement('pauseMenu'); }
+    hideGameContainer() { 
+        this.hideElement('gameContainer'); 
+        this.updatePauseBtnVisibility(); 
+        this.updateVirtualJoystickVisibility();
+        this.stopGameplayMusic(); 
+    }
+    showPauseMenu() { 
+        this.showElement('pauseMenu'); 
+        this.updateVirtualJoystickVisibility();
+    }
+    hidePauseMenu() { 
+        this.hideElement('pauseMenu'); 
+        this.updateVirtualJoystickVisibility();
+    }
     showGameOverElement() { this.showElement('gameOver'); }
     hideGameOverScreen() { 
         this.hideElement('gameOver'); 
@@ -742,6 +772,166 @@ class DungeonCrawlerGame {
                 }
                 statusElement.style.color = '#ff9800'; // Orange warning
             }
+        }
+    }
+
+    initializeVirtualJoystick() {
+        this.joystickState = {
+            active: false,
+            startX: 0,
+            startY: 0,
+            currentX: 0,
+            currentY: 0,
+            deltaX: 0,
+            deltaY: 0
+        };
+
+        const joystickBase = document.querySelector('.joystick-base');
+        const joystickKnob = document.getElementById('joystickKnob');
+
+        if (joystickBase && joystickKnob) {
+            console.log('Initializing joystick event handlers');
+            
+            // Touch events for mobile
+            joystickBase.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                console.log('Touch start on joystick');
+                const touch = e.touches[0];
+                const rect = joystickBase.getBoundingClientRect();
+                this.joystickState.active = true;
+                this.joystickState.startX = rect.left + rect.width / 2;
+                this.joystickState.startY = rect.top + rect.height / 2;
+                this.updateJoystick(touch.clientX, touch.clientY);
+            });
+
+            document.addEventListener('touchmove', (e) => {
+                if (this.joystickState.active) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    this.updateJoystick(touch.clientX, touch.clientY);
+                }
+            });
+
+            document.addEventListener('touchend', (e) => {
+                if (this.joystickState.active) {
+                    console.log('Touch end on joystick');
+                    this.joystickState.active = false;
+                    this.resetJoystick();
+                }
+            });
+
+            // Mouse events for desktop testing
+            joystickBase.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                console.log('Mouse down on joystick');
+                const rect = joystickBase.getBoundingClientRect();
+                this.joystickState.active = true;
+                this.joystickState.startX = rect.left + rect.width / 2;
+                this.joystickState.startY = rect.top + rect.height / 2;
+                this.updateJoystick(e.clientX, e.clientY);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (this.joystickState.active) {
+                    e.preventDefault();
+                    this.updateJoystick(e.clientX, e.clientY);
+                }
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (this.joystickState.active) {
+                    console.log('Mouse up on joystick');
+                    this.joystickState.active = false;
+                    this.resetJoystick();
+                }
+            });
+        } else {
+            console.log('Joystick elements not found:', { joystickBase, joystickKnob });
+        }
+
+        this.updateVirtualJoystickVisibility();
+    }
+
+    updateJoystick(clientX, clientY) {
+        const maxDistance = 30; // Half of base radius (50px) minus knob radius (20px)
+        
+        console.log('Updating joystick position:', { clientX, clientY });
+        
+        this.joystickState.currentX = clientX;
+        this.joystickState.currentY = clientY;
+        
+        let deltaX = clientX - this.joystickState.startX;
+        let deltaY = clientY - this.joystickState.startY;
+        
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance > maxDistance) {
+            deltaX = (deltaX / distance) * maxDistance;
+            deltaY = (deltaY / distance) * maxDistance;
+        }
+        
+        this.joystickState.deltaX = deltaX / maxDistance;
+        this.joystickState.deltaY = deltaY / maxDistance;
+        
+        console.log('Joystick delta:', { 
+            deltaX: this.joystickState.deltaX, 
+            deltaY: this.joystickState.deltaY 
+        });
+        
+        // Pass virtual input to inputManager
+        if (this.inputManager) {
+            this.inputManager.setVirtualInput(this.joystickState.deltaX, this.joystickState.deltaY);
+        } else {
+            console.log('InputManager not available');
+        }
+        
+        const knob = document.getElementById('joystickKnob');
+        if (knob) {
+            knob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+        } else {
+            console.log('Joystick knob not found');
+        }
+    }
+
+    resetJoystick() {
+        this.joystickState.deltaX = 0;
+        this.joystickState.deltaY = 0;
+        
+        // Reset virtual input in inputManager
+        if (this.inputManager) {
+            this.inputManager.setVirtualInput(0, 0);
+        }
+        
+        const knob = document.getElementById('joystickKnob');
+        if (knob) {
+            knob.style.transform = 'translate(-50%, -50%)';
+        }
+    }
+
+    updateVirtualJoystickVisibility() {
+        const joystick = document.getElementById('virtualJoystick');
+        if (joystick) {
+            // For debugging - show on all devices when enabled
+            const shouldShow = this.gameState.settings.virtualJoystick && this.gameState.gameStarted && !this.gameState.isPaused;
+            
+            console.log('Virtual joystick visibility check:', {
+                virtualJoystickSetting: this.gameState.settings.virtualJoystick,
+                gameStarted: this.gameState.gameStarted,
+                isPaused: this.gameState.isPaused,
+                shouldShow: shouldShow
+            });
+            
+            if (shouldShow) {
+                joystick.style.display = 'block';
+                joystick.classList.add('mobile-enabled');
+                console.log('Showing virtual joystick');
+            } else {
+                joystick.style.display = 'none';
+                joystick.classList.remove('mobile-enabled');
+                console.log('Hiding virtual joystick');
+            }
+        } else {
+            console.log('Virtual joystick element not found');
         }
     }
 

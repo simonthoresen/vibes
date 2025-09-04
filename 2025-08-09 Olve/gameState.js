@@ -63,7 +63,8 @@ export class GameState {
             menuSounds: true,
             gameOverSounds: true,
             gameSounds: true,
-            gameMusic: true
+            gameMusic: true,
+            virtualJoystick: false
         };
 
         // Try localStorage first

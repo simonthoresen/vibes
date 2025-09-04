@@ -5,6 +5,10 @@ export class InputManager {
         this.mouseY = 0;
         this.listeningForKey = null;
         this.konamiIndex = 0;
+        this.virtualInput = {
+            deltaX: 0,
+            deltaY: 0
+        };
         
         this.setupEventListeners();
     }
@@ -76,5 +80,25 @@ export class InputManager {
             this.konamiIndex = 0;
         }
         return false;
+    }
+
+    // Virtual joystick input methods
+    setVirtualInput(deltaX, deltaY) {
+        this.virtualInput.deltaX = deltaX;
+        this.virtualInput.deltaY = deltaY;
+        
+        // Debug logging for virtual input
+        if (Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) {
+            console.log('Virtual input set:', { deltaX, deltaY });
+        }
+    }
+
+    getVirtualInput() {
+        return this.virtualInput;
+    }
+
+    isMoving() {
+        const threshold = 0.1;
+        return Math.abs(this.virtualInput.deltaX) > threshold || Math.abs(this.virtualInput.deltaY) > threshold;
     }
 }
