@@ -793,12 +793,40 @@ class DungeonCrawlerGame {
     updateSettingsMenuScrollable() {
         const settingsMenu = document.getElementById('settingsMenu');
         if (settingsMenu) {
+            const isIPad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const content = settingsMenu.querySelector('.content');
+            
             if (this.gameState.settings.scrollableSettingsMenu) {
                 settingsMenu.classList.add('scrollable');
-                console.log('Settings menu made scrollable');
+                console.log('Settings menu made scrollable' + (isIPad ? ' (iPad detected)' : ''));
+                
+                // Apply direct styles for iPad as fallback
+                if (isIPad && content) {
+                    content.style.maxHeight = '600px';
+                    content.style.overflowY = 'scroll';
+                    content.style.overflowX = 'hidden';
+                    content.style.webkitOverflowScrolling = 'touch';
+                    console.log('Applied direct iPad styles');
+                    
+                    // Force a style recalculation
+                    content.style.display = 'none';
+                    content.offsetHeight; // Trigger reflow
+                    content.style.display = '';
+                    console.log('Forced style recalculation on iPad');
+                }
             } else {
                 settingsMenu.classList.remove('scrollable');
-                console.log('Settings menu made non-scrollable');
+                
+                // Remove direct styles for iPad
+                if (isIPad && content) {
+                    content.style.maxHeight = '';
+                    content.style.overflowY = '';
+                    content.style.overflowX = '';
+                    content.style.webkitOverflowScrolling = '';
+                    console.log('Removed direct iPad styles');
+                }
+                
+                console.log('Settings menu made non-scrollable' + (isIPad ? ' (iPad detected)' : ''));
             }
         }
     }

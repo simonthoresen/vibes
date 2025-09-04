@@ -280,26 +280,57 @@
         /* Scrollable settings menu styles */
         #settingsMenu.scrollable .content {
             max-height: 70vh;
+            max-height: calc(100vh - 120px); /* Fallback for better iPad support */
             overflow-y: auto;
             overflow-x: hidden;
+            -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+        }
+        
+        /* iPad specific fixes */
+        @media screen and (min-device-width: 768px) and (max-device-width: 1024px) {
+            #settingsMenu.scrollable .content {
+                max-height: 600px !important; /* Force height for iPad */
+                min-height: 400px;
+                height: auto;
+                overflow-y: scroll !important; /* Force scroll on iPad */
+                overflow-x: hidden !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+        }
+        
+        /* Additional iPad detection for newer iPads */
+        @supports (-webkit-touch-callout: none) {
+            @media screen and (min-width: 768px) and (max-width: 1024px) {
+                #settingsMenu.scrollable .content {
+                    max-height: 600px !important;
+                    overflow-y: scroll !important;
+                }
+            }
+        }
+        
+        /* Ensure scrollbar is visible on iPad */
+        #settingsMenu.scrollable .content {
+            scrollbar-width: auto; /* Firefox */
         }
         
         #settingsMenu.scrollable .content::-webkit-scrollbar {
-            width: 8px;
+            width: 12px; /* Larger scrollbar for touch devices */
+            -webkit-appearance: none;
         }
         
         #settingsMenu.scrollable .content::-webkit-scrollbar-track {
             background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
+            border-radius: 6px;
         }
         
         #settingsMenu.scrollable .content::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
         }
         
         #settingsMenu.scrollable .content::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.6);
         }
         .keybind-row {
             display: flex;
