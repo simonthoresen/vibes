@@ -4,6 +4,72 @@ export class WeaponSystem {
     constructor(gameState, particleEngine = null) {
         this.gameState = gameState;
         this.particleEngine = particleEngine;
+        
+        // Sound pool for bow shooting to prevent lag
+        this.bowSoundPool = [];
+        this.activeBowSounds = 0;
+        this.maxConcurrentBowSounds = 3; // Increased to 3 for faster sound effects
+        this.currentSoundIndex = 0; // For round-robin sound selection
+        this.initializeBowSoundPool();
+    }
+
+    initializeBowSoundPool() {
+        // Pre-create bow sound instances for reuse
+        for (let i = 0; i < this.maxConcurrentBowSounds; i++) {
+            const sound = new Audio('sounds/bow-shooting.wav');
+            sound.volume = 0.7;
+            sound.preload = 'auto'; // Ensure fast loading
+            
+            // Handle when sound ends to free up the slot
+            sound.addEventListener('ended', () => {
+                this.activeBowSounds = Math.max(0, this.activeBowSounds - 1);
+            });
+            
+            // Also handle errors to prevent stuck counters
+            sound.addEventListener('error', () => {
+                this.activeBowSounds = Math.max(0, this.activeBowSounds - 1);
+            });
+            
+            // Optimize for fast restart
+            sound.addEventListener('loadeddata', () => {
+                sound.fastRestart = true;
+            });
+            
+            this.bowSoundPool.push(sound);
+        }
+        
+        console.log(`Initialized bow sound pool with ${this.maxConcurrentBowSounds} sounds`);
+    }
+
+    playBowSound() {
+        if (!this.gameState.settings || !this.gameState.settings.gameSounds) {
+            return;
+        }
+        
+        // Always play a sound - either find available or use round-robin
+        let availableSound = this.bowSoundPool.find(sound => 
+            sound.paused || sound.ended || sound.currentTime === 0
+        );
+        
+        // If no available sound, use round-robin to cycle through sounds
+        if (!availableSound) {
+            availableSound = this.bowSoundPool[this.currentSoundIndex];
+            this.currentSoundIndex = (this.currentSoundIndex + 1) % this.maxConcurrentBowSounds;
+        }
+        
+        if (availableSound) {
+            // Track active sounds but don't prevent playing
+            if (this.activeBowSounds < this.maxConcurrentBowSounds) {
+                this.activeBowSounds++;
+            }
+            
+            // Reset and play immediately for fast response
+            availableSound.currentTime = 0;
+            availableSound.play().catch(error => {
+                // Silently handle errors to prevent console spam
+                this.activeBowSounds = Math.max(0, this.activeBowSounds - 1);
+            });
+        }
     }
 
     update(deltaTime) {
@@ -206,14 +272,9 @@ export class WeaponSystem {
     }
 
     createProjectile(weapon, x, y, angle) {
-        // Play bow shooting sound for bow weapons
-        if (weapon.name && (weapon.name.includes('Bow') || weapon.name.includes('bow')) && 
-            this.gameState.settings && this.gameState.settings.gameSounds) {
-            const bowSound = new Audio('sounds/bow-shooting.wav');
-            bowSound.volume = 0.7; // Set volume to 70%
-            bowSound.play().catch(error => {
-                console.log('Bow shooting sound failed to play:', error);
-            });
+        // Play bow shooting sound for bow weapons using sound pool
+        if (weapon.name && (weapon.name.includes('Bow') || weapon.name.includes('bow'))) {
+            this.playBowSound();
         }
         
         this.gameState.projectiles.push({
