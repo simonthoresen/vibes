@@ -163,6 +163,18 @@ class DungeonCrawlerGame {
             };
         }
 
+        // Settings toggle for scrollable settings menu
+        const scrollableSettingsMenuSetting = document.getElementById('scrollableSettingsMenuSetting');
+        if (scrollableSettingsMenuSetting) {
+            // Set initial state from gameState
+            scrollableSettingsMenuSetting.checked = !!this.gameState.settings.scrollableSettingsMenu;
+            scrollableSettingsMenuSetting.onchange = (e) => {
+                this.gameState.settings.scrollableSettingsMenu = scrollableSettingsMenuSetting.checked;
+                this.gameState.saveSettings();
+                this.updateSettingsMenuScrollable();
+            };
+        }
+
         // Settings toggle for menu sounds
         const menuSoundsSetting = document.getElementById('menuSoundsSetting');
         if (menuSoundsSetting) {
@@ -242,6 +254,9 @@ class DungeonCrawlerGame {
         
         // Update storage status indicator
         this.updateStorageStatus();
+
+        // Initialize settings menu scrollable state
+        this.updateSettingsMenuScrollable();
 
         // Initialize virtual joystick
         this.initializeVirtualJoystick();
@@ -771,6 +786,19 @@ class DungeonCrawlerGame {
                     statusElement.textContent = 'Storage Status: Settings will not persist (Private browsing?)';
                 }
                 statusElement.style.color = '#ff9800'; // Orange warning
+            }
+        }
+    }
+
+    updateSettingsMenuScrollable() {
+        const settingsMenu = document.getElementById('settingsMenu');
+        if (settingsMenu) {
+            if (this.gameState.settings.scrollableSettingsMenu) {
+                settingsMenu.classList.add('scrollable');
+                console.log('Settings menu made scrollable');
+            } else {
+                settingsMenu.classList.remove('scrollable');
+                console.log('Settings menu made non-scrollable');
             }
         }
     }

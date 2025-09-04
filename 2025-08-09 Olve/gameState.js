@@ -60,6 +60,7 @@ export class GameState {
             keybinds: { ...DEFAULT_KEYBINDS },
             showPauseBtn: true,
             scrollableCheatMenu: false,
+            scrollableSettingsMenu: false,
             menuSounds: true,
             gameOverSounds: true,
             gameSounds: true,

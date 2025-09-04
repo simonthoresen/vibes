@@ -276,6 +276,31 @@
             border-radius: 15px;
             min-width: 400px;
         }
+        
+        /* Scrollable settings menu styles */
+        #settingsMenu.scrollable .content {
+            max-height: 70vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        #settingsMenu.scrollable .content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #settingsMenu.scrollable .content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        #settingsMenu.scrollable .content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        #settingsMenu.scrollable .content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
         .keybind-row {
             display: flex;
             justify-content: space-between;
@@ -393,6 +418,10 @@
             <div class="keybind-row">
                 <span>Scrollable Cheat Menu</span>
                 <input type="checkbox" id="scrollableCheatMenuSetting" />
+            </div>
+            <div class="keybind-row">
+                <span>Scrollable Settings Menu</span>
+                <input type="checkbox" id="scrollableSettingsMenuSetting" />
             </div>
             <div class="keybind-row">
                 <span>Menu Sounds</span>
