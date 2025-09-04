@@ -534,4 +534,133 @@ export class ParticleEngine {
             this.particles.push(healingOrb);
         }
     }
+
+    // Summoning and ally-related particle effects
+    createSummonEffect(x, y, color) {
+        // Create a magical summoning circle effect
+        for (let i = 0; i < 20; i++) {
+            const angle = (i / 20) * Math.PI * 2;
+            const radius = 40 + Math.random() * 20;
+            const particle = {
+                x: x + Math.cos(angle) * radius,
+                y: y + Math.sin(angle) * radius,
+                vx: -Math.cos(angle) * 2,
+                vy: -Math.sin(angle) * 2,
+                size: 4 + Math.random() * 3,
+                color: color,
+                maxLife: 1000 + Math.random() * 500,
+                life: 1000 + Math.random() * 500,
+                alpha: 1,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.2
+            };
+            this.particles.push(particle);
+        }
+
+        // Add some sparkle effects
+        for (let i = 0; i < 15; i++) {
+            const particle = {
+                x: x + (Math.random() - 0.5) * 60,
+                y: y + (Math.random() - 0.5) * 60,
+                vx: (Math.random() - 0.5) * 3,
+                vy: (Math.random() - 0.5) * 3,
+                size: 2 + Math.random() * 4,
+                color: '#ffffff',
+                maxLife: 800,
+                life: 800,
+                alpha: 1,
+                rotation: 0,
+                rotationSpeed: 0
+            };
+            this.particles.push(particle);
+        }
+    }
+
+    createAllyAttackEffect(x, y, color) {
+        // Create a burst effect when allies attack
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + Math.random() * 3;
+            const particle = {
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 3 + Math.random() * 2,
+                color: color,
+                maxLife: 400,
+                life: 400,
+                alpha: 1,
+                rotation: 0,
+                rotationSpeed: 0
+            };
+            this.particles.push(particle);
+        }
+    }
+
+    createAllyDamageEffect(x, y, color) {
+        // Create effect when allies take damage
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 2;
+            const particle = {
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 2 + Math.random() * 2,
+                color: color,
+                maxLife: 300,
+                life: 300,
+                alpha: 1,
+                rotation: 0,
+                rotationSpeed: 0
+            };
+            this.particles.push(particle);
+        }
+    }
+
+    createAllyDeathEffect(x, y, color) {
+        // Create dramatic effect when allies die
+        for (let i = 0; i < 12; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + Math.random() * 4;
+            const particle = {
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 4 + Math.random() * 3,
+                color: color,
+                maxLife: 800,
+                life: 800,
+                alpha: 1,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.3
+            };
+            this.particles.push(particle);
+        }
+    }
+
+    createAllyDespawnEffect(x, y, color) {
+        // Create gentle effect when allies naturally despawn
+        for (let i = 0; i < 10; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 2;
+            const particle = {
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 1, // Slight upward drift
+                size: 3 + Math.random() * 2,
+                color: color,
+                maxLife: 1200,
+                life: 1200,
+                alpha: 1,
+                rotation: 0,
+                rotationSpeed: 0
+            };
+            this.particles.push(particle);
+        }
+    }
 }

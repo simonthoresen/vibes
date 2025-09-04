@@ -215,6 +215,56 @@ export class Renderer {
         });
     }
 
+    drawAllies(allies) {
+        if (!allies || allies.length === 0) return;
+        
+        allies.forEach(ally => {
+            // Draw ally with subtle glow effect to distinguish from enemies
+            this.ctx.save();
+            
+            // Add glow effect
+            this.ctx.shadowColor = ally.color;
+            this.ctx.shadowBlur = 8;
+            
+            // Draw ally body with hit effect
+            this.ctx.fillStyle = ally.hitTime && Date.now() - ally.hitTime < 100 ? 
+                '#ffffff' : ally.color;
+            this.ctx.fillRect(ally.x, ally.y, ally.width, ally.height);
+            
+            // Remove shadow for border
+            this.ctx.shadowBlur = 0;
+            
+            // Draw a friendly border to distinguish from enemies
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(ally.x, ally.y, ally.width, ally.height);
+            
+            this.ctx.restore();
+            
+            // Draw ally health bar (green background for friendlies) - skip for flaming skulls
+            if (ally.type !== 'orbital_skull') {
+                this.drawHealthBar(ally.x, ally.y - 10, ally.width, 4, ally.health, ally.maxHealth, '#228B22', '#90EE90');
+            }
+            
+            // Draw duration indicator (small bar showing remaining time) - skip for permanent allies
+            if (!ally.permanent) {
+                const now = Date.now();
+                const timeRemaining = ally.duration - (now - ally.spawnTime);
+                const durationPercent = Math.max(0, timeRemaining / ally.duration);
+                
+                if (durationPercent < 0.3) { // Only show when less than 30% time left
+                    this.ctx.fillStyle = durationPercent < 0.1 ? '#ff4444' : '#ffaa44';
+                    const durationBarWidth = ally.width * 0.8;
+                    const durationBarHeight = 2;
+                    const durationBarX = ally.x + (ally.width - durationBarWidth) / 2;
+                    const durationBarY = ally.y - 16;
+                    
+                    this.ctx.fillRect(durationBarX, durationBarY, durationBarWidth * durationPercent, durationBarHeight);
+                }
+            }
+        });
+    }
+
     drawProjectiles(projectiles) {
         projectiles.forEach(proj => {
             // Check projectile type by color
@@ -446,6 +496,9 @@ export class Renderer {
                 break;
             case 'staff':
                 this.drawStaffWeapon(weapon, count, playerCenterX, playerCenterY, player);
+                break;
+            case 'summon':
+                this.drawSummonWeapon(weapon, count, playerCenterX, playerCenterY, player);
                 break;
         }
     }
@@ -915,13 +968,75 @@ export class Renderer {
         }
     }
 
-    drawHealthBar(x, y, width, height, currentHealth, maxHealth) {
-        // Background (red)
-        this.ctx.fillStyle = '#ff0000';
+    drawSummonWeapon(weapon, count, playerCenterX, playerCenterY, player) {
+        // Draw summoning aura/effect around player
+        const now = Date.now();
+        const lastAttack = player.lastAttacks[weapon.id] || 0;
+        const timeSinceAttack = now - lastAttack;
+        const cooldownProgress = Math.min(1, timeSinceAttack / weapon.cooldown);
+        
+        // Draw cooldown indicator - a circle that fills up as cooldown progresses
+        this.ctx.save();
+        
+        // Draw outer ring (empty)
+        this.ctx.strokeStyle = weapon.color + '40';
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.arc(playerCenterX, playerCenterY, 50, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        // Draw cooldown progress
+        if (cooldownProgress < 1) {
+            this.ctx.strokeStyle = weapon.color;
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath();
+            this.ctx.arc(playerCenterX, playerCenterY, 50, -Math.PI/2, -Math.PI/2 + (cooldownProgress * Math.PI * 2));
+            this.ctx.stroke();
+        }
+        
+        // Draw magical glowing effect when ready to summon
+        if (cooldownProgress >= 1) {
+            this.ctx.shadowColor = weapon.color;
+            this.ctx.shadowBlur = 15;
+            this.ctx.strokeStyle = weapon.color;
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.arc(playerCenterX, playerCenterY, 50 + Math.sin(now * 0.01) * 5, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Draw inner pulse
+            this.ctx.globalAlpha = 0.3 + Math.sin(now * 0.005) * 0.2;
+            this.ctx.fillStyle = weapon.color;
+            this.ctx.beginPath();
+            this.ctx.arc(playerCenterX, playerCenterY, 25, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        this.ctx.restore();
+        
+        // Show minion count if weapon has summoned allies
+        if (this.gameState && this.gameState.allies) {
+            const minionCount = this.gameState.allies.filter(ally => ally.sourceWeapon === weapon.id).length;
+            const maxMinions = weapon.maxMinions * count;
+            
+            if (minionCount > 0) {
+                this.ctx.save();
+                this.ctx.fillStyle = weapon.color;
+                this.ctx.font = '14px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`${minionCount}/${maxMinions}`, playerCenterX, playerCenterY - 65);
+                this.ctx.restore();
+            }
+        }
+    }
+
+    drawHealthBar(x, y, width, height, currentHealth, maxHealth, bgColor = '#ff0000', healthColor = '#00ff00') {
+        // Background (default red, or custom)
+        this.ctx.fillStyle = bgColor;
         this.ctx.fillRect(x, y, width, height);
         
-        // Health (green)
-        this.ctx.fillStyle = '#00ff00';
+        // Health (default green, or custom)
+        this.ctx.fillStyle = healthColor;
         const healthPercent = currentHealth / maxHealth;
         this.ctx.fillRect(x, y, width * healthPercent, height);
     }

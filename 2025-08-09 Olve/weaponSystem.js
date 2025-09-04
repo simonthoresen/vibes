@@ -1,4 +1,4 @@
-import { WEAPONS } from './constants.js';
+import { WEAPONS, COMPANION_TYPES } from './constants.js';
 
 export class WeaponSystem {
     constructor(gameState, particleEngine = null) {
@@ -73,8 +73,40 @@ export class WeaponSystem {
     }
 
     update(deltaTime) {
+        // Handle orbital weapons (create companions if needed)
+        this.updateOrbitalWeapons();
+        
         // Continuously attempt to attack enemies
         this.attack();
+    }
+
+    updateOrbitalWeapons() {
+        if (!this.gameState.allies) {
+            this.gameState.allies = [];
+        }
+
+        const playerCenterX = this.gameState.player.x + this.gameState.player.width / 2;
+        const playerCenterY = this.gameState.player.y + this.gameState.player.height / 2;
+
+        // Group weapons by their ID to handle stacking
+        const weaponGroups = this.groupWeapons();
+
+        // Check for orbital weapons that need companions
+        Object.values(weaponGroups).forEach(weapons => {
+            const weapon = weapons[0];
+            const count = weapons.length;
+
+            if (weapon.type === 'orbital' && weapon.id === 'FLAMING_SKULL') {
+                const existingSkulls = this.gameState.allies.filter(ally => 
+                    ally.sourceWeapon === weapon.id && ally.type === 'orbital_skull'
+                ).length;
+
+                const neededSkulls = count - existingSkulls;
+                for (let i = 0; i < neededSkulls; i++) {
+                    this.createOrbitalSkull(weapon, playerCenterX, playerCenterY, existingSkulls + i);
+                }
+            }
+        });
     }
 
     attack() {
@@ -173,6 +205,12 @@ export class WeaponSystem {
                 break;
             case 'throwing':
                 this.handleThrowingAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
+                break;
+            case 'summon':
+                this.handleSummonAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
+                break;
+            case 'orbital':
+                this.handleOrbitalAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
                 break;
         }
     }
@@ -495,9 +533,9 @@ export class WeaponSystem {
 
         // Get available weapons
         let weaponsList = Object.entries(WEAPONS);
-        // Filter dragon weapons for starting selection
+        // Filter dragon weapons and legendary summon weapons for starting selection
         if (!isBossReward && Math.random() > 0.05) {
-            weaponsList = weaponsList.filter(([id]) => !id.includes('DRAGON'));
+            weaponsList = weaponsList.filter(([id]) => !id.includes('DRAGON') && !id.includes('CURSED_ORB') && !id.includes('FLAMING_SKULL'));
         }
         // Shuffle and take first 3
         this.shuffleArray(weaponsList);
@@ -559,6 +597,14 @@ export class WeaponSystem {
                 } else {
                     return `A magical ${weapon.name.toLowerCase()} that launches ${weapon.special.replace('_', ' ')} projectiles dealing ${weapon.damage} damage`;
                 }
+            case 'summon':
+                if (weapon.id === 'CURSED_ORB') {
+                    return `A cursed ${weapon.name.toLowerCase()} that summons huge demons every 60s. Demons have ${weapon.baseMinionHealth}HP (doubles per stack), shoot ${weapon.baseMinionDamage}dmg projectiles (doubles per stack), and reflect damage back to attackers. Lasts ${weapon.minionDuration/1000}s.`;
+                } else if (weapon.id === 'FLAMING_SKULL') {
+                    return `A ${weapon.name.toLowerCase()} that summons permanent skull companions. Each skull shoots blue lightning for ${weapon.baseMinionDamage}dmg every second (damage and speed double per stack). Never despawns.`;
+                } else {
+                    return `A legendary ${weapon.name.toLowerCase()} that summons powerful companions`;
+                }
             default:
                 return '';
         }
@@ -594,5 +640,198 @@ export class WeaponSystem {
     dispatchEvent(eventName, detail = {}) {
         const event = new CustomEvent(eventName, { detail });
         document.dispatchEvent(event);
+    }
+
+    handleSummonAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy) {
+        // Initialize companions array in game state if not present
+        if (!this.gameState.allies) {
+            this.gameState.allies = [];
+        }
+
+        // Handle different summon types
+        if (weapon.id === 'CURSED_ORB') {
+            this.handleCursedOrbSummon(weapon, count, playerCenterX, playerCenterY);
+        } else if (weapon.id === 'FLAMING_SKULL') {
+            this.handleFlamingSkullSummon(weapon, count, playerCenterX, playerCenterY);
+        }
+    }
+
+    handleCursedOrbSummon(weapon, count, playerCenterX, playerCenterY) {
+        // Count existing demons for this weapon
+        const existingDemons = this.gameState.allies.filter(ally => 
+            ally.sourceWeapon === weapon.id && ally.type === 'demon'
+        ).length;
+        
+        const maxDemons = weapon.maxMinions * count; // More orbs = more demons
+
+        // Don't summon if we already have max demons
+        if (existingDemons >= maxDemons) {
+            return;
+        }
+
+        // Get companion type
+        const companionType = COMPANION_TYPES.DEMON;
+        if (!companionType) {
+            console.error('DEMON companion type not found');
+            return;
+        }
+
+        // Create new demon with scaling based on weapon count
+        const demon = this.createDemon(companionType, weapon, playerCenterX, playerCenterY, count);
+        this.gameState.allies.push(demon);
+
+        // Create summoning effect particles
+        if (this.particleEngine) {
+            this.particleEngine.createSummonEffect(demon.x + demon.width/2, demon.y + demon.height/2, weapon.color);
+        }
+    }
+
+    handleFlamingSkullSummon(weapon, count, playerCenterX, playerCenterY) {
+        // For flaming skulls, we only summon if we don't have any yet or if we got another weapon
+        const existingSkulls = this.gameState.allies.filter(ally => 
+            ally.sourceWeapon === weapon.id && ally.type === 'skull_companion'
+        ).length;
+
+        const maxSkulls = weapon.maxMinions * count; // More skulls = more companions
+
+        // Don't summon if we already have max skulls
+        if (existingSkulls >= maxSkulls) {
+            return;
+        }
+
+        // Get companion type
+        const companionType = COMPANION_TYPES.SKULL_COMPANION;
+        if (!companionType) {
+            console.error('SKULL_COMPANION companion type not found');
+            return;
+        }
+
+        // Create new skull companion
+        const skull = this.createSkullCompanion(companionType, weapon, playerCenterX, playerCenterY, count);
+        this.gameState.allies.push(skull);
+
+        // Create summoning effect particles
+        if (this.particleEngine) {
+            this.particleEngine.createSummonEffect(skull.x + skull.width/2, skull.y + skull.height/2, weapon.color);
+        }
+    }
+
+    handleOrbitalAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy) {
+        // Initialize allies array in game state if not present
+        if (!this.gameState.allies) {
+            this.gameState.allies = [];
+        }
+
+        // For flaming skull, ensure we have exactly count orbital companions
+        if (weapon.id === 'FLAMING_SKULL') {
+            const existingSkulls = this.gameState.allies.filter(ally => 
+                ally.sourceWeapon === weapon.id && ally.type === 'orbital_skull'
+            ).length;
+
+            const neededSkulls = count - existingSkulls;
+            for (let i = 0; i < neededSkulls; i++) {
+                this.createOrbitalSkull(weapon, playerCenterX, playerCenterY, existingSkulls + i);
+            }
+        }
+    }
+
+    createOrbitalSkull(weapon, playerCenterX, playerCenterY, index) {
+        // Position the skull in orbit around the player
+        const angle = (index * 2 * Math.PI) / Math.max(1, this.gameState.player.weapons.filter(w => w.id === 'FLAMING_SKULL').length);
+        const radius = weapon.orbitRadius || 100;
+        
+        const skull = {
+            x: playerCenterX + Math.cos(angle) * radius - 16,
+            y: playerCenterY + Math.sin(angle) * radius - 16,
+            width: 32,
+            height: 32,
+            health: 999999, // Immortal
+            maxHealth: 999999,
+            damage: weapon.damage,
+            speed: 3, // Flying speed for autonomous movement
+            type: 'orbital_skull',
+            sourceWeapon: weapon.id,
+            sprite: weapon.sprite,
+            orbitAngle: angle,
+            orbitRadius: radius,
+            lastAttack: 0,
+            attackCooldown: weapon.cooldown,
+            attackRange: weapon.attackRange,
+            permanent: true,
+            spawnTime: Date.now()
+        };
+
+        this.gameState.allies.push(skull);
+
+        // Create summoning effect particles
+        if (this.particleEngine) {
+            this.particleEngine.createSummonEffect(skull.x + skull.width/2, skull.y + skull.height/2, weapon.color);
+        }
+    }
+
+    createDemon(companionType, weapon, playerCenterX, playerCenterY, count) {
+        // Spawn near player but not on top
+        const angle = Math.random() * Math.PI * 2;
+        const spawnDistance = 80;
+        const x = playerCenterX + Math.cos(angle) * spawnDistance - companionType.width / 2;
+        const y = playerCenterY + Math.sin(angle) * spawnDistance - companionType.height / 2;
+
+        // Calculate scaled stats based on weapon count
+        const healthMultiplier = Math.pow(2, count - 1); // Doubles each time
+        const damageMultiplier = Math.pow(2, count - 1); // Doubles each time
+
+        const demon = {
+            ...companionType,
+            x: x,
+            y: y,
+            maxHealth: weapon.baseMinionHealth * healthMultiplier,
+            health: weapon.baseMinionHealth * healthMultiplier,
+            damage: weapon.baseMinionDamage * damageMultiplier,
+            sourceWeapon: weapon.id,
+            weaponCount: count,
+            spawnTime: Date.now(),
+            duration: weapon.minionDuration,
+            lastAttack: 0,
+            target: null,
+            type: 'demon',
+            isCompanion: true,
+            projectileSpeed: weapon.projectileSpeed,
+            attackRate: weapon.attackRate
+        };
+
+        return demon;
+    }
+
+    createSkullCompanion(companionType, weapon, playerCenterX, playerCenterY, count) {
+        // Spawn near player but not on top
+        const angle = Math.random() * Math.PI * 2;
+        const spawnDistance = 60;
+        const x = playerCenterX + Math.cos(angle) * spawnDistance - companionType.width / 2;
+        const y = playerCenterY + Math.sin(angle) * spawnDistance - companionType.height / 2;
+
+        // Calculate scaled stats - damage and attack speed double each time
+        const damageMultiplier = Math.pow(2, count - 1); // Doubles each time
+        const attackSpeedMultiplier = Math.pow(0.5, count - 1); // Halves cooldown each time (faster attacks)
+
+        const skull = {
+            ...companionType,
+            x: x,
+            y: y,
+            maxHealth: companionType.health, // Always immortal
+            health: companionType.health,
+            damage: weapon.baseMinionDamage * damageMultiplier,
+            sourceWeapon: weapon.id,
+            weaponCount: count,
+            spawnTime: Date.now(),
+            duration: 0, // Permanent
+            lastAttack: 0,
+            target: null,
+            type: 'skull_companion',
+            isCompanion: true,
+            attackCooldown: companionType.attackCooldown * attackSpeedMultiplier,
+            attackRange: weapon.attackRange
+        };
+
+        return skull;
     }
 }

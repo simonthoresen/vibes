@@ -58,6 +58,7 @@ export class GameLoop {
         // Render game elements
         this.renderer.drawWeapons(this.gameState.player);
         this.renderer.drawEnemies(this.gameState.enemies);
+        this.renderer.drawAllies(this.gameState.allies);
         this.renderer.drawProjectiles(this.gameState.projectiles);
         
         // Render frost zones

@@ -10,6 +10,7 @@ import { ProjectileSystem } from './projectileSystem.js';
 import { PlayerController } from './playerController.js';
 import { GameLoop } from './gameLoop.js';
 import { ParticleEngine } from './particleEngine.js';
+import { AllySystem } from './allySystem.js';
 import { KONAMI_CODE, WEAPONS } from './constants.js';
 
 class DungeonCrawlerGame {
@@ -47,6 +48,7 @@ class DungeonCrawlerGame {
         this.enemySystem = new EnemySystem(this.gameState);
         this.projectileSystem = new ProjectileSystem(this.gameState, this.particleEngine);
         this.playerController = new PlayerController(this.gameState, this.inputManager);
+        this.allySystem = new AllySystem(this.gameState, this.particleEngine);
 
         // Connect particle engine to systems that need it
         this.enemySystem.setParticleEngine(this.particleEngine);
@@ -56,6 +58,7 @@ class DungeonCrawlerGame {
             this.playerController,
             this.weaponSystem,
             this.enemySystem,
+            this.allySystem,
             this.projectileSystem,
             this.particleEngine
         ];
@@ -1106,7 +1109,11 @@ class DungeonCrawlerGame {
         weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
         weaponSection.appendChild(weaponTitle);
 
-        const weapons = ['Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe'];
+        const weapons = [
+            'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
+            'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
+            'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull'
+        ];
         
         // Add amount selector
         const amountControl = document.createElement('div');

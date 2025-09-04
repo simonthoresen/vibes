@@ -212,6 +212,39 @@ export const WEAPONS = {
         maxDistance: TILE_SIZE * 4,
         spinSpeed: 0.15,
         heavy: true // Slower but more powerful
+    },
+
+    // Legendary Summoning Weapons (Dragon-tier rarity)
+    CURSED_ORB: {
+        name: 'Cursed Orb',
+        damage: 0, // Doesn't deal direct damage
+        range: TILE_SIZE * 15, // Large summoning range
+        cooldown: 60000, // 60 seconds between summons
+        color: '#8B0000', // dark red
+        type: 'summon',
+        sprite: 'summon_orb.png',
+        summonType: 'demon',
+        maxMinions: 1, // Base amount, increases with stacking
+        minionDuration: 30000, // 30 seconds
+        baseMinionHealth: 200,
+        baseMinionDamage: 100,
+        minionSpeed: 2,
+        projectileSpeed: 6,
+        attackRate: 3, // 3 shots per second
+        special: 'reflection_damage' // Reflects damage back to attackers
+    },
+    FLAMING_SKULL: {
+        name: 'Flaming Skull',
+        damage: 25, // Base damage for lightning attacks
+        range: TILE_SIZE * 6,
+        cooldown: 1000, // 1 second attack cooldown  
+        color: '#FF6347', // tomato red
+        type: 'orbital', // Changed from 'summon' to 'orbital'
+        sprite: 'Skull_minion.png',
+        orbitRadius: TILE_SIZE * 3, // Distance from player
+        attackRange: TILE_SIZE * 6,
+        special: 'blue_lightning', // Shoots blue lightning
+        permanent: true // Never despawns
     }
 };
 
@@ -244,6 +277,36 @@ export const ENEMY_TYPES = {
         height: TILE_SIZE * 3,
         points: 1000,
         isBoss: true
+    }
+};
+
+// Companion types for summoning weapons
+export const COMPANION_TYPES = {
+    DEMON: {
+        health: 200, // Base health, doubles with each stack
+        damage: 100, // Base damage, doubles with each stack
+        speed: 2,
+        color: '#8B0000', // dark red
+        width: TILE_SIZE * 2, // Twice player size
+        height: TILE_SIZE * 2,
+        attackRange: TILE_SIZE * 8,
+        attackCooldown: 333, // 3 shots per second (1000ms / 3)
+        sprite: 'summon_orb.png',
+        projectileSize: TILE_SIZE, // Player-sized projectiles
+        reflectsDamage: true
+    },
+    SKULL_COMPANION: {
+        health: 999999, // Effectively immortal
+        damage: 25, // Base damage, doubles with each stack
+        speed: 3,
+        color: '#FF6347', // tomato red with blue lightning
+        width: TILE_SIZE,
+        height: TILE_SIZE,
+        attackRange: TILE_SIZE * 6,
+        attackCooldown: 1000, // 1 second, halves with each stack
+        sprite: 'Skull_minion.png',
+        permanent: true,
+        lightningColor: '#00BFFF' // Deep sky blue
     }
 };
 

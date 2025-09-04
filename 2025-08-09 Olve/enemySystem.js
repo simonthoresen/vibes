@@ -93,6 +93,9 @@ export class EnemySystem {
         // Check for player collisions with enemies
         this.checkPlayerCollisions();
 
+        // Check for ally collisions with enemies
+        this.checkAllyCollisions();
+
         // Remove dead enemies and check for floor completion
         const initialEnemyCount = this.gameState.enemies.length;
         let killedBoss = false;
@@ -253,6 +256,33 @@ export class EnemySystem {
         
         console.log('Dispatching game-over event');
         this.dispatchEvent('game-over');
+    }
+
+    checkAllyCollisions() {
+        if (!this.gameState.allies || this.gameState.allies.length === 0) {
+            return;
+        }
+
+        this.gameState.enemies.forEach(enemy => {
+            this.gameState.allies.forEach(ally => {
+                if (this.detectCollision(ally, enemy)) {
+                    // Enemy attacks ally
+                    this.damageAlly(ally, enemy.damage);
+                }
+            });
+        });
+    }
+
+    damageAlly(ally, damage) {
+        ally.health = Math.max(0, ally.health - damage);
+        ally.hitTime = Date.now();
+        
+        // Create ally damage particle effect
+        if (this.particleEngine) {
+            const centerX = ally.x + ally.width / 2;
+            const centerY = ally.y + ally.height / 2;
+            this.particleEngine.createAllyDamageEffect(centerX, centerY, '#ff4444');
+        }
     }
 
     dispatchEvent(eventName, detail = {}) {
