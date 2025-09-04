@@ -144,7 +144,13 @@ export class WeaponSystem {
         const count = weapons.length;
         
         // Check weapon cooldown (faster with more weapons)
-        const scaledCooldown = weapon.cooldown / count;
+        let scaledCooldown = weapon.cooldown / count;
+        
+        // Apply Ice Staff attack speed reduction if enemies are in frost zones
+        if (weapon.sprite === 'Ice_staff.png' && this.gameState.iceStaffSlowEndTime && now < this.gameState.iceStaffSlowEndTime) {
+            scaledCooldown = scaledCooldown / weapon.attackSpeedReduction; // Increase cooldown (slower attack)
+        }
+        
         if (now - (this.gameState.player.lastAttacks[weapon.id] || 0) < scaledCooldown) {
             return;
         }
@@ -161,6 +167,9 @@ export class WeaponSystem {
                 break;
             case 'melee':
                 this.handleMeleeAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
+                break;
+            case 'staff':
+                this.handleStaffAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
                 break;
         }
     }
@@ -217,13 +226,20 @@ export class WeaponSystem {
             const scytheY = playerCenterY + Math.sin(angle) * currentOrbitRadius;
 
             this.gameState.enemies.forEach(enemy => {
-                const enemyCenterX = enemy.x + enemy.width / 2;
-                const enemyCenterY = enemy.y + enemy.height / 2;
-                const dx = enemyCenterX - scytheX;
-                const dy = enemyCenterY - scytheY;
+                // Check if the circular scythe hitbox intersects with the enemy rectangle
+                const scytheRadius = weapon.range; // Scythe sprite radius (sprite size is weapon.range * 2)
+                
+                // Find the closest point on the enemy rectangle to the scythe center
+                const closestX = Math.max(enemy.x, Math.min(scytheX, enemy.x + enemy.width));
+                const closestY = Math.max(enemy.y, Math.min(scytheY, enemy.y + enemy.height));
+                
+                // Calculate distance from scythe center to closest point on enemy rectangle
+                const dx = scytheX - closestX;
+                const dy = scytheY - closestY;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distance <= enemy.width / 2 + weapon.range) {
+                // Check if the distance is less than or equal to the scythe radius
+                if (distance <= scytheRadius) {
                     this.damageEnemy(enemy, weapon, now);
                 }
             });
@@ -269,6 +285,53 @@ export class WeaponSystem {
             }
         }
         return false;
+    }
+
+    handleStaffAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy) {
+        if (!closestEnemy) return;
+
+        // Initialize shot counters if not present
+        if (!this.gameState.player.staffShotCounters) {
+            this.gameState.player.staffShotCounters = {};
+        }
+        if (!this.gameState.player.staffShotCounters[weapon.id]) {
+            this.gameState.player.staffShotCounters[weapon.id] = 0;
+        }
+
+        // Create staff projectile with special effects
+        for (let i = 0; i < count; i++) {
+            const spreadAngle = (i - (count - 1) / 2) * 0.2; // Slight spread for multiple staves
+            const angleToEnemy = Math.atan2(
+                closestEnemy.y + closestEnemy.height / 2 - playerCenterY,
+                closestEnemy.x + closestEnemy.width / 2 - playerCenterX
+            ) + spreadAngle;
+
+            // Increment shot counter for this weapon
+            this.gameState.player.staffShotCounters[weapon.id]++;
+            const shotNumber = this.gameState.player.staffShotCounters[weapon.id];
+
+            // Create staff projectile
+            const staffProjectile = {
+                x: playerCenterX,
+                y: playerCenterY,
+                dx: Math.cos(angleToEnemy) * weapon.speed,
+                dy: Math.sin(angleToEnemy) * weapon.speed,
+                width: 8,
+                height: 8,
+                damage: weapon.damage,
+                range: weapon.range,
+                color: weapon.color,
+                startX: playerCenterX,
+                startY: playerCenterY,
+                type: 'staff',
+                special: weapon.special,
+                weapon: weapon, // Reference to original weapon for special effects
+                hitEnemies: new Set(),
+                shotNumber: shotNumber // Track which shot this is
+            };
+
+            this.gameState.projectiles.push(staffProjectile);
+        }
     }
 
     createProjectile(weapon, x, y, angle) {
@@ -410,6 +473,16 @@ export class WeaponSystem {
                 return `A mystical ${weapon.name.toLowerCase()} that orbits around you, dealing ${weapon.damage} damage to anything it touches`;
             case 'ranged':
                 return `A powerful ${weapon.name.toLowerCase()} that shoots ${weapon.piercing ? 'piercing' : ''} projectiles dealing ${weapon.damage} damage`;
+            case 'staff':
+                if (weapon.special === 'healing_over_time') {
+                    return `A magical ${weapon.name.toLowerCase()} that deals ${weapon.damage} damage while healing you ${weapon.healAmount} HP every ${weapon.healInterval/1000} seconds`;
+                } else if (weapon.special === 'frost_zone_periodic') {
+                    return `A magical ${weapon.name.toLowerCase()} that deals ${weapon.damage} damage and creates frost zones every 5th shot. Enemies in zones for 3s freeze for 2s and lose 25% speed permanently`;
+                } else if (weapon.special === 'fire_explosion_dot') {
+                    return `A magical ${weapon.name.toLowerCase()} that deals ${weapon.damage} damage with explosions that set enemies on fire for 3 seconds, dealing ${weapon.fireDotDamage} damage every 0.5s`;
+                } else {
+                    return `A magical ${weapon.name.toLowerCase()} that launches ${weapon.special.replace('_', ' ')} projectiles dealing ${weapon.damage} damage`;
+                }
             default:
                 return '';
         }

@@ -149,10 +149,29 @@ export class EnemySystem {
         const dist = Math.sqrt(dx * dx + dy * dy);
         
         if (dist > 0) {
+            // Check if enemy is frozen/stunned
+            if (enemy.isStunned || enemy.isFrozen) {
+                // Frozen enemies cannot move
+                return;
+            }
+            
+            // Calculate effective speed with all modifiers
+            let effectiveSpeed = enemy.speed;
+            
+            // Apply permanent speed reduction if present
+            if (enemy.permanentSpeedReduction) {
+                effectiveSpeed *= enemy.permanentSpeedReduction;
+            }
+            
+            // Apply temporary slow effect if present
+            if (enemy.slowEffect && enemy.slowEndTime && Date.now() < enemy.slowEndTime) {
+                effectiveSpeed *= enemy.slowEffect;
+            }
+            
             // Move enemy and handle screen wrapping
             const timeScale = this.gameState.timeScale || 1;
-            enemy.x += (dx / dist) * enemy.speed * timeScale;
-            enemy.y += (dy / dist) * enemy.speed * timeScale;
+            enemy.x += (dx / dist) * effectiveSpeed * timeScale;
+            enemy.y += (dy / dist) * effectiveSpeed * timeScale;
             
             // Wrap around screen edges
             this.wrapEnemyPosition(enemy);

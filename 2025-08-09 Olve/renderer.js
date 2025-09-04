@@ -79,6 +79,39 @@ export class Renderer {
         this.crystalScytheImage.onload = () => {
             this.crystalScytheImageLoaded = true;
         };
+
+        // Load staff sprites
+        this.fireStaffImage = new Image();
+        this.fireStaffImage.src = 'images/Fire_staff.png';
+        this.fireStaffImageLoaded = false;
+        this.fireStaffImage.onload = () => {
+            this.fireStaffImageLoaded = true;
+            console.log('Fire Staff image loaded successfully');
+        };
+        this.fireStaffImage.onerror = () => {
+            console.error('Failed to load Fire Staff image: images/Fire_staff.png');
+        };
+
+        this.iceStaffImage = new Image();
+        this.iceStaffImage.src = 'images/Ice_staff.png';
+        this.iceStaffImageLoaded = false;
+        this.iceStaffImage.onload = () => {
+            this.iceStaffImageLoaded = true;
+        };
+
+        this.lightningStaffImage = new Image();
+        this.lightningStaffImage.src = 'images/lightning_staff.png';
+        this.lightningStaffImageLoaded = false;
+        this.lightningStaffImage.onload = () => {
+            this.lightningStaffImageLoaded = true;
+        };
+
+        this.healingStaffImage = new Image();
+        this.healingStaffImage.src = 'images/Healing_staff.png';
+        this.healingStaffImageLoaded = false;
+        this.healingStaffImage.onload = () => {
+            this.healingStaffImageLoaded = true;
+        };
     }
 
     clear() {
@@ -109,6 +142,29 @@ export class Renderer {
                 '#ff0000' : enemy.color;
             this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
             
+            // Draw frozen enemy overlay
+            if (enemy.isFrozen || enemy.isStunned) {
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.5; // Semi-transparent
+                this.ctx.fillStyle = '#00FFFF'; // Cyan color
+                this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                
+                // Draw ice crystal pattern
+                this.ctx.globalAlpha = 0.8;
+                this.ctx.strokeStyle = '#FFFFFF';
+                this.ctx.lineWidth = 2;
+                
+                // Draw ice lines across the enemy
+                this.ctx.beginPath();
+                this.ctx.moveTo(enemy.x, enemy.y);
+                this.ctx.lineTo(enemy.x + enemy.width, enemy.y + enemy.height);
+                this.ctx.moveTo(enemy.x + enemy.width, enemy.y);
+                this.ctx.lineTo(enemy.x, enemy.y + enemy.height);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+            
             // Draw enemy health bar
             this.drawHealthBar(enemy.x, enemy.y - 10, enemy.width, 5, enemy.health, enemy.maxHealth);
         });
@@ -120,6 +176,7 @@ export class Renderer {
             const isPiercingBow = proj.color === '#8b4513';
             const isDragonBow = proj.color === '#f77';
             const isBowProjectile = isPiercingBow || isDragonBow;
+            const isStaffProjectile = proj.type === 'staff';
             
             if (isBowProjectile) {
                 // Determine which sprite to use
@@ -166,6 +223,28 @@ export class Renderer {
                     this.ctx.arc(proj.x, proj.y, proj.width / 2, 0, Math.PI * 2);
                     this.ctx.fill();
                 }
+            } else if (isStaffProjectile) {
+                // Draw staff projectiles as glowing orbs with special effects
+                this.ctx.save();
+                
+                // Create glowing effect
+                this.ctx.shadowColor = proj.color;
+                this.ctx.shadowBlur = 15;
+                
+                // Draw outer glow
+                this.ctx.fillStyle = proj.color + '40'; // Semi-transparent
+                this.ctx.beginPath();
+                this.ctx.arc(proj.x, proj.y, proj.width * 1.5, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Draw inner core
+                this.ctx.shadowBlur = 8;
+                this.ctx.fillStyle = proj.color;
+                this.ctx.beginPath();
+                this.ctx.arc(proj.x, proj.y, proj.width / 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.restore();
             } else {
                 // Use circle for non-bow projectiles
                 this.ctx.fillStyle = proj.color;
@@ -173,6 +252,55 @@ export class Renderer {
                 this.ctx.arc(proj.x, proj.y, proj.width / 2, 0, Math.PI * 2);
                 this.ctx.fill();
             }
+        });
+    }
+
+    drawFrostZones(frostZones) {
+        frostZones.forEach(zone => {
+            const now = Date.now();
+            const age = now - zone.createdAt;
+            const agePercent = age / zone.duration;
+            const alpha = Math.max(0.1, 1 - agePercent); // Fade out over time
+            
+            this.ctx.save();
+            
+            // Draw frost zone as a semi-transparent blue circle
+            this.ctx.globalAlpha = alpha * 0.3;
+            this.ctx.fillStyle = '#87CEEB';
+            this.ctx.beginPath();
+            this.ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Draw frost zone border
+            this.ctx.globalAlpha = alpha * 0.6;
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Add snowflake-like effect
+            this.ctx.globalAlpha = alpha * 0.8;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * Math.PI * 2) / 8;
+                const innerRadius = zone.radius * 0.3;
+                const outerRadius = zone.radius * 0.9;
+                
+                this.ctx.strokeStyle = '#FFFFFF';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(
+                    zone.x + Math.cos(angle) * innerRadius,
+                    zone.y + Math.sin(angle) * innerRadius
+                );
+                this.ctx.lineTo(
+                    zone.x + Math.cos(angle) * outerRadius,
+                    zone.y + Math.sin(angle) * outerRadius
+                );
+                this.ctx.stroke();
+            }
+            
+            this.ctx.restore();
         });
     }
 
@@ -212,6 +340,9 @@ export class Renderer {
                 break;
             case 'ranged':
                 this.drawBowAiming(weapon, count, playerCenterX, playerCenterY, player);
+                break;
+            case 'staff':
+                this.drawStaffWeapon(weapon, count, playerCenterX, playerCenterY, player);
                 break;
         }
     }
@@ -543,6 +674,141 @@ export class Renderer {
             
             // Restore canvas state
             this.ctx.restore();
+        }
+    }
+
+    drawStaffWeapon(weapon, count, playerCenterX, playerCenterY, player) {
+        // Determine which staff sprite to use based on weapon sprite property
+        let staffImage = null;
+        let staffImageLoaded = false;
+
+        switch (weapon.sprite) {
+            case 'Fire_staff.png':
+                staffImage = this.fireStaffImage;
+                staffImageLoaded = this.fireStaffImageLoaded;
+                break;
+            case 'Ice_staff.png':
+                staffImage = this.iceStaffImage;
+                staffImageLoaded = this.iceStaffImageLoaded;
+                break;
+            case 'lightning_staff.png':
+                staffImage = this.lightningStaffImage;
+                staffImageLoaded = this.lightningStaffImageLoaded;
+                break;
+            case 'Healing_staff.png':
+                staffImage = this.healingStaffImage;
+                staffImageLoaded = this.healingStaffImageLoaded;
+                break;
+        }
+
+        // Special handling for Fire Staff - use sprite if loaded, otherwise use fallback
+        if (weapon.sprite === 'Fire_staff.png') {
+            console.log('Drawing Fire Staff - Image loaded:', staffImageLoaded, 'Image exists:', !!staffImage);
+            if (staffImage && staffImageLoaded) {
+                // Draw Fire Staff sprite pointing toward the aiming direction
+                const staffSize = 80 + (count - 1) * 12; // Much larger and more visible with more staves
+                
+                // Position the staff outside the player, similar to sword positioning
+                const staffDistance = 25; // Distance from player center - closer to player
+                const staffX = playerCenterX + Math.cos(player.rotation) * staffDistance;
+                const staffY = playerCenterY + Math.sin(player.rotation) * staffDistance;
+                
+                console.log('Drawing Fire Staff sprite with size:', staffSize, 'at position:', staffX, staffY);
+                
+                // Save current canvas state
+                this.ctx.save();
+                
+                // Move to staff position (outside player)
+                this.ctx.translate(staffX, staffY);
+                
+                // Rotate to face player rotation (aiming direction)
+                this.ctx.rotate(player.rotation);
+                
+                // Draw Fire Staff sprite
+                this.ctx.drawImage(
+                    staffImage,
+                    -staffSize / 2,
+                    -staffSize / 2,
+                    staffSize,
+                    staffSize
+                );
+                
+                // Restore canvas state
+                this.ctx.restore();
+            } else {
+                console.log('Using Fire Staff fallback rectangle');
+                // Fallback rectangle for Fire Staff if sprite not loaded
+                const aimLength = 60 + (count - 1) * 10;
+                const aimWidth = 8 + (count - 1) * 2;
+                
+                const aimEndX = playerCenterX + Math.cos(player.rotation) * aimLength;
+                const aimEndY = playerCenterY + Math.sin(player.rotation) * aimLength;
+                
+                this.ctx.save();
+                this.ctx.strokeStyle = weapon.color; // Fire Staff orange-red color
+                this.ctx.lineWidth = aimWidth;
+                this.ctx.lineCap = 'round';
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(playerCenterX, playerCenterY);
+                this.ctx.lineTo(aimEndX, aimEndY);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+        } else {
+            // Handle all other staff weapons with their sprites
+            if (staffImage && staffImageLoaded) {
+                // Draw staff sprite pointing toward the aiming direction
+                const staffSize = 80 + (count - 1) * 12; // Same size as Fire Staff
+                
+                // Position the staff outside the player, same as Fire Staff
+                const staffDistance = 25; // Same distance as Fire Staff
+                const staffX = playerCenterX + Math.cos(player.rotation) * staffDistance;
+                const staffY = playerCenterY + Math.sin(player.rotation) * staffDistance;
+                
+                console.log('Drawing', weapon.sprite, 'sprite with size:', staffSize, 'at position:', staffX, staffY);
+                
+                // Save current canvas state
+                this.ctx.save();
+                
+                // Move to staff position (outside player)
+                this.ctx.translate(staffX, staffY);
+                
+                // Rotate to face player rotation (aiming direction)
+                this.ctx.rotate(player.rotation);
+                
+                // Draw staff sprite
+                this.ctx.drawImage(
+                    staffImage,
+                    -staffSize / 2,
+                    -staffSize / 2,
+                    staffSize,
+                    staffSize
+                );
+                
+                // Restore canvas state
+                this.ctx.restore();
+            } else {
+                // Fallback rectangle if sprite not loaded
+                const aimLength = 60 + (count - 1) * 10;
+                const aimWidth = 8 + (count - 1) * 2;
+                
+                const aimEndX = playerCenterX + Math.cos(player.rotation) * aimLength;
+                const aimEndY = playerCenterY + Math.sin(player.rotation) * aimLength;
+                
+                this.ctx.save();
+                this.ctx.strokeStyle = weapon.color;
+                this.ctx.lineWidth = aimWidth;
+                this.ctx.lineCap = 'round';
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(playerCenterX, playerCenterY);
+                this.ctx.lineTo(aimEndX, aimEndY);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
         }
     }
 
