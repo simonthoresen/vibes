@@ -151,6 +151,67 @@ export const WEAPONS = {
         special: 'healing_over_time',
         healAmount: 10, // Heal 10 HP
         healInterval: 3000 // Every 3 seconds
+    },
+
+    // Throwing Weapons
+    CHAKRAM: {
+        name: 'Chakram',
+        damage: 25,
+        range: TILE_SIZE * 15, // Long duration bouncing
+        cooldown: 2000,
+        color: '#FFD700', // gold
+        type: 'throwing',
+        speed: 7,
+        sprite: 'Chakram.png',
+        returnSpeed: 0, // Never returns normally
+        maxDistance: TILE_SIZE * 50, // Very long distance before disappearing
+        spinSpeed: 0.5,
+        bouncing: true, // Special bouncing behavior
+        piercing: true, // Hits all enemies in path
+        bounceDuration: 8000, // Bounces for 8 seconds
+        bounceSpeedIncrease: 1.1 // Speed increases 10% per stack
+    },
+    BOOMERANG: {
+        name: 'Boomerang',
+        damage: 35,
+        range: TILE_SIZE * 7,
+        cooldown: 1500,
+        color: '#8B4513', // brown
+        type: 'throwing',
+        speed: 5,
+        sprite: 'Boomerang.png',
+        returnSpeed: 6,
+        maxDistance: TILE_SIZE * 7,
+        spinSpeed: 0.25,
+        piercing: true
+    },
+    SPIRIT_BLADE: {
+        name: 'Spirit Blade',
+        damage: 45,
+        range: TILE_SIZE * 5,
+        cooldown: 1000,
+        color: '#9370DB', // medium purple
+        type: 'throwing',
+        speed: 8,
+        sprite: 'Spirit_blade.png',
+        returnSpeed: 8,
+        maxDistance: TILE_SIZE * 5,
+        spinSpeed: 0.4,
+        spectral: true // Passes through enemies but damages them
+    },
+    THROWING_AXE: {
+        name: 'Throwing Axe',
+        damage: 65,
+        range: TILE_SIZE * 4,
+        cooldown: 1200,
+        color: '#8B4513', // saddle brown
+        type: 'throwing',
+        speed: 5,
+        sprite: 'axe.png', // You can change this to the actual axe sprite filename
+        returnSpeed: 4,
+        maxDistance: TILE_SIZE * 4,
+        spinSpeed: 0.15,
+        heavy: true // Slower but more powerful
     }
 };
 

@@ -171,6 +171,9 @@ export class WeaponSystem {
             case 'staff':
                 this.handleStaffAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
                 break;
+            case 'throwing':
+                this.handleThrowingAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
+                break;
         }
     }
 
@@ -331,6 +334,79 @@ export class WeaponSystem {
             };
 
             this.gameState.projectiles.push(staffProjectile);
+        }
+    }
+
+    handleThrowingAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy) {
+        if (!closestEnemy) return;
+
+        // Special handling for Chakram - limit to one per weapon owned
+        if (weapon.bouncing) {
+            // Count existing chakrams on screen
+            const existingChakrams = this.gameState.projectiles.filter(p => 
+                p.type === 'throwing' && p.bouncing
+            ).length;
+            
+            // Don't throw any chakrams if we're at the limit
+            if (existingChakrams >= count) {
+                return; // Exit completely - no chakrams thrown
+            }
+            
+            // Only create the missing chakrams
+            count = count - existingChakrams;
+        }
+
+        // Calculate stacking bonuses for special weapons like Chakram
+        let stackedSpeed = weapon.speed;
+        let stackedDamage = weapon.damage;
+        
+        if (weapon.bouncing && weapon.bounceSpeedIncrease) {
+            // For bouncing weapons like Chakram, increase speed and damage per stack
+            const totalChakrams = this.gameState.projectiles.filter(p => 
+                p.type === 'throwing' && p.bouncing
+            ).length + count; // Total after this throw
+            stackedSpeed = weapon.speed * Math.pow(weapon.bounceSpeedIncrease, totalChakrams - 1);
+            stackedDamage = weapon.damage * totalChakrams; // Scale with total chakrams
+        }
+
+        // Create throwing weapon projectiles
+        for (let i = 0; i < count; i++) {
+            const spreadAngle = (i - (count - 1) / 2) * 0.15; // Slight spread for multiple weapons
+            const angleToEnemy = Math.atan2(
+                closestEnemy.y + closestEnemy.height / 2 - playerCenterY,
+                closestEnemy.x + closestEnemy.width / 2 - playerCenterX
+            ) + spreadAngle;
+
+            // Create throwing weapon projectile
+            const throwingProjectile = {
+                x: playerCenterX,
+                y: playerCenterY,
+                dx: Math.cos(angleToEnemy) * stackedSpeed,
+                dy: Math.sin(angleToEnemy) * stackedSpeed,
+                width: 30,
+                height: 30,
+                damage: stackedDamage,
+                range: weapon.range,
+                color: weapon.color,
+                startX: playerCenterX,
+                startY: playerCenterY,
+                maxDistance: weapon.maxDistance,
+                returnSpeed: weapon.returnSpeed,
+                type: 'throwing',
+                weapon: weapon,
+                hitEnemies: new Set(),
+                piercing: true, // All throwing weapons pierce by default
+                spectral: weapon.spectral || false,
+                bouncing: weapon.bouncing || false,
+                bounceDuration: weapon.bounceDuration || 0,
+                noReturn: weapon.noReturn || false,
+                returning: false, // Will be set to true when it starts returning
+                rotation: 0,
+                spinSpeed: weapon.spinSpeed || 0.2,
+                distanceTraveled: 0
+            };
+
+            this.gameState.projectiles.push(throwingProjectile);
         }
     }
 

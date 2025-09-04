@@ -38,6 +38,11 @@ export class ProjectileSystem {
                 this.createHealingTrail(proj);
             }
 
+            // Handle throwing weapon behavior
+            if (proj.type === 'throwing') {
+                this.updateThrowingWeapon(proj);
+            }
+
             // Check enemy collisions
             this.checkEnemyCollisions(proj);
 
@@ -48,7 +53,28 @@ export class ProjectileSystem {
 
     checkEnemyCollisions(projectile) {
         this.gameState.enemies.forEach(enemy => {
-            if (!projectile.hitEnemies.has(enemy)) {
+            // For throwing weapons, allow hitting the same enemy multiple times
+            // by adding a cooldown instead of permanent tracking
+            let canHit = true;
+            
+            if (projectile.type === 'throwing') {
+                // All throwing weapons can hit the same enemy again after a short cooldown
+                const now = Date.now();
+                
+                if (!projectile.enemyHitCooldowns) {
+                    projectile.enemyHitCooldowns = new Map();
+                }
+                
+                const lastHitTime = projectile.enemyHitCooldowns.get(enemy);
+                if (lastHitTime && now - lastHitTime < 500) { // 500ms cooldown
+                    canHit = false;
+                }
+            } else {
+                // Regular projectiles use permanent hit tracking
+                canHit = !projectile.hitEnemies.has(enemy);
+            }
+            
+            if (canHit) {
                 const dx = enemy.x + enemy.width / 2 - projectile.x;
                 const dy = enemy.y + enemy.height / 2 - projectile.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
@@ -70,7 +96,18 @@ export class ProjectileSystem {
         
         enemy.health -= projectile.damage;
         enemy.hitTime = Date.now();
-        projectile.hitEnemies.add(enemy);
+        
+        // Handle hit tracking differently for throwing vs regular projectiles
+        if (projectile.type === 'throwing') {
+            // For all throwing weapons, use cooldown system instead of permanent tracking
+            if (!projectile.enemyHitCooldowns) {
+                projectile.enemyHitCooldowns = new Map();
+            }
+            projectile.enemyHitCooldowns.set(enemy, Date.now());
+        } else {
+            // Regular projectiles use permanent hit tracking
+            projectile.hitEnemies.add(enemy);
+        }
         
         // Handle staff weapon special effects
         if (projectile.type === 'staff' && projectile.weapon) {
@@ -317,6 +354,21 @@ export class ProjectileSystem {
     isInBounds(projectile) {
         if (projectile.shouldRemove) return false;
         
+        // Chakrams never get removed by bounds - they bounce forever
+        if (projectile.type === 'throwing' && projectile.bouncing) {
+            return true; // Always keep chakrams in bounds check
+        }
+        
+        // Special handling for Spirit Blade - allow it to reach screen edges
+        if (projectile.type === 'throwing' && projectile.spectral) {
+            // Spirit Blade can go slightly outside bounds to trigger edge detection
+            // but should be removed if it goes too far beyond the screen
+            const buffer = 50; // Allow 50 pixels beyond screen edge
+            return projectile.x >= -buffer && projectile.x <= CANVAS_WIDTH + buffer && 
+                   projectile.y >= -buffer && projectile.y <= CANVAS_HEIGHT + buffer;
+        }
+        
+        // Regular bounds checking for other projectiles
         return projectile.x >= 0 && projectile.x <= CANVAS_WIDTH && 
                projectile.y >= 0 && projectile.y <= CANVAS_HEIGHT;
     }
@@ -679,6 +731,148 @@ export class ProjectileSystem {
             }
             
             projectile.lastHealingParticleTime = now;
+        }
+    }
+
+    updateThrowingWeapon(projectile) {
+        // Update rotation for spinning effect
+        projectile.rotation += projectile.spinSpeed;
+        
+        // Handle bouncing weapons (like Chakram) - skip all distance tracking
+        if (projectile.bouncing) {
+            this.updateBouncingWeapon(projectile);
+            return;
+        }
+        
+        // Track distance traveled for non-bouncing weapons only
+        const frameDistance = Math.sqrt(projectile.dx * projectile.dx + projectile.dy * projectile.dy);
+        projectile.distanceTraveled += frameDistance;
+        
+        // Handle Spirit Blade - travels until screen edge then returns
+        if (projectile.spectral) {
+            this.updateSpiritBlade(projectile);
+            return;
+        }
+        
+        // Handle special weapons that don't return (like Spirit Blade)
+        if (projectile.noReturn) {
+            // Check if weapon should be removed (reached max distance)
+            if (projectile.distanceTraveled >= projectile.maxDistance) {
+                projectile.shouldRemove = true;
+            }
+            return;
+        }
+        
+        // Check if weapon should start returning
+        if (!projectile.returning && projectile.distanceTraveled >= projectile.maxDistance) {
+            projectile.returning = true;
+        }
+        
+        // Handle returning behavior for normal throwing weapons
+        if (projectile.returning) {
+            const playerCenterX = this.gameState.player.x + this.gameState.player.width / 2;
+            const playerCenterY = this.gameState.player.y + this.gameState.player.height / 2;
+            
+            // Calculate return direction
+            const dx = playerCenterX - projectile.x;
+            const dy = playerCenterY - projectile.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Check if weapon reached player
+            if (distance < 20) {
+                // Mark for removal - weapon has returned
+                projectile.shouldRemove = true;
+                return;
+            }
+            
+            // Update velocity to move toward player
+            const returnDirection = Math.atan2(dy, dx);
+            projectile.dx = Math.cos(returnDirection) * projectile.returnSpeed;
+            projectile.dy = Math.sin(returnDirection) * projectile.returnSpeed;
+        }
+    }
+
+    updateSpiritBlade(projectile) {
+        // Use actual canvas dimensions
+        const mapWidth = 800; // CANVAS_WIDTH
+        const mapHeight = 600; // CANVAS_HEIGHT
+        
+        // Check if Spirit Blade hit a screen edge
+        if (!projectile.returning) {
+            if (projectile.x <= 0 || projectile.x >= mapWidth - projectile.width ||
+                projectile.y <= 0 || projectile.y >= mapHeight - projectile.height) {
+                // Hit screen edge, start returning
+                projectile.returning = true;
+                
+                // Clamp position to screen bounds
+                projectile.x = Math.max(0, Math.min(mapWidth - projectile.width, projectile.x));
+                projectile.y = Math.max(0, Math.min(mapHeight - projectile.height, projectile.y));
+            }
+        }
+        
+        // Handle return to player
+        if (projectile.returning) {
+            const playerCenterX = this.gameState.player.x + this.gameState.player.width / 2;
+            const playerCenterY = this.gameState.player.y + this.gameState.player.height / 2;
+            
+            // Calculate return direction
+            const dx = playerCenterX - projectile.x;
+            const dy = playerCenterY - projectile.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Check if weapon reached player
+            if (distance < 20) {
+                // Mark for removal - weapon has returned
+                projectile.shouldRemove = true;
+                return;
+            }
+            
+            // Update velocity to move toward player
+            const returnDirection = Math.atan2(dy, dx);
+            projectile.dx = Math.cos(returnDirection) * projectile.returnSpeed;
+            projectile.dy = Math.sin(returnDirection) * projectile.returnSpeed;
+        }
+    }
+
+    updateBouncingWeapon(projectile) {
+        // Initialize bounce timer if not set
+        if (!projectile.bounceStartTime) {
+            projectile.bounceStartTime = Date.now();
+        }
+        
+        // Chakrams never despawn - remove the duration check for bouncing weapons
+        // This makes chakrams permanent until manually removed
+        
+        // Use actual canvas dimensions for bouncing
+        const mapWidth = 800; // CANVAS_WIDTH
+        const mapHeight = 600; // CANVAS_HEIGHT
+        
+        // Bounce off walls with proper boundary checking
+        if (projectile.x <= 0) {
+            projectile.dx = Math.abs(projectile.dx); // Always bounce right
+            projectile.x = 0;
+        } else if (projectile.x >= mapWidth - projectile.width) {
+            projectile.dx = -Math.abs(projectile.dx); // Always bounce left
+            projectile.x = mapWidth - projectile.width;
+        }
+        
+        if (projectile.y <= 0) {
+            projectile.dy = Math.abs(projectile.dy); // Always bounce down
+            projectile.y = 0;
+        } else if (projectile.y >= mapHeight - projectile.height) {
+            projectile.dy = -Math.abs(projectile.dy); // Always bounce up
+            projectile.y = mapHeight - projectile.height;
+        }
+        
+        // Add some randomness to bounces to make them more interesting
+        if (Math.random() < 0.05) { // 5% chance per frame to slightly change direction
+            const randomAngle = (Math.random() - 0.5) * 0.3; // Small random angle
+            const currentAngle = Math.atan2(projectile.dy, projectile.dx);
+            const newAngle = currentAngle + randomAngle;
+            const speed = Math.sqrt(projectile.dx * projectile.dx + projectile.dy * projectile.dy);
+            
+            projectile.dx = Math.cos(newAngle) * speed;
+            projectile.dy = Math.sin(newAngle) * speed;
         }
     }
 

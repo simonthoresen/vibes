@@ -112,6 +112,51 @@ export class Renderer {
         this.healingStaffImage.onload = () => {
             this.healingStaffImageLoaded = true;
         };
+
+        // Load throwing weapon sprites
+        this.spiritBladeImage = new Image();
+        this.spiritBladeImage.src = 'images/Spirit_blade.png';
+        this.spiritBladeImageLoaded = false;
+        this.spiritBladeImage.onload = () => {
+            this.spiritBladeImageLoaded = true;
+            console.log('Spirit Blade image loaded successfully');
+        };
+        this.spiritBladeImage.onerror = () => {
+            console.error('Failed to load Spirit Blade image: images/Spirit_blade.png');
+        };
+
+        this.boomerangImage = new Image();
+        this.boomerangImage.src = 'images/Boomerang.png';
+        this.boomerangImageLoaded = false;
+        this.boomerangImage.onload = () => {
+            this.boomerangImageLoaded = true;
+            console.log('Boomerang image loaded successfully');
+        };
+        this.boomerangImage.onerror = () => {
+            console.error('Failed to load Boomerang image: images/Boomerang.png');
+        };
+
+        this.throwingAxeImage = new Image();
+        this.throwingAxeImage.src = 'images/throwing_axe.png';
+        this.throwingAxeImageLoaded = false;
+        this.throwingAxeImage.onload = () => {
+            this.throwingAxeImageLoaded = true;
+            console.log('Throwing Axe image loaded successfully');
+        };
+        this.throwingAxeImage.onerror = () => {
+            console.error('Failed to load Throwing Axe image: images/throwing_axe.png');
+        };
+
+        this.chakramImage = new Image();
+        this.chakramImage.src = 'images/Chakram.png';
+        this.chakramImageLoaded = false;
+        this.chakramImage.onload = () => {
+            this.chakramImageLoaded = true;
+            console.log('Chakram image loaded successfully');
+        };
+        this.chakramImage.onerror = () => {
+            console.error('Failed to load Chakram image: images/Chakram.png');
+        };
     }
 
     clear() {
@@ -245,6 +290,64 @@ export class Renderer {
                 this.ctx.fill();
                 
                 this.ctx.restore();
+            } else if (proj.type === 'throwing') {
+                // Handle throwing weapons with sprites
+                let useSprite = false;
+                let spriteImage = null;
+                
+                // Check if this is a Spirit Blade
+                if (proj.spectral && this.spiritBladeImageLoaded) {
+                    useSprite = true;
+                    spriteImage = this.spiritBladeImage;
+                }
+                // Check if this is a Boomerang (identify by weapon name or returning property)
+                else if (proj.weapon && proj.weapon.name === 'Boomerang' && this.boomerangImageLoaded) {
+                    useSprite = true;
+                    spriteImage = this.boomerangImage;
+                }
+                // Check if this is a Throwing Axe
+                else if (proj.weapon && proj.weapon.name === 'Throwing Axe' && this.throwingAxeImageLoaded) {
+                    useSprite = true;
+                    spriteImage = this.throwingAxeImage;
+                }
+                // Check if this is a Chakram
+                else if (proj.weapon && proj.weapon.name === 'Chakram' && this.chakramImageLoaded) {
+                    useSprite = true;
+                    spriteImage = this.chakramImage;
+                }
+                
+                if (useSprite) {
+                    // Calculate rotation - use projectile's rotation property for spinning effect
+                    const angle = proj.rotation || 0;
+                    
+                    // Save current canvas state
+                    this.ctx.save();
+                    
+                    // Move to projectile position and center it
+                    this.ctx.translate(proj.x + proj.width / 2, proj.y + proj.height / 2);
+                    
+                    // Rotate for spinning effect
+                    this.ctx.rotate(angle);
+                    
+                    // Draw sprite centered with proper size
+                    const spriteSize = 40;
+                    this.ctx.drawImage(
+                        spriteImage, 
+                        -spriteSize / 2, 
+                        -spriteSize / 2, 
+                        spriteSize, 
+                        spriteSize
+                    );
+                    
+                    // Restore canvas state
+                    this.ctx.restore();
+                } else {
+                    // Fallback to circle for throwing weapons without sprites
+                    this.ctx.fillStyle = proj.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(proj.x + proj.width / 2, proj.y + proj.height / 2, proj.width / 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             } else {
                 // Use circle for non-bow projectiles
                 this.ctx.fillStyle = proj.color;
