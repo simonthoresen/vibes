@@ -19,24 +19,21 @@ const subdirs = fs.readdirSync(ROOT)
   .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
 const listItems = subdirs.length
-  ? subdirs.map(d => `<li><a href="${encodeURIComponent(d)}/">${d}/</a></li>`).join("\n")
+  ? subdirs.map(d => `<li><a href="${encodeURIComponent(d)}/">${d}</a></li>`).join("\n")
   : `<li><em>No sub-folders</em></li>`;
 
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Index of /</title>
+<title>Hult Vibes</title>
 <style>
   body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; line-height: 1.6; }
   h1 { margin-bottom: 1rem; }
-  li { list-style: none; }
-  a { text-decoration: none; }
-  a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
-  <h1>Index of /</h1>
+  <h1>Hult Vibes</h1>
   <ul>
     ${listItems}
   </ul>
