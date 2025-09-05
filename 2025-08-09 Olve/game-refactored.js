@@ -1033,7 +1033,8 @@ class DungeonCrawlerGame {
                 max-height: 90vh;
                 overflow-y: auto;
                 overflow-x: hidden;
-                width: 400px;
+                width: 900px;
+                min-width: 800px;
             `;
         } else {
             content.style.cssText = `

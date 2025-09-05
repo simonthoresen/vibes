@@ -34,8 +34,13 @@ export class AllySystem {
                 }
             }
 
-            // Check if ally is dead
-            if (ally.health <= 0) {
+            // Check if ally is dead (skip immortal flaming skulls)
+            if (ally.type !== 'orbital_skull' && ally.health <= 0) {
+                // Special explosive death for demons
+                if (ally.type === 'demon') {
+                    this.createDemonExplosiveProjectiles(ally);
+                }
+                
                 // Create death effect
                 if (this.particleEngine) {
                     this.particleEngine.createAllyDeathEffect(
@@ -57,6 +62,12 @@ export class AllySystem {
         // Handle orbital skulls differently
         if (ally.type === 'orbital_skull') {
             this.updateFlyingSkull(ally, deltaTime);
+            return;
+        }
+
+        // Handle demons as stationary turrets
+        if (ally.type === 'demon') {
+            this.updateDemon(ally, deltaTime);
             return;
         }
 
@@ -85,7 +96,81 @@ export class AllySystem {
         this.constrainToScreen(ally);
     }
 
+    updateDemon(ally, deltaTime) {
+        // Add purple flame particle effect from the top of demons periodically
+        if (!ally.lastParticleTime) ally.lastParticleTime = 0;
+        const now = Date.now();
+        if (now - ally.lastParticleTime > 150) { // Emit particles every 150ms
+            ally.lastParticleTime = now;
+            if (this.particleEngine) {
+                const topX = ally.x + ally.width / 2;
+                const topY = ally.y + ally.height * 0.1; // Position near top of demon cube
+                
+                // Create multiple larger particle bursts from the top
+                for (let i = 0; i < 3; i++) {
+                    const offsetX = topX + (Math.random() - 0.5) * ally.width * 0.5; // Wider horizontal spread
+                    const offsetY = topY + (Math.random() - 0.5) * ally.height * 0.1; // Small vertical spread
+                    
+                    this.particleEngine.createExplosion(offsetX, offsetY, {
+                        particleCount: 2,
+                        colors: ['#8B0091', '#9932CC', '#BA55D3', '#DA70D6'], // Purple flame colors
+                        minSize: 4,
+                        maxSize: 8,
+                        minSpeed: 0.6,
+                        maxSpeed: 1.8,
+                        minLife: 600,
+                        maxLife: 1000,
+                        gravity: -0.04 // Gentle upward float
+                    });
+                }
+            }
+        }
+
+        // Demons are stationary turrets - they don't move, only attack
+        const closestEnemy = this.findClosestEnemy(ally);
+        
+        if (closestEnemy) {
+            ally.target = closestEnemy;
+            const distanceToEnemy = this.getDistance(ally, closestEnemy);
+            
+            // Attack if in range and cooldown is ready
+            if (distanceToEnemy <= ally.attackRange) {
+                this.tryDemonAttack(ally, closestEnemy);
+            }
+        }
+        // Demons stay where they are summoned - no movement or bounds checking
+    }
+
     updateFlyingSkull(ally, deltaTime) {
+        // Add blue fire particle effect periodically
+        if (!ally.lastParticleTime) ally.lastParticleTime = 0;
+        const now = Date.now();
+        if (now - ally.lastParticleTime > 80) { // Emit particles every 80ms for more frequency
+            ally.lastParticleTime = now;
+            if (this.particleEngine) {
+                const centerX = ally.x + ally.width / 2;
+                const topY = ally.y + ally.height * 0.2; // Position near top of sprite
+                
+                // Create multiple small particle bursts concentrated at the top
+                for (let i = 0; i < 3; i++) {
+                    const offsetX = centerX + (Math.random() - 0.5) * ally.width * 0.3; // Small horizontal spread
+                    const offsetY = topY + (Math.random() - 0.5) * ally.height * 0.1; // Very small vertical spread
+                    
+                    this.particleEngine.createExplosion(offsetX, offsetY, {
+                        particleCount: 2,
+                        colors: ['#0080ff', '#00bfff', '#87ceeb'],
+                        minSize: 1,
+                        maxSize: 2,
+                        minSpeed: 0.5,
+                        maxSpeed: 1.5,
+                        minLife: 400,
+                        maxLife: 800,
+                        gravity: -0.05 // Gentle upward float
+                    });
+                }
+            }
+        }
+
         // Clean up dead targets
         if (ally.currentTarget && (ally.currentTarget.health <= 0 || !this.gameState.enemies.includes(ally.currentTarget))) {
             ally.currentTarget = null;
@@ -104,38 +189,49 @@ export class AllySystem {
             if (ally.currentTarget && ally.currentTarget.health > 0 && this.gameState.enemies.includes(ally.currentTarget)) {
                 const targetDistance = this.getDistance(ally, ally.currentTarget);
                 
-                // Simple behavior: chase enemy if far, attack if close
+                // Attack if in range
                 if (targetDistance <= ally.attackRange) {
-                    // In attack range - attack the enemy
                     this.tryAttackEnemy(ally, ally.currentTarget);
-                    
-                    // Move slightly towards enemy to stay engaged, but slowly
-                    if (targetDistance > ally.attackRange * 0.8) {
-                        this.moveTowardsTarget(ally, ally.currentTarget, deltaTime, 0.5);
-                    }
-                } else {
-                    // Too far - chase the enemy smoothly
-                    this.moveTowardsTarget(ally, ally.currentTarget, deltaTime, 1.5);
+                }
+                
+                // Always move towards target with constant speed (like enemies do)
+                if (targetDistance > 30) { // Minimum distance to avoid jittering
+                    this.moveTowardsTargetSmooth(ally, ally.currentTarget);
                 }
             } else {
                 // Current target is invalid, clear it and find new one
                 ally.currentTarget = closestEnemy;
             }
         } else {
-            // No enemies - return to player and hover nearby
+            // No enemies - return to player
             ally.currentTarget = null;
             const player = this.gameState.player;
             const distanceToPlayer = this.getDistance(ally, player);
             
-            if (distanceToPlayer > 120) {
-                // Too far from player, move closer
-                this.moveTowardsTarget(ally, player, deltaTime, 1);
+            if (distanceToPlayer > 80) {
+                this.moveTowardsTargetSmooth(ally, player);
             }
-            // If close enough to player, just stay put
         }
         
         // Keep within screen bounds
         this.constrainToScreen(ally);
+    }
+
+    moveTowardsTargetSmooth(ally, target) {
+        // Calculate direction vector (same as enemy movement)
+        const dx = (target.x + target.width / 2) - (ally.x + ally.width / 2);
+        const dy = (target.y + target.height / 2) - (ally.y + ally.height / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 0) {
+            // Use timeScale like enemies do for consistent movement
+            const timeScale = this.gameState.timeScale || 1;
+            const speed = ally.speed; // Constant speed, no custom speed parameter
+            
+            // Move using the same formula as enemies
+            ally.x += (dx / dist) * speed * timeScale;
+            ally.y += (dy / dist) * speed * timeScale;
+        }
     }
 
     findClosestEnemy(ally) {
@@ -257,6 +353,69 @@ export class AllySystem {
         }
     }
 
+    tryDemonAttack(ally, enemy) {
+        const now = Date.now();
+        if (now - ally.lastAttack < ally.attackCooldown) {
+            return;
+        }
+
+        ally.lastAttack = now;
+
+        // Create a projectile towards the enemy
+        const centerX = ally.x + ally.width / 2;
+        const centerY = ally.y + ally.height / 2;
+        const targetX = enemy.x + enemy.width / 2;
+        const targetY = enemy.y + enemy.height / 2;
+
+        // Calculate direction
+        const dx = targetX - centerX;
+        const dy = targetY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0) {
+            const speed = ally.projectileSpeed || 6;
+            const projectile = {
+                x: centerX - 8, // Center the projectile
+                y: centerY - 8,
+                dx: (dx / distance) * speed,
+                dy: (dy / distance) * speed,
+                width: ally.projectileSize || 16,
+                height: ally.projectileSize || 16,
+                damage: ally.damage,
+                color: ally.color,
+                type: 'demon_projectile',
+                sourceType: 'ally',
+                piercing: false,
+                hitEnemies: new Set(),
+                range: ally.attackRange,
+                distanceTraveled: 0,
+                maxDistance: 2000, // Can travel across the entire map
+                startX: centerX,
+                startY: centerY
+            };
+
+            // Add to projectile system
+            if (this.gameState.projectiles) {
+                this.gameState.projectiles.push(projectile);
+            }
+
+            // Create muzzle flash effect
+            if (this.particleEngine) {
+                this.particleEngine.createExplosion(centerX, centerY, {
+                    particleCount: 4,
+                    colors: [ally.color, '#FF4500'],
+                    minSize: 2,
+                    maxSize: 4,
+                    minSpeed: 2,
+                    maxSpeed: 5,
+                    minLife: 200,
+                    maxLife: 400,
+                    gravity: 0
+                });
+            }
+        }
+    }
+
     tryAttackEnemy(ally, enemy) {
         const now = Date.now();
         if (now - ally.lastAttack < ally.attackCooldown) {
@@ -328,5 +487,57 @@ export class AllySystem {
     // Get all allies for rendering system
     getAllies() {
         return this.gameState.allies || [];
+    }
+
+    // Create explosive projectiles when a demon dies
+    createDemonExplosiveProjectiles(demon) {
+        const centerX = demon.x + demon.width / 2;
+        const centerY = demon.y + demon.height / 2;
+        const projectileCount = 8; // 8 projectiles in all directions
+        
+        // Create projectiles in a circle pattern
+        for (let i = 0; i < projectileCount; i++) {
+            const angle = (i * 2 * Math.PI) / projectileCount;
+            const speed = demon.projectileSpeed || 6;
+            
+            const projectile = {
+                x: centerX - 8, // Center the projectile
+                y: centerY - 8,
+                dx: Math.cos(angle) * speed,
+                dy: Math.sin(angle) * speed,
+                width: 16,
+                height: 16,
+                damage: Math.floor(demon.damage * 0.75), // 75% of demon's damage
+                color: demon.color,
+                type: 'demon_explosion',
+                sourceType: 'ally',
+                piercing: false,
+                hitEnemies: new Set(), // Initialize hit tracking
+                distanceTraveled: 0,
+                maxDistance: 200, // Remove after 200 pixels
+                startX: centerX,
+                startY: centerY
+            };
+            
+            // Add to projectile system
+            if (this.gameState.projectiles) {
+                this.gameState.projectiles.push(projectile);
+            }
+        }
+        
+        // Create explosive visual effect
+        if (this.particleEngine) {
+            this.particleEngine.createExplosion(centerX, centerY, {
+                particleCount: 20,
+                colors: ['#8B0000', '#FF0000', '#FF4500', '#FFA500'],
+                minSize: 3,
+                maxSize: 8,
+                minSpeed: 4,
+                maxSpeed: 12,
+                minLife: 400,
+                maxLife: 800,
+                gravity: 0.1
+            });
+        }
     }
 }

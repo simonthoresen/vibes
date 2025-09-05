@@ -18,6 +18,18 @@ export class ProjectileSystem {
             proj.x += proj.dx;
             proj.y += proj.dy;
 
+            // Track distance for projectiles with maxDistance (like explosive projectiles)
+            // Skip distance tracking for Spirit Blade - it should travel to screen edges
+            if (proj.maxDistance && proj.startX !== undefined && proj.startY !== undefined && !proj.spectral) {
+                const dx = proj.x - proj.startX;
+                const dy = proj.y - proj.startY;
+                proj.distanceTraveled = Math.sqrt(dx * dx + dy * dy);
+                
+                if (proj.distanceTraveled >= proj.maxDistance) {
+                    return false; // Remove projectile
+                }
+            }
+
             // Create fire particles for fire staff projectiles while flying
             if (proj.type === 'staff' && proj.weapon && proj.weapon.special === 'fire_explosion_dot') {
                 this.createFireballTrail(proj);

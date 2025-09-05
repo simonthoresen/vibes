@@ -103,7 +103,7 @@ export class WeaponSystem {
 
                 const neededSkulls = count - existingSkulls;
                 for (let i = 0; i < neededSkulls; i++) {
-                    this.createOrbitalSkull(weapon, playerCenterX, playerCenterY, existingSkulls + i);
+                    this.createOrbitalSkull(weapon, playerCenterX, playerCenterY, existingSkulls + i, count);
                 }
             }
         });
@@ -676,13 +676,17 @@ export class WeaponSystem {
             return;
         }
 
-        // Create new demon with scaling based on weapon count
-        const demon = this.createDemon(companionType, weapon, playerCenterX, playerCenterY, count);
-        this.gameState.allies.push(demon);
+        // Summon all missing demons at once (when first orb triggers, summon for all orbs)
+        const demonsToSummon = maxDemons - existingDemons;
+        for (let i = 0; i < demonsToSummon; i++) {
+            // Create new demon with scaling based on weapon count
+            const demon = this.createDemon(companionType, weapon, playerCenterX, playerCenterY, count);
+            this.gameState.allies.push(demon);
 
-        // Create summoning effect particles
-        if (this.particleEngine) {
-            this.particleEngine.createSummonEffect(demon.x + demon.width/2, demon.y + demon.height/2, weapon.color);
+            // Create summoning effect particles for each demon
+            if (this.particleEngine) {
+                this.particleEngine.createSummonEffect(demon.x + demon.width/2, demon.y + demon.height/2, weapon.color);
+            }
         }
     }
 
@@ -730,35 +734,41 @@ export class WeaponSystem {
 
             const neededSkulls = count - existingSkulls;
             for (let i = 0; i < neededSkulls; i++) {
-                this.createOrbitalSkull(weapon, playerCenterX, playerCenterY, existingSkulls + i);
+                this.createOrbitalSkull(weapon, playerCenterX, playerCenterY, existingSkulls + i, count);
             }
         }
     }
 
-    createOrbitalSkull(weapon, playerCenterX, playerCenterY, index) {
+    createOrbitalSkull(weapon, playerCenterX, playerCenterY, index, count) {
         // Position the skull in orbit around the player
         const angle = (index * 2 * Math.PI) / Math.max(1, this.gameState.player.weapons.filter(w => w.id === 'FLAMING_SKULL').length);
         const radius = weapon.orbitRadius || 100;
         
+        // Calculate scaling based on weapon count
+        const damageMultiplier = Math.pow(2, count - 1); // 2x damage per stack (doubles each time)
+        const speedMultiplier = Math.min(2, 1 + (count - 1) * 0.3); // Max 2x speed, +30% per stack
+        const attackSpeedMultiplier = Math.pow(0.5, count - 1); // 2x faster attacks per stack (half cooldown each time)
+        
         const skull = {
-            x: playerCenterX + Math.cos(angle) * radius - 16,
-            y: playerCenterY + Math.sin(angle) * radius - 16,
-            width: 32,
-            height: 32,
+            x: playerCenterX + Math.cos(angle) * radius - 24,
+            y: playerCenterY + Math.sin(angle) * radius - 32,
+            width: 48,
+            height: 64,
             health: 999999, // Immortal
             maxHealth: 999999,
-            damage: weapon.damage,
-            speed: 3, // Flying speed for autonomous movement
+            damage: Math.floor(weapon.damage * damageMultiplier),
+            speed: 3 * speedMultiplier, // Base speed 3 with scaling
             type: 'orbital_skull',
             sourceWeapon: weapon.id,
             sprite: weapon.sprite,
             orbitAngle: angle,
             orbitRadius: radius,
             lastAttack: 0,
-            attackCooldown: weapon.cooldown,
+            attackCooldown: Math.floor(weapon.cooldown * attackSpeedMultiplier),
             attackRange: weapon.attackRange,
             permanent: true,
-            spawnTime: Date.now()
+            spawnTime: Date.now(),
+            weaponCount: count // Store count for reference
         };
 
         this.gameState.allies.push(skull);
@@ -790,7 +800,7 @@ export class WeaponSystem {
             sourceWeapon: weapon.id,
             weaponCount: count,
             spawnTime: Date.now(),
-            duration: weapon.minionDuration,
+            duration: weapon.minionDuration, // Fixed 30s duration
             lastAttack: 0,
             target: null,
             type: 'demon',

@@ -157,6 +157,53 @@ export class Renderer {
         this.chakramImage.onerror = () => {
             console.error('Failed to load Chakram image: images/Chakram.png');
         };
+
+        // Load skull minion sprite for flaming skull orbital weapon
+        this.skullMinionImage = new Image();
+        this.skullMinionImage.src = 'images/Skull_minion.png';
+        this.skullMinionImageLoaded = false;
+        this.skullMinionImage.onload = () => {
+            this.skullMinionImageLoaded = true;
+            console.log('Skull Minion image loaded successfully');
+        };
+        this.skullMinionImage.onerror = () => {
+            console.error('Failed to load Skull Minion image: images/Skull_minion.png');
+        };
+
+        // Load summon orb sprite for cursed orb visual indicator
+        this.summonOrbImage = new Image();
+        this.summonOrbImage.src = 'images/summon_orb.png';
+        this.summonOrbImageLoaded = false;
+        this.summonOrbImage.onload = () => {
+            this.summonOrbImageLoaded = true;
+            console.log('Summon Orb image loaded successfully');
+        };
+        this.summonOrbImage.onerror = () => {
+            console.error('Failed to load Summon Orb image: images/summon_orb.png');
+        };
+
+        // Load eyeball minion sprites for demons
+        this.eyeballMinionImage = new Image();
+        this.eyeballMinionImage.src = 'images/eyeball_minion.png';
+        this.eyeballMinionImageLoaded = false;
+        this.eyeballMinionImage.onload = () => {
+            this.eyeballMinionImageLoaded = true;
+            console.log('Eyeball Minion image loaded successfully');
+        };
+        this.eyeballMinionImage.onerror = () => {
+            console.error('Failed to load Eyeball Minion image: images/eyeball_minion.png');
+        };
+
+        this.eyeballMinionAttackImage = new Image();
+        this.eyeballMinionAttackImage.src = 'images/eyeball_minion_attack.png';
+        this.eyeballMinionAttackImageLoaded = false;
+        this.eyeballMinionAttackImage.onload = () => {
+            this.eyeballMinionAttackImageLoaded = true;
+            console.log('Eyeball Minion Attack image loaded successfully');
+        };
+        this.eyeballMinionAttackImage.onerror = () => {
+            console.error('Failed to load Eyeball Minion Attack image: images/eyeball_minion_attack.png');
+        };
     }
 
     clear() {
@@ -222,27 +269,74 @@ export class Renderer {
             // Draw ally with subtle glow effect to distinguish from enemies
             this.ctx.save();
             
-            // Add glow effect
-            this.ctx.shadowColor = ally.color;
-            this.ctx.shadowBlur = 8;
-            
-            // Draw ally body with hit effect
-            this.ctx.fillStyle = ally.hitTime && Date.now() - ally.hitTime < 100 ? 
-                '#ffffff' : ally.color;
-            this.ctx.fillRect(ally.x, ally.y, ally.width, ally.height);
-            
-            // Remove shadow for border
-            this.ctx.shadowBlur = 0;
-            
-            // Draw a friendly border to distinguish from enemies
-            this.ctx.strokeStyle = '#ffffff';
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(ally.x, ally.y, ally.width, ally.height);
+            // Special rendering for flaming skull with sprite
+            if (ally.type === 'orbital_skull' && ally.sprite) {
+                if (this.skullMinionImageLoaded) {
+                    // Add glow effect for skull
+                    this.ctx.shadowColor = ally.color;
+                    this.ctx.shadowBlur = 8;
+                    
+                    // Draw the skull sprite
+                    this.ctx.drawImage(this.skullMinionImage, ally.x, ally.y, ally.width, ally.height);
+                    
+                    // Remove shadow
+                    this.ctx.shadowBlur = 0;
+                } else {
+                    // Fallback to colored rectangle if sprite not loaded
+                    this.ctx.shadowColor = ally.color;
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.fillStyle = ally.color;
+                    this.ctx.fillRect(ally.x, ally.y, ally.width, ally.height);
+                    this.ctx.shadowBlur = 0;
+                }
+            } else if (ally.type === 'demon' && ally.sprite) {
+                // Special rendering for demons with sprite
+                if (this.eyeballMinionImageLoaded) {
+                    // Add purple glow effect for demon
+                    this.ctx.shadowColor = '#800080';
+                    this.ctx.shadowBlur = 10;
+                    
+                    // Draw the demon sprite with double size
+                    const spriteWidth = ally.width * 2;
+                    const spriteHeight = ally.height * 2;
+                    const offsetX = ally.x - ally.width / 2; // Center the larger sprite
+                    const offsetY = ally.y - ally.height / 2;
+                    this.ctx.drawImage(this.eyeballMinionImage, offsetX, offsetY, spriteWidth, spriteHeight);
+                    
+                    // Remove shadow
+                    this.ctx.shadowBlur = 0;
+                } else {
+                    // Fallback to colored rectangle if sprite not loaded
+                    this.ctx.shadowColor = ally.color;
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.fillStyle = ally.color;
+                    this.ctx.fillRect(ally.x, ally.y, ally.width, ally.height);
+                    this.ctx.shadowBlur = 0;
+                }
+            } else {
+                // Standard ally rendering for non-skull, non-demon allies
+                // Add glow effect
+                this.ctx.shadowColor = ally.color;
+                this.ctx.shadowBlur = 8;
+                
+                // Draw ally body with hit effect (skip hit effect for flaming skulls)
+                const showHitEffect = ally.type !== 'orbital_skull' && ally.hitTime && Date.now() - ally.hitTime < 100;
+                this.ctx.fillStyle = showHitEffect ? '#ffffff' : ally.color;
+                this.ctx.fillRect(ally.x, ally.y, ally.width, ally.height);
+                
+                // Remove shadow for border
+                this.ctx.shadowBlur = 0;
+                
+                // Draw a friendly border to distinguish from enemies
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(ally.x, ally.y, ally.width, ally.height);
+            }
             
             this.ctx.restore();
             
-            // Draw ally health bar (green background for friendlies) - skip for flaming skulls
-            if (ally.type !== 'orbital_skull') {
+            // Draw ally health bar (green background for friendlies) - skip for flaming skulls and demons
+            if (ally.type !== 'orbital_skull' && ally.type !== 'demon') {
                 this.drawHealthBar(ally.x, ally.y - 10, ally.width, 4, ally.health, ally.maxHealth, '#228B22', '#90EE90');
             }
             
@@ -398,8 +492,35 @@ export class Renderer {
                     this.ctx.arc(proj.x + proj.width / 2, proj.y + proj.height / 2, proj.width / 2, 0, Math.PI * 2);
                     this.ctx.fill();
                 }
+            } else if ((proj.type === 'demon_projectile' || proj.type === 'demon_explosion') && this.eyeballMinionAttackImageLoaded) {
+                // Special rendering for demon projectiles with sprite
+                // Calculate rotation angle based on projectile velocity
+                const angle = Math.atan2(proj.dy, proj.dx);
+                
+                // Save current canvas state
+                this.ctx.save();
+                
+                // Move to projectile position
+                this.ctx.translate(proj.x, proj.y);
+                
+                // Rotate to match projectile direction and add 10 degrees left tilt
+                const leftTilt = -10 * Math.PI / 180; // Convert 10 degrees to radians (negative for left)
+                this.ctx.rotate(angle + leftTilt);
+                
+                // Draw demon projectile sprite centered
+                const spriteSize = proj.type === 'demon_explosion' ? 16 : 20; // Slightly smaller for explosion projectiles
+                this.ctx.drawImage(
+                    this.eyeballMinionAttackImage, 
+                    -spriteSize / 2, 
+                    -spriteSize / 2, 
+                    spriteSize, 
+                    spriteSize
+                );
+                
+                // Restore canvas state
+                this.ctx.restore();
             } else {
-                // Use circle for non-bow projectiles
+                // Use circle for non-bow, non-demon projectiles
                 this.ctx.fillStyle = proj.color;
                 this.ctx.beginPath();
                 this.ctx.arc(proj.x, proj.y, proj.width / 2, 0, Math.PI * 2);
@@ -969,46 +1090,111 @@ export class Renderer {
     }
 
     drawSummonWeapon(weapon, count, playerCenterX, playerCenterY, player) {
-        // Draw summoning aura/effect around player
+        // Draw orbiting timing orb instead of static circle
         const now = Date.now();
         const lastAttack = player.lastAttacks[weapon.id] || 0;
         const timeSinceAttack = now - lastAttack;
-        const cooldownProgress = Math.min(1, timeSinceAttack / weapon.cooldown);
         
-        // Draw cooldown indicator - a circle that fills up as cooldown progresses
-        this.ctx.save();
+        // Calculate orb position based on timing cycle
+        // Full cycle = 90 seconds (60s cooldown + 30s demon duration)
+        // But we want the orb to complete one orbit in 30 seconds
+        const totalCycle = 90000; // 90 seconds total cycle
+        const orbitalPeriod = 30000; // 30 seconds per orbit
+        const cycleProgress = (timeSinceAttack % totalCycle) / totalCycle;
         
-        // Draw outer ring (empty)
-        this.ctx.strokeStyle = weapon.color + '40';
-        this.ctx.lineWidth = 4;
-        this.ctx.beginPath();
-        this.ctx.arc(playerCenterX, playerCenterY, 50, 0, Math.PI * 2);
-        this.ctx.stroke();
+        // Orb orbits around player - one full orbit = 30 seconds
+        const orbitalAngle = (now / orbitalPeriod) * Math.PI * 2;
+        const orbitRadius = 50;
+        const orbX = playerCenterX + Math.cos(orbitalAngle) * orbitRadius;
+        const orbY = playerCenterY + Math.sin(orbitalAngle) * orbitRadius;
         
-        // Draw cooldown progress
-        if (cooldownProgress < 1) {
-            this.ctx.strokeStyle = weapon.color;
-            this.ctx.lineWidth = 4;
-            this.ctx.beginPath();
-            this.ctx.arc(playerCenterX, playerCenterY, 50, -Math.PI/2, -Math.PI/2 + (cooldownProgress * Math.PI * 2));
-            this.ctx.stroke();
+        // Emit purple flame particles from the top of the orb periodically
+        if (!this.lastOrbParticleTime) this.lastOrbParticleTime = 0;
+        if (now - this.lastOrbParticleTime > 120) { // Emit particles every 120ms
+            this.lastOrbParticleTime = now;
+            if (this.particleEngine) {
+                // Create 3 larger particle bursts from the top of the orb
+                for (let i = 0; i < 3; i++) {
+                    const topX = orbX + (Math.random() - 0.5) * 12; // Wider horizontal spread at top
+                    const topY = orbY - orbSize * 0.8; // Position at top of orb
+                    
+                    this.particleEngine.createExplosion(topX, topY, {
+                        particleCount: 2,
+                        colors: ['#8B0091', '#9932CC', '#BA55D3', '#DA70D6'], // Purple flame colors
+                        minSize: 3,
+                        maxSize: 6,
+                        minSpeed: 0.5,
+                        maxSpeed: 1.5,
+                        minLife: 500,
+                        maxLife: 900,
+                        gravity: -0.03 // Gentle upward float
+                    });
+                }
+            }
         }
         
-        // Draw magical glowing effect when ready to summon
-        if (cooldownProgress >= 1) {
+        this.ctx.save();
+        
+        // Draw orbital path (faint)
+        this.ctx.strokeStyle = weapon.color + '20';
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([2, 2]);
+        this.ctx.beginPath();
+        this.ctx.arc(playerCenterX, playerCenterY, orbitRadius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+        
+        // Determine orb state based on timing
+        let orbColor = weapon.color;
+        let orbSize = 8;
+        let orbAlpha = 0.8;
+        
+        if (timeSinceAttack < 30000) {
+            // Demons are active - bright, pulsing orb
+            orbColor = '#00FF00'; // Green for active
+            orbSize = 10 + Math.sin(now * 0.01) * 2;
+            orbAlpha = 0.9 + Math.sin(now * 0.008) * 0.1;
+        } else if (timeSinceAttack < 60000) {
+            // Cooldown period - dimmer, smaller orb
+            orbColor = '#FF6600'; // Orange for cooldown
+            orbSize = 6;
+            orbAlpha = 0.5;
+        } else {
+            // Ready to summon - bright, glowing orb
+            orbColor = weapon.color;
+            orbSize = 12 + Math.sin(now * 0.01) * 3;
+            orbAlpha = 1.0;
+            
+            // Add glow effect when ready
             this.ctx.shadowColor = weapon.color;
             this.ctx.shadowBlur = 15;
-            this.ctx.strokeStyle = weapon.color;
-            this.ctx.lineWidth = 3;
+        }
+        
+        // Draw the orbiting orb using sprite or fallback
+        this.ctx.globalAlpha = orbAlpha;
+        
+        if (this.summonOrbImageLoaded) {
+            // Use summon_orb.png sprite - doubled size
+            const spriteSize = orbSize * 4; // Doubled from orbSize * 2
+            this.ctx.drawImage(
+                this.summonOrbImage, 
+                orbX - spriteSize / 2, 
+                orbY - spriteSize / 2, 
+                spriteSize, 
+                spriteSize
+            );
+        } else {
+            // Fallback to colored circle if sprite not loaded
+            this.ctx.fillStyle = orbColor;
             this.ctx.beginPath();
-            this.ctx.arc(playerCenterX, playerCenterY, 50 + Math.sin(now * 0.01) * 5, 0, Math.PI * 2);
-            this.ctx.stroke();
+            this.ctx.arc(orbX, orbY, orbSize, 0, Math.PI * 2);
+            this.ctx.fill();
             
-            // Draw inner pulse
-            this.ctx.globalAlpha = 0.3 + Math.sin(now * 0.005) * 0.2;
-            this.ctx.fillStyle = weapon.color;
+            // Add inner core
+            this.ctx.globalAlpha = orbAlpha * 0.8;
+            this.ctx.fillStyle = '#FFFFFF';
             this.ctx.beginPath();
-            this.ctx.arc(playerCenterX, playerCenterY, 25, 0, Math.PI * 2);
+            this.ctx.arc(orbX, orbY, orbSize * 0.4, 0, Math.PI * 2);
             this.ctx.fill();
         }
         
@@ -1024,7 +1210,7 @@ export class Renderer {
                 this.ctx.fillStyle = weapon.color;
                 this.ctx.font = '14px Arial';
                 this.ctx.textAlign = 'center';
-                this.ctx.fillText(`${minionCount}/${maxMinions}`, playerCenterX, playerCenterY - 65);
+                this.ctx.fillText(`${minionCount}/${maxMinions}`, playerCenterX, playerCenterY - 70);
                 this.ctx.restore();
             }
         }

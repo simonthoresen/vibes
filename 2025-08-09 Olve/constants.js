@@ -235,14 +235,14 @@ export const WEAPONS = {
     },
     FLAMING_SKULL: {
         name: 'Flaming Skull',
-        damage: 25, // Base damage for lightning attacks
-        range: TILE_SIZE * 6,
+        damage: 75, // Base damage for lightning attacks
+        range: TILE_SIZE * 18, // 3x longer range for lightning
         cooldown: 1000, // 1 second attack cooldown  
         color: '#FF6347', // tomato red
         type: 'orbital', // Changed from 'summon' to 'orbital'
         sprite: 'Skull_minion.png',
         orbitRadius: TILE_SIZE * 3, // Distance from player
-        attackRange: TILE_SIZE * 6,
+        attackRange: TILE_SIZE * 18, // 3x longer attack range for lightning
         special: 'blue_lightning', // Shoots blue lightning
         permanent: true // Never despawns
     }
@@ -289,10 +289,11 @@ export const COMPANION_TYPES = {
         color: '#8B0000', // dark red
         width: TILE_SIZE * 2, // Twice player size
         height: TILE_SIZE * 2,
-        attackRange: TILE_SIZE * 8,
+        attackRange: 9999, // Can attack enemies anywhere on the map
         attackCooldown: 333, // 3 shots per second (1000ms / 3)
-        sprite: 'summon_orb.png',
+        sprite: 'eyeball_minion.png',
         projectileSize: TILE_SIZE, // Player-sized projectiles
+        projectileSprite: 'eyeball_minion_attack.png',
         reflectsDamage: true
     },
     SKULL_COMPANION: {

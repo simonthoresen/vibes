@@ -265,17 +265,46 @@ export class EnemySystem {
 
         this.gameState.enemies.forEach(enemy => {
             this.gameState.allies.forEach(ally => {
+                // Skip collision for flaming skulls - they are intangible
+                if (ally.type === 'orbital_skull') {
+                    return;
+                }
+                
                 if (this.detectCollision(ally, enemy)) {
                     // Enemy attacks ally
-                    this.damageAlly(ally, enemy.damage);
+                    this.damageAlly(ally, enemy.damage, enemy);
                 }
             });
         });
     }
 
-    damageAlly(ally, damage) {
+    damageAlly(ally, damage, attacker = null) {
         ally.health = Math.max(0, ally.health - damage);
         ally.hitTime = Date.now();
+        
+        // Handle reflection damage for demons
+        if (ally.reflectsDamage && attacker && attacker.health > 0) {
+            const reflectionDamage = Math.floor(damage * 0.5); // Reflect 50% of damage
+            attacker.health = Math.max(0, attacker.health - reflectionDamage);
+            attacker.hitTime = Date.now();
+            
+            // Create reflection damage effect on the attacker
+            if (this.particleEngine) {
+                const attackerCenterX = attacker.x + attacker.width / 2;
+                const attackerCenterY = attacker.y + attacker.height / 2;
+                this.particleEngine.createExplosion(attackerCenterX, attackerCenterY, {
+                    particleCount: 6,
+                    colors: ['#8B0000', '#FF0000', '#FF4500'],
+                    minSize: 2,
+                    maxSize: 4,
+                    minSpeed: 3,
+                    maxSpeed: 8,
+                    minLife: 300,
+                    maxLife: 600,
+                    gravity: 0
+                });
+            }
+        }
         
         // Create ally damage particle effect
         if (this.particleEngine) {
