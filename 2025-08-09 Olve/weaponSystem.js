@@ -1463,16 +1463,11 @@ export class WeaponSystem {
             
             console.log(`Thunder struck player for 25 damage! Health: ${oldHealth} -> ${this.gameState.player.health} (UNDODGEABLE)`);
             
-            // Set brief invulnerability frames to prevent multiple hits in the same frame
+            // Set brief invulnerability frames using the game's proper system
             this.gameState.player.invulnerable = true;
             this.gameState.player.lastHit = Date.now();
-            
-            // Remove invulnerability after a short period
-            setTimeout(() => {
-                if (this.gameState.player.invulnerable) {
-                    this.gameState.player.invulnerable = false;
-                }
-            }, 100); // Very short invulnerability, just to prevent frame-perfect double hits
+            // Note: invulnerability will be removed by playerController.updateInvulnerability()
+            // after the normal invulnerabilityDuration (1000ms)
             
             if (this.gameState.player.health <= 0) {
                 // Player death will be handled by the main game loop
