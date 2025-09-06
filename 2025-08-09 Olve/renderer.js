@@ -204,6 +204,55 @@ export class Renderer {
         this.eyeballMinionAttackImage.onerror = () => {
             console.error('Failed to load Eyeball Minion Attack image: images/eyeball_minion_attack.png');
         };
+
+        // Load trap sprites
+        this.spikeTrapImage = new Image();
+        this.spikeTrapImage.src = 'images/spike_trap.png';
+        this.spikeTrapImageLoaded = false;
+        this.spikeTrapImage.onload = () => {
+            this.spikeTrapImageLoaded = true;
+            console.log('Spike Trap image loaded successfully');
+        };
+        this.spikeTrapImage.onerror = () => {
+            console.error('Failed to load Spike Trap image: images/spike_trap.png');
+        };
+
+        this.explosiveMineImage = new Image();
+        this.explosiveMineImage.src = 'images/Landmine.png';
+        this.explosiveMineImageLoaded = false;
+        this.explosiveMineImage.onload = () => {
+            this.explosiveMineImageLoaded = true;
+            console.log('Explosive Mine image loaded successfully');
+        };
+        this.explosiveMineImage.onerror = () => {
+            console.error('Failed to load Explosive Mine image: images/Landmine.png');
+        };
+
+        this.cobwebImage = new Image();
+        this.cobwebImage.src = 'images/cobweb.png';
+        this.cobwebImageLoaded = false;
+        this.cobwebImage.onload = () => {
+            this.cobwebImageLoaded = true;
+            console.log('Cobweb image loaded successfully');
+        };
+        this.cobwebImage.onerror = () => {
+            console.error('Failed to load Cobweb image: images/cobweb.png');
+        };
+
+        this.umbrellaImage = new Image();
+        this.umbrellaImage.src = 'images/umbrella.png';
+        this.umbrellaImageLoaded = false;
+        this.umbrellaImage.onload = () => {
+            this.umbrellaImageLoaded = true;
+            console.log('Umbrella image loaded successfully');
+        };
+        this.umbrellaImage.onerror = () => {
+            console.error('Failed to load Umbrella image: images/umbrella.png');
+        };
+    }
+
+    setWeaponSystem(weaponSystem) {
+        this.weaponSystem = weaponSystem;
     }
 
     clear() {
@@ -213,6 +262,9 @@ export class Renderer {
     drawPlayer(player) {
         const centerX = player.x + player.width / 2;
         const centerY = player.y + player.height / 2;
+
+        // Draw poison aura if player has poison cloud weapon
+        this.drawPoisonAura(player, centerX, centerY);
 
         // Draw player with current skin color and invulnerability effect
         this.ctx.fillStyle = player.invulnerable ?
@@ -620,6 +672,12 @@ export class Renderer {
                 break;
             case 'summon':
                 this.drawSummonWeapon(weapon, count, playerCenterX, playerCenterY, player);
+                break;
+            case 'trap':
+                this.drawTrapWeapon(weapon, count, playerCenterX, playerCenterY, player);
+                break;
+            case 'umbrella':
+                this.drawUmbrellaWeapon(weapon, count, playerCenterX, playerCenterY, player);
                 break;
         }
     }
@@ -1275,6 +1333,395 @@ export class Renderer {
     drawParticles(particleEngine) {
         if (particleEngine && particleEngine.render) {
             particleEngine.render(this.ctx);
+        }
+    }
+
+    drawTrapWeapon(weapon, count, playerCenterX, playerCenterY, player) {
+        // Trap weapon deployment indicators removed - no visual indicators drawn
+    }
+
+    drawUmbrellaWeapon(weapon, count, playerCenterX, playerCenterY, player) {
+        // Draw a single umbrella to the right of the player to show they're holding it
+        if (this.umbrellaImageLoaded && count > 0) {
+            this.ctx.save();
+            
+            const umbrellaSize = 75; // 2.5x larger size (30 * 2.5 = 75)
+            const offsetX = 25; // Distance to the right of the player
+            const offsetY = -25.5; // Lowered by 17 pixels from -42.5
+            
+            // Position umbrella to the right of the player
+            const x = playerCenterX + offsetX - umbrellaSize / 2;
+            const y = playerCenterY + offsetY - umbrellaSize / 2;
+            
+            // Add subtle floating animation to make it feel alive
+            const floatOffset = Math.sin(Date.now() * 0.002) * 1;
+            
+            this.ctx.globalAlpha = 0.9;
+            this.ctx.drawImage(
+                this.umbrellaImage,
+                x,
+                y + floatOffset,
+                umbrellaSize,
+                umbrellaSize
+            );
+            
+            this.ctx.restore();
+        }
+    }
+
+    drawTraps(traps) {
+        if (!traps || traps.length === 0) return;
+
+        traps.forEach(trap => {
+            this.ctx.save();
+
+            // Set alpha based on trap state
+            let alpha = 0.8;
+            if (!trap.active) {
+                alpha = 0.4;
+            } else if (trap.halfTransparent) {
+                alpha = 0.5; // Half transparent after being used
+            }
+            
+            // Draw trap base
+            this.ctx.fillStyle = trap.armed ? trap.color : '#666666';
+            this.ctx.globalAlpha = alpha;
+            
+            switch (trap.weaponId) {
+                case 'SPIKE_TRAP':
+                    this.drawSpikeTrap(trap);
+                    break;
+                case 'WEB_LAUNCHER':
+                    this.drawWebTrap(trap);
+                    break;
+                case 'EXPLOSIVE_MINE':
+                    this.drawExplosiveMine(trap);
+                    break;
+                case 'POISON_CLOUD':
+                    this.drawPoisonCloud(trap);
+                    break;
+            }
+
+            // Draw arming indicator if not yet armed
+            if (!trap.armed) {
+                this.ctx.globalAlpha = 0.7;
+                this.ctx.strokeStyle = '#ffff00';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([3, 3]);
+                this.ctx.strokeRect(trap.x, trap.y, trap.width, trap.height);
+            }
+
+            this.ctx.restore();
+        });
+    }
+
+    drawSpikeTrap(trap) {
+        // Use sprite if loaded, otherwise fall back to shape drawing
+        if (this.spikeTrapImageLoaded) {
+            // Draw the spike trap sprite
+            this.ctx.drawImage(
+                this.spikeTrapImage,
+                trap.x,
+                trap.y,
+                trap.width,
+                trap.height
+            );
+        } else {
+            // Fallback to shape drawing if sprite not loaded
+            // Draw trap base
+            this.ctx.fillRect(trap.x, trap.y, trap.width, trap.height);
+            
+            // Draw spikes if armed
+            if (trap.armed) {
+                this.ctx.fillStyle = '#888888';
+                const spikeCount = 4;
+                const spikeWidth = trap.width / spikeCount;
+                
+                for (let i = 0; i < spikeCount; i++) {
+                    const spikeX = trap.x + i * spikeWidth + spikeWidth / 2;
+                    const spikeY = trap.y + trap.height / 2;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(spikeX - spikeWidth / 4, trap.y + trap.height);
+                    this.ctx.lineTo(spikeX, trap.y + trap.height / 4);
+                    this.ctx.lineTo(spikeX + spikeWidth / 4, trap.y + trap.height);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                }
+            }
+        }
+    }
+
+    drawWebTrap(trap) {
+        // Draw cobweb sprite if loaded, otherwise fall back to manual web pattern
+        if (this.cobwebImageLoaded && trap.active) {
+            this.ctx.save();
+            
+            // Apply transparency if the trap is half transparent
+            if (trap.halfTransparent) {
+                this.ctx.globalAlpha = 0.5;
+            } else {
+                this.ctx.globalAlpha = 0.8; // Slightly transparent for visual appeal
+            }
+            
+            const centerX = trap.x + trap.width / 2;
+            const centerY = trap.y + trap.height / 2;
+            const size = trap.width; // Use trap size for the sprite
+            
+            // Draw the cobweb sprite centered on the trap
+            this.ctx.drawImage(
+                this.cobwebImage,
+                centerX - size / 2,
+                centerY - size / 2,
+                size,
+                size
+            );
+            
+            this.ctx.restore();
+        } else if (trap.active) {
+            // Fallback to manual web pattern if sprite isn't loaded
+            this.ctx.globalAlpha = 0.6;
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 1;
+            this.ctx.setLineDash([]);
+            
+            const centerX = trap.x + trap.width / 2;
+            const centerY = trap.y + trap.height / 2;
+            const radius = trap.width / 2;
+            
+            // Draw web lines
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * Math.PI) / 4;
+                this.ctx.beginPath();
+                this.ctx.moveTo(centerX, centerY);
+                this.ctx.lineTo(
+                    centerX + Math.cos(angle) * radius,
+                    centerY + Math.sin(angle) * radius
+                );
+                this.ctx.stroke();
+            }
+            
+            // Draw concentric circles
+            for (let r = radius / 3; r < radius; r += radius / 3) {
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
+            
+            this.ctx.globalAlpha = 1.0; // Reset alpha
+        }
+    }
+
+    drawExplosiveMine(trap) {
+        // Skip drawing if mine is blinking and currently invisible
+        if (trap.isBlinking && !trap.visible) {
+            return;
+        }
+        
+        // Use sprite if loaded, otherwise fall back to shape drawing
+        if (this.explosiveMineImageLoaded) {
+            // Draw the explosive mine sprite
+            this.ctx.drawImage(
+                this.explosiveMineImage,
+                trap.x,
+                trap.y,
+                trap.width,
+                trap.height
+            );
+        } else {
+            // Fallback to shape drawing if sprite not loaded
+            // Draw mine body
+            this.ctx.fillStyle = trap.color;
+            this.ctx.beginPath();
+            this.ctx.arc(trap.x + trap.width / 2, trap.y + trap.height / 2, trap.width / 3, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        // Draw warning indicators if armed
+        if (trap.armed) {
+            this.ctx.strokeStyle = '#ff0000';
+            this.ctx.lineWidth = 2;
+            
+            // If blinking, make the warning more intense
+            if (trap.isBlinking) {
+                this.ctx.globalAlpha = 1.0; // Full opacity when visible during blinking
+                this.ctx.lineWidth = 3; // Thicker outline when blinking
+            } else {
+                this.ctx.globalAlpha = Math.sin(Date.now() / 200) * 0.5 + 0.5; // Normal blinking effect
+            }
+            
+            this.ctx.beginPath();
+            this.ctx.arc(trap.x + trap.width / 2, trap.y + trap.height / 2, trap.width / 2, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Draw proximity detection range indicator (dotted blue circle)
+            this.ctx.globalAlpha = 0.3;
+            this.ctx.strokeStyle = '#00aaff';
+            this.ctx.lineWidth = 1;
+            this.ctx.setLineDash([3, 3]);
+            this.ctx.beginPath();
+            this.ctx.arc(
+                trap.x + trap.width / 2, 
+                trap.y + trap.height / 2, 
+                trap.triggerRange, 
+                0, 
+                Math.PI * 2
+            );
+            this.ctx.stroke();
+            
+            // Draw explosion radius indicator (faint orange)
+            this.ctx.globalAlpha = 0.1;
+            this.ctx.strokeStyle = '#ff6600';
+            this.ctx.lineWidth = 1;
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.beginPath();
+            this.ctx.arc(
+                trap.x + trap.width / 2, 
+                trap.y + trap.height / 2, 
+                trap.explosionRadius, 
+                0, 
+                Math.PI * 2
+            );
+            this.ctx.stroke();
+            
+            // Reset line dash for other drawings
+            this.ctx.setLineDash([]);
+        }
+    }
+
+    drawPoisonCloud(trap) {
+        // Draw thick poison gas cloud with dense particles
+        if (trap.active) {
+            const centerX = trap.x + trap.width / 2;
+            const centerY = trap.y + trap.height / 2;
+            const radius = trap.width / 2;
+            const time = Date.now() / 1000;
+            
+            // Create much denser cloud of poison particles
+            const particleCount = 120; // Double the particles for thicker cloud
+            
+            for (let i = 0; i < particleCount; i++) {
+                // Use particle index for consistent positioning (no random jumping)
+                const baseAngle = (i * 137.5) * (Math.PI / 180); // Golden angle distribution
+                const baseDistance = (i % 20) / 20 * radius; // Consistent radial distribution
+                
+                // Very slow, gentle floating motion based on particle index
+                const gentleSwirl = time * 0.05 + i * 0.02; // Even slower movement
+                const particleX = centerX + Math.cos(baseAngle + gentleSwirl) * baseDistance;
+                const particleY = centerY + Math.sin(baseAngle + gentleSwirl) * baseDistance;
+                
+                // Consistent particle sizes based on index
+                const particleSize = 1 + (i % 4);
+                
+                // Slower, gentler pulsing opacity based on index
+                const opacity = 0.15 + Math.abs(Math.sin(time * 0.3 + i * 0.1)) * 0.25; // Much slower pulsing
+                
+                // Consistent color based on particle index
+                const greenShades = ['#32CD32', '#90EE90', '#98FB98', '#00FF32', '#228B22'];
+                const color = greenShades[i % greenShades.length];
+                
+                this.ctx.globalAlpha = opacity;
+                this.ctx.fillStyle = color;
+                this.ctx.beginPath();
+                this.ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            
+            // Add more larger floating particles for extra thickness
+            for (let i = 0; i < 25; i++) { // More floating particles
+                const angle = (i * Math.PI * 2) / 25 + time * 0.02; // Much slower orbit
+                const distance = radius * 0.7 + Math.sin(time * 0.2 + i) * (radius * 0.1); // Gentler variation
+                const particleX = centerX + Math.cos(angle) * distance;
+                const particleY = centerY + Math.sin(angle) * distance;
+                
+                const floatingOpacity = 0.2 + Math.sin(time * 0.2 + i) * 0.2; // Slower opacity change
+                
+                this.ctx.globalAlpha = floatingOpacity;
+                this.ctx.fillStyle = '#32CD32';
+                this.ctx.beginPath();
+                this.ctx.arc(particleX, particleY, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        }
+
+        this.ctx.restore();
+    }
+
+    drawPoisonAura(player, centerX, centerY) {
+        // Check if player has poison cloud weapon
+        const hasPoisonCloud = player.weapons.some(weapon => weapon.id === 'POISON_CLOUD');
+        if (!hasPoisonCloud) return;
+
+        // Get aura config from constants
+        const auraRadius = 64; // TILE_SIZE * 2
+        const particleCount = 60;
+        
+        this.ctx.save();
+        
+        const time = Date.now() * 0.001; // Convert to seconds
+        
+        // Draw poison aura particles around player
+        for (let i = 0; i < particleCount; i++) {
+            // Use golden angle for even distribution
+            const angle = (i * 137.5) * (Math.PI / 180);
+            
+            // Create swirling motion around player
+            const swirlingOffset = Math.sin(time * 2 + i * 0.5) * 8;
+            const distance = (auraRadius * 0.3) + ((i % 15) / 15 * auraRadius * 0.7) + swirlingOffset;
+            
+            const particleX = centerX + Math.cos(angle + time * 0.5) * distance;
+            const particleY = centerY + Math.sin(angle + time * 0.5) * distance;
+            
+            // Pulsing opacity
+            const pulseOpacity = 0.3 + Math.sin(time * 3 + i * 0.2) * 0.2;
+            
+            this.ctx.globalAlpha = pulseOpacity;
+            this.ctx.fillStyle = '#90EE90'; // Light green
+            this.ctx.beginPath();
+            this.ctx.arc(particleX, particleY, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        this.ctx.restore();
+    }
+
+    drawUmbrellaRain() {
+        // Check if weaponSystem is available and has rain state
+        if (!this.weaponSystem || !this.weaponSystem.rainState) return;
+
+        const rainDroplets = this.weaponSystem.rainState.rainDroplets;
+        if (!rainDroplets || rainDroplets.length === 0) return;
+
+        this.ctx.save();
+
+        // Draw rain droplets
+        rainDroplets.forEach(droplet => {
+            // Draw rain droplet as a blue line/streak
+            this.ctx.strokeStyle = '#87CEEB'; // Sky blue color
+            this.ctx.lineWidth = 2;
+            this.ctx.globalAlpha = 0.7;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(droplet.x, droplet.y);
+            this.ctx.lineTo(droplet.x + 2, droplet.y + 15); // Small streak effect
+            this.ctx.stroke();
+
+            // Add a small droplet at the bottom
+            this.ctx.fillStyle = '#00BFFF'; // Deep sky blue
+            this.ctx.globalAlpha = 0.8;
+            this.ctx.beginPath();
+            this.ctx.arc(droplet.x + 1, droplet.y + 15, 1.5, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+
+        this.ctx.restore();
+
+        // Add rain overlay effect for atmosphere
+        if (rainDroplets.length > 0) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(135, 206, 235, 0.05)'; // Very light blue overlay
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.restore();
         }
     }
 }

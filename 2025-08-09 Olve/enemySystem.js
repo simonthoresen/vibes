@@ -10,6 +10,10 @@ export class EnemySystem {
         this.particleEngine = particleEngine;
     }
 
+    setPlayerController(playerController) {
+        this.playerController = playerController;
+    }
+
     spawnFloorEnemies() {
         const isBossFloor = this.gameState.currentFloor % 5 === 0;
         
@@ -86,7 +90,20 @@ export class EnemySystem {
     }
 
     update() {
+        const now = Date.now();
+        
         this.gameState.enemies.forEach(enemy => {
+            // Handle web effects
+            if (enemy.webbed && enemy.webbedUntil && now > enemy.webbedUntil) {
+                // Restore original speed when web effect expires
+                if (enemy.originalSpeed !== undefined) {
+                    enemy.speed = enemy.originalSpeed;
+                    delete enemy.originalSpeed;
+                }
+                enemy.webbed = false;
+                delete enemy.webbedUntil;
+            }
+            
             this.updateEnemyMovement(enemy);
         });
 
@@ -221,9 +238,20 @@ export class EnemySystem {
 
     damagePlayer(damage) {
         console.log(`Player taking ${damage} damage, current health: ${this.gameState.player.health}`);
-        this.gameState.player.health = Math.max(0, this.gameState.player.health - damage);
-        this.gameState.player.invulnerable = true;
-        this.gameState.player.lastHit = Date.now();
+        
+        // Use playerController's takeDamage method to respect umbrella dodge chance
+        if (this.playerController && this.playerController.takeDamage) {
+            const damageTaken = this.playerController.takeDamage(damage);
+            if (!damageTaken) {
+                console.log(`Damage dodged by umbrella! (particle effect handled in playerController)`);
+                return; // Don't create damage effects if dodged
+            }
+        } else {
+            // Fallback to direct damage if playerController isn't available
+            this.gameState.player.health = Math.max(0, this.gameState.player.health - damage);
+            this.gameState.player.invulnerable = true;
+            this.gameState.player.lastHit = Date.now();
+        }
         
         // Create player damage particle effect
         if (this.particleEngine) {

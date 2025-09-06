@@ -245,6 +245,85 @@ export const WEAPONS = {
         attackRange: TILE_SIZE * 18, // 3x longer attack range for lightning
         special: 'blue_lightning', // Shoots blue lightning
         permanent: true // Never despawns
+    },
+
+    // Trap Weapons (Deployable/Strategic)
+    SPIKE_TRAP: {
+        name: 'Spike Trap',
+        damage: 60,
+        range: TILE_SIZE * 0.5, // Detection range for enemies
+        cooldown: 3000, // 3 seconds between deployments
+        color: '#808080', // Gray color
+        type: 'trap',
+        trigger: 'proximity', // Activates when enemies get close
+        triggerRange: TILE_SIZE * 1.5, // Range to detect enemies
+        duration: 15000, // Trap lasts 15 seconds
+        armTime: 1000, // 1 second to arm after placement
+        sprite: 'spike_trap.png'
+    },
+    WEB_LAUNCHER: {
+        name: 'Web Launcher',
+        damage: 1, // Deals 1 damage
+        range: TILE_SIZE * 4, // Deployment range
+        cooldown: 4000, // 4 seconds between deployments
+        color: '#e0e0e0', // Light gray
+        type: 'trap',
+        trigger: 'area', // Creates persistent area effect
+        area: TILE_SIZE * 2.5, // Size of sticky area
+        slowEffect: 0.3, // Slows enemies to 30% speed
+        duration: 10000, // Web lasts 10 seconds
+        sprite: 'cobweb.png'
+    },
+    EXPLOSIVE_MINE: {
+        name: 'Explosive Mine',
+        damage: 120, // High explosion damage
+        range: TILE_SIZE * 1, // Deployment range
+        cooldown: 5000, // 5 seconds between deployments
+        color: '#ffcc00', // Yellow/gold
+        type: 'trap',
+        trigger: 'proximity_timer', // Proximity OR timer trigger
+        triggerRange: TILE_SIZE * 1.875, // Increased proximity radius (50% larger)
+        explosionRadius: TILE_SIZE * 2.5, // Large explosion area
+        duration: 12000, // Mine lasts 12 seconds before auto-detonating
+        armTime: 2000, // 2 seconds to arm
+        blinkDuration: 3000, // Start blinking 3 seconds before detonation
+        proximityWarningTime: 1000, // 1 second of rapid blinking before exploding when enemy is close
+        sprite: 'explosive_mine.png'
+    },
+    POISON_CLOUD: {
+        name: 'Poison Cloud',
+        damage: 0, // No initial damage
+        range: TILE_SIZE * 3, // Deployment range
+        cooldown: 6000, // 6 seconds between deployments
+        color: '#98fb98', // Light green
+        type: 'trap',
+        trigger: 'area', // Creates persistent poison area
+        area: TILE_SIZE * 3, // Large poison cloud area
+        dotDamage: 8, // Damage over time per tick
+        dotInterval: 1000, // Damage every 1 second
+        duration: 12000, // Cloud lasts 12 seconds
+        sprite: 'poison_cloud.png',
+        // Poison aura around player when equipped
+        aura: {
+            radius: TILE_SIZE * 2, // Poison aura radius around player
+            dotDamage: 5, // Damage per tick in aura
+            dotInterval: 1000, // Damage every 1 second
+            particleCount: 60 // Number of particles in aura
+        }
+    },
+
+    // Passive Weapons (Special Effects)
+    UMBRELLA: {
+        name: 'The Umbrella',
+        damage: 0, // No damage
+        range: 0, // No range
+        cooldown: 0, // No cooldown
+        color: '#0080FF', // Bright blue
+        type: 'umbrella',
+        description: 'Seems to do nothing.',
+        sprite: 'umbrella.png',
+        dodgeChance: 0.05, // 5% base chance to avoid damage
+        dodgeChancePerStack: 0.05 // Additional 5% per umbrella
     }
 };
 

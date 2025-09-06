@@ -83,11 +83,13 @@ export class ParticleEngine {
             ctx.strokeStyle = particle.color;
             ctx.lineWidth = 1;
             
-            // Draw ice cube as square, healing orb with pulse, or regular circle
+            // Draw ice cube as square, healing orb with pulse, sprite, or regular circle
             if (particle.isIceCube) {
                 this.drawIceCube(ctx, particle.size);
             } else if (particle.isHealingOrb) {
                 this.drawHealingOrb(ctx, particle.size, particle.currentPulse || 0);
+            } else if (particle.isSprite && particle.sprite) {
+                this.drawSprite(ctx, particle.sprite, particle.size);
             } else {
                 this.drawCircle(ctx, particle.size);
             }
@@ -191,6 +193,21 @@ export class ParticleEngine {
         ctx.beginPath();
         ctx.arc(0, 0, radius, 0, Math.PI * 2);
         ctx.stroke();
+    }
+
+    drawSprite(ctx, spriteImage, size) {
+        const halfSize = size / 2;
+        
+        // Draw the sprite image if it's loaded
+        if (spriteImage && spriteImage.complete) {
+            ctx.drawImage(spriteImage, -halfSize, -halfSize, size, size);
+        } else {
+            // Fallback to colored circle if sprite isn't loaded
+            ctx.fillStyle = '#0080FF'; // Bright blue for umbrella
+            ctx.beginPath();
+            ctx.arc(0, 0, halfSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     createExplosion(x, y, options = {}) {
@@ -422,6 +439,45 @@ export class ParticleEngine {
             maxLife: 600,
             gravity: -0.1 // Make particles float upward like fire
         });
+    }
+
+    createUmbrellaDodgeEffect(x, y, umbrellaSprite) {
+        // Create umbrella sprite particles that poof out
+        const particleCount = 8;
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Random angle for explosion direction
+            const angle = Math.random() * Math.PI * 2;
+            
+            // Random speed - moderate speed for visible effect
+            const speed = 4 + Math.random() * 6;
+            
+            // Calculate velocity components
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            
+            // Random particle properties
+            const particle = {
+                x: x,
+                y: y,
+                vx: vx,
+                vy: vy,
+                size: 12 + Math.random() * 8, // Larger size for umbrella sprites
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: 0.05 + Math.random() * 0.15, // Moderate rotation
+                life: 400 + Math.random() * 400, // Longer life for visual impact
+                maxLife: 0, // Will be set below
+                alpha: 1,
+                color: '#0080FF', // Bright blue fallback color
+                deceleration: 0.88, // Strong deceleration for poof effect
+                gravity: 0.1, // Slight gravity to make them fall naturally
+                isSprite: true, // Flag for sprite rendering
+                sprite: umbrellaSprite // The umbrella image to render
+            };
+            
+            particle.maxLife = particle.life;
+            this.particles.push(particle);
+        }
     }
 
     clear() {

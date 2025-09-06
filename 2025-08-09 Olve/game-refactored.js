@@ -52,6 +52,16 @@ class DungeonCrawlerGame {
 
         // Connect particle engine to systems that need it
         this.enemySystem.setParticleEngine(this.particleEngine);
+        
+        // Connect playerController to enemySystem for umbrella dodge functionality
+        this.enemySystem.setPlayerController(this.playerController);
+        
+        // Connect particle engine and renderer to playerController for umbrella effects
+        this.playerController.setParticleEngine(this.particleEngine);
+        this.playerController.setRenderer(this.renderer);
+
+        // Connect weaponSystem to renderer for rain effects
+        this.renderer.setWeaponSystem(this.weaponSystem);
 
         // Initialize game loop with all systems
         const systems = [
@@ -211,16 +221,6 @@ class DungeonCrawlerGame {
             };
         }
 
-        // Settings toggle for game sounds
-        const gameSoundsSetting = document.getElementById('gameSoundsSetting');
-        if (gameSoundsSetting) {
-            gameSoundsSetting.checked = !!this.gameState.settings.gameSounds;
-            gameSoundsSetting.onchange = (e) => {
-                this.gameState.settings.gameSounds = gameSoundsSetting.checked;
-                this.gameState.saveSettings();
-            };
-        }
-
         // Settings toggle for game music
         const gameMusicSetting = document.getElementById('gameMusicSetting');
         if (gameMusicSetting) {
@@ -348,27 +348,22 @@ class DungeonCrawlerGame {
                             zoomFadeOverlay.style.transition = 'background 0.6s, opacity 1.2s, transform 1.2s';
                             zoomFadeOverlay.style.background = '#000';
                             setTimeout(() => {
-                                // Play start beep sound
+                                // Play start beep sound and start game simultaneously
                                 const beep = new Audio('sounds/195912__acpascal__start-beep.wav');
                                 beep.volume = 1.0;
                                 beep.play().catch(() => {
-                                    // Audio failed to play, skip sound and continue
+                                    // Audio failed to play, continue anyway
+                                });
+                                
+                                // Start game immediately when beep starts playing
+                                zoomFadeOverlay.style.opacity = '0';
+                                setTimeout(() => {
                                     if (zoomFadeOverlay.parentNode) zoomFadeOverlay.parentNode.removeChild(zoomFadeOverlay);
                                     this.gameState.gameStarted = true;
                                     this.showGameContainer();
                                     this.updatePauseBtnVisibility();
                                     this.gameLoop.start();
-                                });
-                                beep.onended = () => {
-                                    zoomFadeOverlay.style.opacity = '0';
-                                    setTimeout(() => {
-                                        if (zoomFadeOverlay.parentNode) zoomFadeOverlay.parentNode.removeChild(zoomFadeOverlay);
-                                        this.gameState.gameStarted = true;
-                                        this.showGameContainer();
-                                        this.updatePauseBtnVisibility();
-                                        this.gameLoop.start();
-                                    }, 700);
-                                };
+                                }, 700);
                             }, 600); // Hold black for 600ms before playing sound
                         }, 900);
                     }, 350); // 350ms delay before zooming in
@@ -1113,7 +1108,8 @@ class DungeonCrawlerGame {
         const weapons = [
             'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
             'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
-            'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull'
+            'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
+            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Umbrella'
         ];
         
         // Add amount selector
@@ -1166,7 +1162,17 @@ class DungeonCrawlerGame {
         
         confirmButton.onclick = () => {
             this.gameState.player.cheatsEnabled = true;
-            this.gameState.player.weapons = [];
+            
+            // Get list of weapon types that are in the cheat menu
+            const cheatMenuWeaponTypes = weapons.map(weapon => weapon.replace(/\s+/g, '_').toUpperCase());
+            
+            // Preserve weapons that are not in the cheat menu (like deployed traps or special weapons)
+            const preservedWeapons = this.gameState.player.weapons.filter(weapon => 
+                !cheatMenuWeaponTypes.includes(weapon.id)
+            );
+            
+            // Start with preserved weapons
+            this.gameState.player.weapons = [...preservedWeapons];
             
             // Add selected weapons with their stack amounts
             weapons.forEach(weapon => {

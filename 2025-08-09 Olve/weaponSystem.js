@@ -1,80 +1,17 @@
-import { WEAPONS, COMPANION_TYPES } from './constants.js';
+import { WEAPONS, COMPANION_TYPES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class WeaponSystem {
     constructor(gameState, particleEngine = null) {
         this.gameState = gameState;
         this.particleEngine = particleEngine;
-        
-        // Sound pool for bow shooting to prevent lag
-        this.bowSoundPool = [];
-        this.activeBowSounds = 0;
-        this.maxConcurrentBowSounds = 3; // Increased to 3 for faster sound effects
-        this.currentSoundIndex = 0; // For round-robin sound selection
-        this.initializeBowSoundPool();
-    }
-
-    initializeBowSoundPool() {
-        // Pre-create bow sound instances for reuse
-        for (let i = 0; i < this.maxConcurrentBowSounds; i++) {
-            const sound = new Audio('sounds/bow-shooting.wav');
-            sound.volume = 0.7;
-            sound.preload = 'auto'; // Ensure fast loading
-            
-            // Handle when sound ends to free up the slot
-            sound.addEventListener('ended', () => {
-                this.activeBowSounds = Math.max(0, this.activeBowSounds - 1);
-            });
-            
-            // Also handle errors to prevent stuck counters
-            sound.addEventListener('error', () => {
-                this.activeBowSounds = Math.max(0, this.activeBowSounds - 1);
-            });
-            
-            // Optimize for fast restart
-            sound.addEventListener('loadeddata', () => {
-                sound.fastRestart = true;
-            });
-            
-            this.bowSoundPool.push(sound);
-        }
-        
-        console.log(`Initialized bow sound pool with ${this.maxConcurrentBowSounds} sounds`);
-    }
-
-    playBowSound() {
-        if (!this.gameState.settings || !this.gameState.settings.gameSounds) {
-            return;
-        }
-        
-        // Always play a sound - either find available or use round-robin
-        let availableSound = this.bowSoundPool.find(sound => 
-            sound.paused || sound.ended || sound.currentTime === 0
-        );
-        
-        // If no available sound, use round-robin to cycle through sounds
-        if (!availableSound) {
-            availableSound = this.bowSoundPool[this.currentSoundIndex];
-            this.currentSoundIndex = (this.currentSoundIndex + 1) % this.maxConcurrentBowSounds;
-        }
-        
-        if (availableSound) {
-            // Track active sounds but don't prevent playing
-            if (this.activeBowSounds < this.maxConcurrentBowSounds) {
-                this.activeBowSounds++;
-            }
-            
-            // Reset and play immediately for fast response
-            availableSound.currentTime = 0;
-            availableSound.play().catch(error => {
-                // Silently handle errors to prevent console spam
-                this.activeBowSounds = Math.max(0, this.activeBowSounds - 1);
-            });
-        }
     }
 
     update(deltaTime) {
         // Handle orbital weapons (create companions if needed)
         this.updateOrbitalWeapons();
+        
+        // Update traps (check triggers, apply effects, remove expired)
+        this.updateTraps(deltaTime);
         
         // Continuously attempt to attack enemies
         this.attack();
@@ -131,6 +68,12 @@ export class WeaponSystem {
         Object.values(weaponGroups).forEach(weapons => {
             this.processWeaponGroup(weapons, now, playerCenterX, playerCenterY, closestEnemy);
         });
+
+        // Process poison aura if player has poison cloud weapon
+        this.processPoisonAura(now, playerCenterX, playerCenterY);
+
+        // Process umbrella rain effect if player has 20+ umbrellas
+        this.processUmbrellaRain(now);
     }
 
     findClosestEnemy(playerCenterX, playerCenterY) {
@@ -211,6 +154,13 @@ export class WeaponSystem {
                 break;
             case 'orbital':
                 this.handleOrbitalAttack(weapon, count, playerCenterX, playerCenterY, closestEnemy);
+                break;
+            case 'trap':
+                this.handleTrapDeployment(weapon, count, playerCenterX, playerCenterY);
+                break;
+            case 'umbrella':
+                // Umbrella weapons are passive and don't need active processing
+                // Their effect is handled in the takeDamage method
                 break;
         }
     }
@@ -449,11 +399,6 @@ export class WeaponSystem {
     }
 
     createProjectile(weapon, x, y, angle) {
-        // Play bow shooting sound for bow weapons using sound pool
-        if (weapon.name && (weapon.name.includes('Bow') || weapon.name.includes('bow'))) {
-            this.playBowSound();
-        }
-        
         this.gameState.projectiles.push({
             x,
             y,
@@ -531,15 +476,36 @@ export class WeaponSystem {
         }
         container.style.display = 'flex';
 
-        // Get available weapons
-        let weaponsList = Object.entries(WEAPONS);
-        // Filter dragon weapons and legendary summon weapons for starting selection
-        if (!isBossReward && Math.random() > 0.05) {
-            weaponsList = weaponsList.filter(([id]) => !id.includes('DRAGON') && !id.includes('CURSED_ORB') && !id.includes('FLAMING_SKULL'));
+        // Get unlocked weapons from weapon tree
+        let unlockedWeaponIds = this.gameState.getUnlockedWeapons();
+        
+        // If no weapons are unlocked (first time), unlock the basic weapons
+        if (unlockedWeaponIds.length === 0) {
+            // Auto-unlock basic weapons for first time players
+            const basicWeapons = ['sword', 'scythe', 'bow'];
+            basicWeapons.forEach(weaponKey => {
+                const branch = weaponKey === 'sword' ? 'melee' : weaponKey === 'scythe' ? 'spinning' : 'ranged';
+                this.gameState.purchaseWeapon(branch, weaponKey);
+            });
+            unlockedWeaponIds = this.gameState.getUnlockedWeapons();
         }
-        // Shuffle and take first 3
+        
+        // Filter available weapons to only unlocked ones
+        let weaponsList = Object.entries(WEAPONS).filter(([id]) => 
+            unlockedWeaponIds.includes(id)
+        );
+        
+        // For starting selection, show all unlocked weapons
+        if (!isBossReward) {
+            // Starting selection: show unlocked weapons
+        } else {
+            // For additional weapons during run, show unlocked weapons
+        }
+        // Shuffle and take up to 3 weapons to choose from
         this.shuffleArray(weaponsList);
-        weaponsList.slice(0, 3).forEach(([id, weapon]) => {
+        const weaponsToShow = weaponsList.slice(0, Math.min(3, weaponsList.length));
+        
+        weaponsToShow.forEach(([id, weapon]) => {
             const option = this.createWeaponOption(id, weapon, isBossReward);
             weaponOptions.appendChild(option);
         });
@@ -843,5 +809,514 @@ export class WeaponSystem {
         };
 
         return skull;
+    }
+
+    // Trap handling methods
+    handleTrapDeployment(weapon, count, playerCenterX, playerCenterY) {
+        const now = Date.now();
+        
+        // Deploy multiple traps based on weapon count
+        for (let i = 0; i < count; i++) {
+            this.deployTrap(weapon, playerCenterX, playerCenterY, i, count, now);
+        }
+    }
+
+    deployTrap(weapon, playerCenterX, playerCenterY, index, totalCount, now) {
+        // Calculate random deployment position anywhere on the map
+        const trapSize = weapon.area || 32;
+        const margin = trapSize; // Keep traps away from edges
+        
+        const x = margin + Math.random() * (CANVAS_WIDTH - 2 * margin);
+        const y = margin + Math.random() * (CANVAS_HEIGHT - 2 * margin);
+
+        const trap = {
+            id: `${weapon.id}_${now}_${index}`,
+            weaponId: weapon.id,
+            name: weapon.name,
+            x: x,
+            y: y,
+            width: weapon.area || 32,
+            height: weapon.area || 32,
+            damage: weapon.damage,
+            sprite: weapon.sprite,
+            color: weapon.color,
+            trigger: weapon.trigger,
+            triggerRange: weapon.triggerRange || weapon.area || 32,
+            explosionRadius: weapon.explosionRadius,
+            slowEffect: weapon.slowEffect,
+            dotDamage: weapon.dotDamage,
+            dotInterval: weapon.dotInterval,
+            duration: weapon.duration,
+            armTime: weapon.armTime || 0,
+            blinkDuration: weapon.blinkDuration || 0,
+            proximityWarningTime: weapon.proximityWarningTime || 0,
+            deployTime: now,
+            armed: weapon.armTime ? false : true,
+            active: true,
+            visible: true,
+            isBlinking: false,
+            proximityTriggered: false,
+            proximityTriggerTime: 0,
+            triggered: false,
+            exploded: false,
+            halfTransparent: false,
+            triggerTime: 0,
+            explodeTime: 0,
+            affectedEnemies: new Set(), // Track enemies for DoT effects
+            lastDotTick: now
+        };
+
+        // Initialize traps array if it doesn't exist
+        if (!this.gameState.traps) {
+            this.gameState.traps = [];
+        }
+
+        this.gameState.traps.push(trap);
+    }
+
+    updateTraps(deltaTime) {
+        if (!this.gameState.traps) return;
+
+        const now = Date.now();
+        
+        // Update existing traps
+        this.gameState.traps = this.gameState.traps.filter(trap => {
+            // Check if trap has expired naturally
+            if (now - trap.deployTime > trap.duration) {
+                return false;
+            }
+
+            // Check if spike trap or explosive mine should despawn after being used
+            if ((trap.weaponId === 'SPIKE_TRAP' && trap.triggered) || 
+                (trap.weaponId === 'EXPLOSIVE_MINE' && trap.exploded)) {
+                const timeAfterUse = trap.triggered ? (now - trap.triggerTime) : (now - trap.explodeTime);
+                
+                // For explosive mines, despawn immediately after exploding
+                // For spike traps, despawn 0.5 seconds after being triggered
+                const despawnDelay = trap.weaponId === 'EXPLOSIVE_MINE' ? 0 : 500;
+                if (timeAfterUse >= despawnDelay) {
+                    return false;
+                }
+            }
+
+            // Arm trap if enough time has passed
+            if (!trap.armed && now - trap.deployTime >= trap.armTime) {
+                trap.armed = true;
+            }
+
+            if (trap.armed && trap.active) {
+                this.processTrapLogic(trap, now);
+            }
+
+            return true;
+        });
+    }
+
+    processTrapLogic(trap, now) {
+        switch (trap.weaponId) {
+            case 'SPIKE_TRAP':
+                this.processSpikeTraps(trap, now);
+                break;
+            case 'WEB_LAUNCHER':
+                this.processWebTrap(trap, now);
+                break;
+            case 'EXPLOSIVE_MINE':
+                this.processExplosiveMine(trap, now);
+                break;
+            case 'POISON_CLOUD':
+                this.processPoisonCloud(trap, now);
+                break;
+        }
+    }
+
+    processSpikeTraps(trap, now) {
+        // Check for enemies in trigger range (only enemies can trigger, not allies or player)
+        const enemiesInRange = this.gameState.enemies.filter(enemy => {
+            const dx = (enemy.x + enemy.width / 2) - (trap.x + trap.width / 2);
+            const dy = (enemy.y + enemy.height / 2) - (trap.y + trap.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance <= trap.triggerRange;
+        });
+
+        if (enemiesInRange.length > 0 && !trap.triggered) {
+            // Trigger trap - damage all enemies in range
+            enemiesInRange.forEach(enemy => {
+                enemy.health -= trap.damage;
+                if (enemy.health <= 0) {
+                    enemy.markedForDeath = true;
+                }
+            });
+
+            // Create damage particles
+            if (this.particleEngine) {
+                this.particleEngine.createExplosion(
+                    trap.x + trap.width / 2,
+                    trap.y + trap.height / 2,
+                    trap.color,
+                    15
+                );
+            }
+
+            // Mark as triggered and make half transparent immediately
+            trap.triggered = true;
+            trap.triggerTime = now;
+            trap.halfTransparent = true; // Become half transparent immediately
+        }
+    }
+
+    processWebTrap(trap, now) {
+        // Continuously slow enemies in the web area and deal damage on first contact
+        this.gameState.enemies.forEach(enemy => {
+            const dx = (enemy.x + enemy.width / 2) - (trap.x + trap.width / 2);
+            const dy = (enemy.y + enemy.height / 2) - (trap.y + trap.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= trap.width / 2) {
+                // Apply slow effect
+                if (!enemy.webbed) {
+                    enemy.originalSpeed = enemy.speed;
+                    enemy.webbed = true;
+                    
+                    // Deal 1 damage when enemy first enters web
+                    enemy.health -= trap.damage;
+                    if (enemy.health <= 0) {
+                        enemy.markedForDeath = true;
+                    }
+                }
+                enemy.speed = enemy.originalSpeed * trap.slowEffect;
+                enemy.webbedUntil = now + 1000; // Effect lasts 1 second after leaving web
+            }
+        });
+    }
+
+    processExplosiveMine(trap, now) {
+        let shouldExplode = false;
+        const timeLeft = trap.duration - (now - trap.deployTime);
+        
+        // Start blinking when close to natural detonation
+        if (timeLeft <= trap.blinkDuration && !trap.proximityTriggered) {
+            trap.isBlinking = true;
+            // Calculate blink frequency - faster as time gets closer to detonation
+            const blinkSpeed = Math.max(100, timeLeft / 10); // Faster blinking as time runs out
+            trap.visible = Math.floor(now / blinkSpeed) % 2 === 0;
+        }
+
+        // Check proximity trigger (only enemies can trigger, not allies or player)
+        if (trap.trigger.includes('proximity') && !trap.proximityTriggered) {
+            const enemiesInRange = this.gameState.enemies.filter(enemy => {
+                const dx = (enemy.x + enemy.width / 2) - (trap.x + trap.width / 2);
+                const dy = (enemy.y + enemy.height / 2) - (trap.y + trap.height / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance <= trap.triggerRange;
+            });
+            
+            // Start proximity warning when enemy gets close
+            if (enemiesInRange.length > 0) {
+                trap.proximityTriggered = true;
+                trap.proximityTriggerTime = now;
+                trap.isBlinking = true; // Override any existing blinking
+            }
+        }
+
+        // Handle proximity warning blinking
+        if (trap.proximityTriggered) {
+            const timeSinceProximity = now - trap.proximityTriggerTime;
+            
+            // Rapid blinking during proximity warning
+            const rapidBlinkSpeed = 100; // Very fast blinking
+            trap.visible = Math.floor(now / rapidBlinkSpeed) % 2 === 0;
+            
+            // Explode after proximity warning time
+            if (timeSinceProximity >= trap.proximityWarningTime) {
+                shouldExplode = true;
+            }
+        }
+
+        // Check timer trigger (natural expiration)
+        if (trap.trigger.includes('timer') && now - trap.deployTime >= trap.duration) {
+            shouldExplode = true;
+        }
+
+        if (shouldExplode && !trap.exploded) {
+            // Damage all enemies in explosion radius
+            this.gameState.enemies.forEach(enemy => {
+                const dx = (enemy.x + enemy.width / 2) - (trap.x + trap.width / 2);
+                const dy = (enemy.y + enemy.height / 2) - (trap.y + trap.height / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= trap.explosionRadius) {
+                    // Apply damage with distance falloff
+                    const damageMultiplier = 1 - (distance / trap.explosionRadius) * 0.5;
+                    const finalDamage = Math.floor(trap.damage * damageMultiplier);
+                    enemy.health -= finalDamage;
+                    if (enemy.health <= 0) {
+                        enemy.markedForDeath = true;
+                    }
+                }
+            });
+
+            // Create explosion particles
+            if (this.particleEngine) {
+                this.particleEngine.createExplosion(
+                    trap.x + trap.width / 2,
+                    trap.y + trap.height / 2,
+                    {
+                        particleCount: 30,
+                        colors: ['#ff4444', '#ff8844', '#ffaa44', '#ffcc44', '#ff0000'],
+                        minSize: 3,
+                        maxSize: 8,
+                        minSpeed: 4,
+                        maxSpeed: 12,
+                        minLife: 300,
+                        maxLife: 600
+                    }
+                );
+            }
+
+            // Mark as exploded and make half transparent immediately
+            trap.exploded = true;
+            trap.explodeTime = now;
+            trap.halfTransparent = true; // Become half transparent immediately
+        }
+    }
+
+    processPoisonCloud(trap, now) {
+        // Apply DoT damage to enemies in the poison cloud
+        this.gameState.enemies.forEach(enemy => {
+            const dx = (enemy.x + enemy.width / 2) - (trap.x + trap.width / 2);
+            const dy = (enemy.y + enemy.height / 2) - (trap.y + trap.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= trap.width / 2) {
+                // Initialize poison tracking for this enemy if needed
+                if (!enemy.poisonEffects) {
+                    enemy.poisonEffects = new Map();
+                }
+
+                const trapId = trap.id;
+                const lastPoisonTick = enemy.poisonEffects.get(trapId) || 0;
+
+                // Apply poison damage if enough time has passed for this specific enemy/trap combination
+                if (now - lastPoisonTick >= trap.dotInterval) {
+                    // Calculate poison damage scaling with poison cloud weapon count
+                    const poisonCloudWeapons = this.gameState.player.weapons.filter(weapon => weapon.id === 'POISON_CLOUD');
+                    const basePoisonDamage = 0.05; // 5% base damage
+                    const bonusDamagePerStack = 0.05; // +5% per additional poison cloud weapon
+                    const totalPoisonPercent = basePoisonDamage + (bonusDamagePerStack * poisonCloudWeapons.length);
+                    const poisonDamage = Math.ceil(enemy.maxHealth * totalPoisonPercent);
+                    
+                    enemy.health -= poisonDamage;
+                    if (enemy.health <= 0) {
+                        enemy.markedForDeath = true;
+                    }
+
+                    // Update the last poison tick for this enemy/trap combination
+                    enemy.poisonEffects.set(trapId, now);
+
+                    // Create poison particles for visual effect
+                    if (this.particleEngine) {
+                        this.particleEngine.createEnemyHitEffect(
+                            enemy.x + enemy.width / 2,
+                            enemy.y + enemy.height / 2,
+                            '#90EE90'
+                        );
+                    }
+                }
+            } else {
+                // Enemy left the poison cloud, start lingering poison effect
+                if (enemy.poisonEffects && enemy.poisonEffects.has(trap.id)) {
+                    const poisonData = enemy.poisonEffects.get(trap.id);
+                    
+                    // If this is a number (old format), convert to object format
+                    if (typeof poisonData === 'number') {
+                        enemy.poisonEffects.set(trap.id, {
+                            lastTick: poisonData,
+                            exitTime: now,
+                            isLingering: true
+                        });
+                    } else if (!poisonData.isLingering) {
+                        // Mark as lingering when enemy exits cloud
+                        poisonData.exitTime = now;
+                        poisonData.isLingering = true;
+                    }
+                }
+            }
+        });
+
+        // Process lingering poison effects for enemies outside clouds
+        this.gameState.enemies.forEach(enemy => {
+            if (!enemy.poisonEffects) return;
+
+            enemy.poisonEffects.forEach((poisonData, trapId) => {
+                // Handle old number format
+                if (typeof poisonData === 'number') return;
+
+                if (poisonData.isLingering) {
+                    const timeSinceExit = now - poisonData.exitTime;
+                    
+                    // Continue poison for 1 second after exiting
+                    if (timeSinceExit <= 1000) {
+                        const timeSinceLastTick = now - poisonData.lastTick;
+                        
+                        if (timeSinceLastTick >= trap.dotInterval) {
+                            // Apply lingering poison damage (5% of max health)
+                            const poisonDamage = Math.ceil(enemy.maxHealth * 0.05);
+                            enemy.health -= poisonDamage;
+                            if (enemy.health <= 0) {
+                                enemy.markedForDeath = true;
+                            }
+
+                            poisonData.lastTick = now;
+
+                            // Create poison particles for visual effect
+                            if (this.particleEngine) {
+                                this.particleEngine.createEnemyHitEffect(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    '#90EE90'
+                                );
+                            }
+                        }
+                    } else {
+                        // Remove poison effect after 1 second
+                        enemy.poisonEffects.delete(trapId);
+                    }
+                }
+            });
+        });
+    }
+
+    processPoisonAura(now, playerCenterX, playerCenterY) {
+        // Check if player has poison cloud weapon
+        const hasPoisonCloud = this.gameState.player.weapons.some(weapon => weapon.id === 'POISON_CLOUD');
+        if (!hasPoisonCloud) return;
+
+        const poisonCloudWeapon = WEAPONS.POISON_CLOUD;
+        const auraConfig = poisonCloudWeapon.aura;
+
+        // Apply poison damage to enemies within aura radius
+        this.gameState.enemies.forEach(enemy => {
+            const dx = (enemy.x + enemy.width / 2) - playerCenterX;
+            const dy = (enemy.y + enemy.height / 2) - playerCenterY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= auraConfig.radius) {
+                // Initialize poison aura tracking for this enemy if needed
+                if (!enemy.poisonAuraEffects) {
+                    enemy.poisonAuraEffects = {};
+                }
+
+                const lastAuraTick = enemy.poisonAuraEffects.lastTick || 0;
+
+                // Apply poison damage if enough time has passed
+                if (now - lastAuraTick >= auraConfig.dotInterval) {
+                    // Calculate poison aura damage scaling with poison cloud weapon count
+                    const poisonCloudWeapons = this.gameState.player.weapons.filter(weapon => weapon.id === 'POISON_CLOUD');
+                    const basePoisonDamage = 0.05; // 5% base damage
+                    const bonusDamagePerStack = 0.05; // +5% per additional poison cloud weapon
+                    const totalPoisonPercent = basePoisonDamage + (bonusDamagePerStack * poisonCloudWeapons.length);
+                    const auraPoisonDamage = Math.ceil(enemy.maxHealth * totalPoisonPercent);
+                    
+                    // Apply poison damage
+                    enemy.health -= auraPoisonDamage;
+                    if (enemy.health <= 0) {
+                        enemy.markedForDeath = true;
+                    }
+
+                    // Update the last poison tick
+                    enemy.poisonAuraEffects.lastTick = now;
+
+                    // Create poison particles for visual effect
+                    if (this.particleEngine) {
+                        this.particleEngine.createEnemyHitEffect(
+                            enemy.x + enemy.width / 2,
+                            enemy.y + enemy.height / 2,
+                            '#90EE90'
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    processUmbrellaRain(now) {
+        // Check if player has 20+ umbrella weapons
+        const umbrellaWeapons = this.gameState.player.weapons.filter(weapon => weapon.id === 'UMBRELLA');
+        if (umbrellaWeapons.length < 20) return;
+
+        // Initialize rain tracking if needed
+        if (!this.rainState) {
+            this.rainState = {
+                lastRainTick: 0,
+                rainDroplets: []
+            };
+        }
+
+        const rainInterval = 200; // Rain drops every 200ms
+        
+        // Create new rain droplets
+        if (now - this.rainState.lastRainTick >= rainInterval) {
+            // Create multiple rain droplets across the screen
+            const dropletsPerTick = 15;
+            for (let i = 0; i < dropletsPerTick; i++) {
+                const droplet = {
+                    x: Math.random() * (CANVAS_WIDTH + 200) - 100, // Slightly wider than screen
+                    y: -50, // Start above screen
+                    speed: 300 + Math.random() * 200, // Fall speed
+                    damage: 0.1, // 10% max health damage
+                    createdAt: now,
+                    hitEnemies: new Set() // Track which enemies this droplet has hit
+                };
+                this.rainState.rainDroplets.push(droplet);
+            }
+            this.rainState.lastRainTick = now;
+        }
+
+        // Update existing rain droplets
+        this.rainState.rainDroplets = this.rainState.rainDroplets.filter(droplet => {
+            // Move droplet down
+            const deltaTime = (now - droplet.createdAt) / 1000;
+            droplet.y = -50 + (droplet.speed * deltaTime);
+
+            // Remove droplets that have fallen off screen
+            if (droplet.y > CANVAS_HEIGHT + 50) {
+                return false;
+            }
+
+            // Check collision with enemies
+            this.gameState.enemies.forEach(enemy => {
+                if (droplet.hitEnemies.has(enemy.id)) return; // Already hit this enemy
+
+                const enemyCenterX = enemy.x + enemy.width / 2;
+                const enemyCenterY = enemy.y + enemy.height / 2;
+                
+                // Check if droplet hits enemy (simple collision)
+                if (Math.abs(droplet.x - enemyCenterX) < enemy.width / 2 && 
+                    Math.abs(droplet.y - enemyCenterY) < enemy.height / 2) {
+                    
+                    // Apply amplified poison damage (10% of max health)
+                    const rainDamage = Math.ceil(enemy.maxHealth * droplet.damage);
+                    enemy.health -= rainDamage;
+                    
+                    if (enemy.health <= 0) {
+                        enemy.markedForDeath = true;
+                    }
+
+                    // Mark this enemy as hit by this droplet
+                    droplet.hitEnemies.add(enemy.id);
+
+                    // Create visual effect
+                    if (this.particleEngine) {
+                        this.particleEngine.createEnemyHitEffect(
+                            enemyCenterX,
+                            enemyCenterY,
+                            '#00BFFF' // Blue for rain effect
+                        );
+                    }
+                }
+            });
+
+            return true;
+        });
     }
 }

@@ -755,7 +755,12 @@ function showCheatMenu() {
     weaponTitle.style.cssText = 'color: white; margin-bottom: 10px;';
     weaponSection.appendChild(weaponTitle);
 
-    const weapons = ['Piercing Bow', 'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe'];
+    const weapons = [
+        'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
+        'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
+        'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
+        'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Umbrella'
+    ];
     console.log('Weapons array:', weapons); // Debug log to see the full array
     console.log('Weapons array length:', weapons.length); // Debug log
     console.log('Last weapon:', weapons[weapons.length - 1]); // Debug log

@@ -4,6 +4,25 @@ export class PlayerController {
     constructor(gameState, inputManager) {
         this.gameState = gameState;
         this.inputManager = inputManager;
+        this.particleEngine = null;
+        this.renderer = null;
+        this.lastUmbrellaPoofTime = 0; // Cooldown for umbrella poof visual effect
+    }
+
+    setParticleEngine(particleEngine) {
+        this.particleEngine = particleEngine;
+    }
+
+    setRenderer(renderer) {
+        this.renderer = renderer;
+    }
+
+    getUmbrellaSprite() {
+        // Try to get umbrella sprite from renderer
+        if (this.renderer && this.renderer.umbrellaImage && this.renderer.umbrellaImageLoaded) {
+            return this.renderer.umbrellaImage;
+        }
+        return null; // Will use fallback circle in particle engine
     }
 
     update() {
@@ -64,6 +83,38 @@ export class PlayerController {
     takeDamage(damage) {
         if (this.gameState.player.invulnerable) {
             return false;
+        }
+
+        // Check for umbrella dodge chance
+        const umbrellaWeapons = this.gameState.player.weapons.filter(weapon => weapon.id === 'UMBRELLA');
+        if (umbrellaWeapons.length > 0) {
+            // Calculate total dodge chance: 5% per umbrella, capped at 100%
+            const totalDodgeChance = Math.min(umbrellaWeapons.length * 0.05, 1.0); // Cap at 100%
+            
+            if (Math.random() < totalDodgeChance) {
+                // Damage dodged! Store this for visual feedback
+                this.gameState.player.lastDodge = Date.now();
+                this.gameState.player.dodgeCount = (this.gameState.player.dodgeCount || 0) + 1;
+                
+                console.log(`Damage dodged with umbrella! (${(totalDodgeChance * 100).toFixed(0)}% chance) - Total dodges: ${this.gameState.player.dodgeCount}`);
+                
+                // Create umbrella dodge particle effect with cooldown (500ms)
+                const currentTime = Date.now();
+                const poofCooldown = 500; // 500ms cooldown between poof effects
+                
+                if (this.particleEngine && this.particleEngine.createUmbrellaDodgeEffect && 
+                    currentTime - this.lastUmbrellaPoofTime > poofCooldown) {
+                    const centerX = this.gameState.player.x + this.gameState.player.width / 2;
+                    const centerY = this.gameState.player.y + this.gameState.player.height / 2;
+                    
+                    // Get umbrella sprite from renderer if available
+                    const umbrellaSprite = this.getUmbrellaSprite();
+                    this.particleEngine.createUmbrellaDodgeEffect(centerX, centerY, umbrellaSprite);
+                    this.lastUmbrellaPoofTime = currentTime;
+                }
+                
+                return false; // No damage taken
+            }
         }
 
         this.gameState.player.health = Math.max(0, this.gameState.player.health - damage);

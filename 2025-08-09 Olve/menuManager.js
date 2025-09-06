@@ -26,13 +26,19 @@ export class MenuManager {
         const content = this.createMenuContent();
         const title = this.createTitle('Dungeon Crawler');
         
+        // Add points display in top left corner
+        const pointsDisplay = this.createPointsDisplay();
+        
         const startButton = this.createButton('Start Game', () => this.startGame(), true);
         const settingsButton = this.createButton('Settings', () => this.showSettings());
+        const weaponTreeButton = this.createButton('Weapon Tree', () => this.showWeaponTree());
         const skinsButton = this.createSkinsButton();
 
+        mainMenu.appendChild(pointsDisplay);
         content.appendChild(title);
         content.appendChild(startButton);
         content.appendChild(settingsButton);
+        content.appendChild(weaponTreeButton);
         content.appendChild(skinsButton);
         
         mainMenu.appendChild(content);
@@ -80,7 +86,24 @@ export class MenuManager {
         // Settings menu is likely already in HTML, just need to handle its logic
         const settingsMenu = document.getElementById('settingsMenu');
         if (settingsMenu) {
-            // Setup settings menu event handlers if needed
+            // Setup reset weapon tree button
+            const resetBtn = document.getElementById('resetWeaponTreeBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (confirm('Are you sure you want to reset your weapon tree progress? This will unlock only Sword, Scythe, and Bow, and set your points to 0. This action cannot be undone!')) {
+                        if (this.gameState.resetWeaponTree()) {
+                            alert('Weapon tree progress has been reset successfully!');
+                            this.updatePointsDisplay();
+                            // Refresh weapon tree if it's open
+                            if (document.getElementById('weaponTreeMenu') && document.getElementById('weaponTreeMenu').style.display !== 'none') {
+                                this.refreshWeaponTree();
+                            }
+                        } else {
+                            alert('Failed to reset weapon tree progress. Please try again.');
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -127,6 +150,54 @@ export class MenuManager {
         return button;
     }
 
+    createPointsDisplay() {
+        const pointsDisplay = document.createElement('div');
+        pointsDisplay.id = 'pointsDisplay';
+        pointsDisplay.style.cssText = `
+            position: absolute;
+            top: 40px;
+            left: 10px;
+            z-index: 2001;
+            display: flex;
+            align-items: center;
+        `;
+
+        // Create the point bar background image
+        const pointBarImg = document.createElement('img');
+        pointBarImg.src = 'images/point_bar.png';
+        pointBarImg.style.cssText = `
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        `;
+        
+        // Set size when image loads to maintain crisp 2x scaling
+        pointBarImg.onload = function() {
+            this.style.width = (this.naturalWidth * 2) + 'px';
+            this.style.height = (this.naturalHeight * 2) + 'px';
+        };
+
+        // Create text overlay for the points number
+        const pointsText = document.createElement('div');
+        pointsText.style.cssText = `
+            position: absolute;
+            color: #CCCCCC;
+            font-size: 28px;
+            font-weight: 900;
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            left: 165px;
+            top: 50%;
+            transform: translateY(-50%);
+            text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 1px -1px 0px #000, -1px 1px 0px #000;
+        `;
+        pointsText.textContent = `Points: ${this.gameState.player.weaponTreePoints}`;
+
+        pointsDisplay.appendChild(pointBarImg);
+        pointsDisplay.appendChild(pointsText);
+        return pointsDisplay;
+    }
+
     createSkinsButton() {
         const skinsButton = this.createButton(
             this.gameState.player.skinsUnlocked ? 'Change Skin' : 'Skins (Reach Floor 100)',
@@ -151,7 +222,7 @@ export class MenuManager {
         if (!mainMenu) return;
         
         const buttons = mainMenu.querySelectorAll('button');
-        const skinsButton = buttons[2]; // 3rd button (0-indexed): Start, Settings, Skins
+        const skinsButton = buttons[3]; // 4th button (0-indexed): Start, Settings, Weapon Tree, Skins
         
         if (skinsButton) {
             // Update text based on current unlock status
@@ -276,6 +347,7 @@ export class MenuManager {
     showMainMenu() {
         this.showElement('mainMenu');
         this.updateSkinsButton();
+        this.updatePointsDisplay();
     }
 
     hideMainMenu() {
@@ -299,5 +371,429 @@ export class MenuManager {
     dispatchEvent(eventName, detail = {}) {
         const event = new CustomEvent(eventName, { detail });
         document.dispatchEvent(event);
+    }
+
+    showWeaponTree() {
+        this.hideMainMenu();
+        
+        // Create weapon tree menu if it doesn't exist
+        let weaponTreeMenu = document.getElementById('weaponTreeMenu');
+        if (!weaponTreeMenu) {
+            weaponTreeMenu = this.createWeaponTreeMenu();
+            document.body.appendChild(weaponTreeMenu);
+        }
+        
+        this.showElement('weaponTreeMenu');
+        this.updatePointsDisplay();
+    }
+
+    createWeaponTreeMenu() {
+        const weaponTreeMenu = document.createElement('div');
+        weaponTreeMenu.id = 'weaponTreeMenu';
+        weaponTreeMenu.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('images/dungeon-door.png') center/cover no-repeat;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            overflow: hidden;
+        `;
+
+        const content = this.createMenuContent();
+        content.style.height = '80vh';
+        content.style.overflow = 'visible';
+        content.style.display = 'flex';
+        content.style.flexDirection = 'column';
+        content.style.alignItems = 'center';
+        content.style.justifyContent = 'center';
+        const title = this.createTitle('Weapon Tree');
+        
+        // Add points display in top left corner
+        const pointsDisplay = this.createPointsDisplay();
+        
+        // Create weapon tree content
+        const treeContent = this.createWeaponTreeContent();
+        
+        const backButton = this.createButton('Back', () => this.hideWeaponTree());
+
+        weaponTreeMenu.appendChild(pointsDisplay);
+        content.appendChild(title);
+        content.appendChild(treeContent);
+        content.appendChild(backButton);
+        weaponTreeMenu.appendChild(content);
+
+        return weaponTreeMenu;
+    }
+
+    createWeaponTreeContent() {
+        const container = document.createElement('div');
+        container.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 60vh;
+            width: 80vw;
+            max-width: 800px;
+            overflow: auto;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #444;
+            justify-content: flex-start;
+            align-items: center;
+            box-sizing: border-box;
+        `;
+
+        const tree = this.gameState.getWeaponTree();
+        const purchased = this.gameState.loadWeaponTreeUpgrades();
+
+        // Create the unified weapon tree
+        const unifiedBranch = tree.unified;
+        const branchDiv = this.createUnifiedWeaponBranch(unifiedBranch, purchased.unified || {});
+        container.appendChild(branchDiv);
+
+        return container;
+    }
+
+    createUnifiedWeaponBranch(branch, purchasedWeapons) {
+        const branchDiv = document.createElement('div');
+        branchDiv.style.cssText = `
+            border: 3px solid ${branch.color};
+            border-radius: 12px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+        `;
+
+        const branchTitle = document.createElement('h3');
+        branchTitle.textContent = branch.name;
+        branchTitle.style.cssText = `
+            color: ${branch.color};
+            margin: 0 0 15px 0;
+            text-align: center;
+            font-size: 20px;
+            text-shadow: 2px 2px 0px #000;
+        `;
+
+        // Create more compact grid for the unified tree (10 rows x 9 columns)
+        const weaponsGrid = document.createElement('div');
+        weaponsGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(9, 60px);
+            grid-template-rows: repeat(10, 60px);
+            gap: 8px;
+            position: relative;
+            justify-content: center;
+        `;
+
+        // Create connection lines container
+        const connectionsContainer = document.createElement('div');
+        connectionsContainer.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        `;
+
+        // Add weapons to their positions
+        Object.entries(branch.weapons).forEach(([weaponKey, weapon]) => {
+            const weaponNode = this.createUnifiedWeaponNode('unified', weaponKey, weapon, purchasedWeapons, branch.color);
+            
+            // Position the weapon in the grid
+            weaponNode.style.gridColumn = weapon.position.col + 1;
+            weaponNode.style.gridRow = weapon.position.row + 1;
+            weaponNode.style.zIndex = '2';
+            
+            weaponsGrid.appendChild(weaponNode);
+        });
+
+        // Add connection lines
+        this.createUnifiedConnectionLines(branch.weapons, purchasedWeapons, connectionsContainer, branch.color);
+        
+        weaponsGrid.appendChild(connectionsContainer);
+        branchDiv.appendChild(branchTitle);
+        branchDiv.appendChild(weaponsGrid);
+        return branchDiv;
+    }
+
+    createUnifiedWeaponNode(branchKey, weaponKey, weapon, purchasedWeapons, branchColor) {
+        let isPurchased = !!purchasedWeapons[weaponKey];
+        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+        
+        // Check if requirements are met
+        let canPurchase = canAfford && !isPurchased && weapon.cost > 0;
+        if (weapon.requires && !isPurchased) {
+            canPurchase = canPurchase && weapon.requires.every(req => purchasedWeapons[req]);
+        }
+
+        // Auto-unlock free weapons
+        if (weapon.cost === 0 && !isPurchased) {
+            this.gameState.purchaseWeapon(branchKey, weaponKey);
+            isPurchased = true;
+            canPurchase = false;
+        }
+
+        const nodeDiv = document.createElement('div');
+        nodeDiv.style.cssText = `
+            width: 60px;
+            height: 60px;
+            border: 2px solid ${isPurchased ? '#0f0' : canPurchase ? branchColor : '#666'};
+            border-radius: 8px;
+            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? `rgba(255, 255, 255, 0.1)` : 'rgba(60, 60, 60, 0.5)'};
+            cursor: ${canPurchase ? 'pointer' : 'default'};
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            position: relative;
+        `;
+
+        const title = document.createElement('div');
+        title.textContent = weapon.name;
+        title.style.cssText = `
+            color: ${isPurchased ? '#0f0' : '#fff'};
+            font-weight: bold;
+            font-size: 8px;
+            text-align: center;
+            margin-bottom: 2px;
+            text-shadow: 1px 1px 0px #000;
+            line-height: 1;
+        `;
+
+        const cost = document.createElement('div');
+        if (weapon.cost > 0) {
+            cost.textContent = `${weapon.cost}pts`;
+            cost.style.cssText = `
+                color: ${canAfford || isPurchased ? '#ccc' : '#f44'};
+                font-size: 8px;
+                text-align: center;
+                text-shadow: 1px 1px 0px #000;
+            `;
+        }
+
+        nodeDiv.appendChild(title);
+        if (weapon.cost > 0) {
+            nodeDiv.appendChild(cost);
+        }
+
+        if (canPurchase) {
+            nodeDiv.addEventListener('click', () => {
+                if (this.gameState.purchaseWeapon(branchKey, weaponKey)) {
+                    this.refreshWeaponTree();
+                }
+            });
+
+            nodeDiv.addEventListener('mouseenter', () => {
+                nodeDiv.style.background = 'rgba(255, 255, 255, 0.3)';
+                nodeDiv.style.transform = 'scale(1.05)';
+            });
+
+            nodeDiv.addEventListener('mouseleave', () => {
+                nodeDiv.style.background = 'rgba(255, 255, 255, 0.1)';
+                nodeDiv.style.transform = 'scale(1)';
+            });
+        }
+
+        return nodeDiv;
+    }
+
+    createUnifiedConnectionLines(weapons, purchasedWeapons, container, branchColor) {
+        // Create SVG for drawing lines
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.style.cssText = `
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        `;
+
+        Object.entries(weapons).forEach(([weaponKey, weapon]) => {
+            if (weapon.requires) {
+                weapon.requires.forEach(reqKey => {
+                    const reqWeapon = weapons[reqKey];
+                    if (reqWeapon) {
+                        // Calculate line positions (68px = 60px width + 8px gap)
+                        const fromX = (reqWeapon.position.col * 68) + 30;
+                        const fromY = (reqWeapon.position.row * 68) + 30;
+                        const toX = (weapon.position.col * 68) + 30;
+                        const toY = (weapon.position.row * 68) + 30;
+
+                        // Create line
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', fromX);
+                        line.setAttribute('y1', fromY);
+                        line.setAttribute('x2', toX);
+                        line.setAttribute('y2', toY);
+                        line.setAttribute('stroke', purchasedWeapons[reqKey] ? branchColor : '#444');
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('opacity', purchasedWeapons[reqKey] ? '0.8' : '0.3');
+
+                        svg.appendChild(line);
+                    }
+                });
+            }
+        });
+
+        container.appendChild(svg);
+    }
+
+    createWeaponNode(branchKey, weaponKey, weapon, purchasedWeapons, branchColor) {
+        let isPurchased = !!purchasedWeapons[weaponKey];
+        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+        
+        // Check if requirements are met
+        let canPurchase = canAfford && !isPurchased && weapon.cost > 0; // Free weapons (cost 0) are auto-unlocked
+        if (weapon.requires && !isPurchased) {
+            canPurchase = canPurchase && weapon.requires.every(req => purchasedWeapons[req]);
+        }
+
+        // Auto-unlock free weapons
+        if (weapon.cost === 0 && !isPurchased) {
+            this.gameState.purchaseWeapon(branchKey, weaponKey);
+            isPurchased = true;
+            canPurchase = false;
+        }
+
+        const nodeDiv = document.createElement('div');
+        nodeDiv.style.cssText = `
+            width: 80px;
+            height: 80px;
+            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? branchColor : '#666'};
+            border-radius: 8px;
+            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? `rgba(255, 255, 255, 0.1)` : 'rgba(60, 60, 60, 0.5)'};
+            cursor: ${canPurchase ? 'pointer' : 'default'};
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            position: relative;
+        `;
+
+        const title = document.createElement('div');
+        title.textContent = weapon.name;
+        title.style.cssText = `
+            color: ${isPurchased ? '#0f0' : '#fff'};
+            font-weight: bold;
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 2px;
+            text-shadow: 1px 1px 0px #000;
+        `;
+
+        const cost = document.createElement('div');
+        if (weapon.cost > 0) {
+            cost.textContent = `${weapon.cost}pts`;
+            cost.style.cssText = `
+                color: ${canAfford || isPurchased ? '#ccc' : '#f44'};
+                font-size: 9px;
+                text-align: center;
+                text-shadow: 1px 1px 0px #000;
+            `;
+        }
+
+        nodeDiv.appendChild(title);
+        if (weapon.cost > 0) {
+            nodeDiv.appendChild(cost);
+        }
+
+        if (canPurchase) {
+            nodeDiv.addEventListener('click', () => {
+                if (this.gameState.purchaseWeapon(branchKey, weaponKey)) {
+                    this.refreshWeaponTree();
+                }
+            });
+
+            nodeDiv.addEventListener('mouseenter', () => {
+                nodeDiv.style.background = 'rgba(255, 255, 255, 0.3)';
+                nodeDiv.style.transform = 'scale(1.05)';
+            });
+
+            nodeDiv.addEventListener('mouseleave', () => {
+                nodeDiv.style.background = 'rgba(255, 255, 255, 0.1)';
+                nodeDiv.style.transform = 'scale(1)';
+            });
+        }
+
+        return nodeDiv;
+    }
+
+    createConnectionLines(weapons, purchasedWeapons, container, branchColor) {
+        // Create SVG for drawing lines
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.style.cssText = `
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        `;
+
+        Object.entries(weapons).forEach(([weaponKey, weapon]) => {
+            if (weapon.requires) {
+                weapon.requires.forEach(reqKey => {
+                    const reqWeapon = weapons[reqKey];
+                    if (reqWeapon) {
+                        // Calculate line positions
+                        const fromX = (reqWeapon.position.col * 95) + 40; // 80px width + 15px gap
+                        const fromY = (reqWeapon.position.row * 95) + 40;
+                        const toX = (weapon.position.col * 95) + 40;
+                        const toY = (weapon.position.row * 95) + 40;
+
+                        // Create line
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', fromX);
+                        line.setAttribute('y1', fromY);
+                        line.setAttribute('x2', toX);
+                        line.setAttribute('y2', toY);
+                        line.setAttribute('stroke', purchasedWeapons[reqKey] ? branchColor : '#444');
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('opacity', purchasedWeapons[reqKey] ? '0.8' : '0.3');
+
+                        svg.appendChild(line);
+                    }
+                });
+            }
+        });
+
+        container.appendChild(svg);
+    }
+
+    refreshWeaponTree() {
+        this.updatePointsDisplay();
+        const weaponTreeMenu = document.getElementById('weaponTreeMenu');
+        if (weaponTreeMenu) {
+            weaponTreeMenu.remove();
+            this.showWeaponTree();
+        }
+    }
+
+    hideWeaponTree() {
+        this.hideElement('weaponTreeMenu');
+        this.showMainMenu();
+    }
+
+    updatePointsDisplay() {
+        const pointsDisplays = document.querySelectorAll('#pointsDisplay');
+        pointsDisplays.forEach(display => {
+            const pointsText = display.querySelector('div');
+            if (pointsText) {
+                pointsText.textContent = `Points: ${this.gameState.player.weaponTreePoints}`;
+            }
+        });
     }
 }

@@ -61,6 +61,11 @@ export class GameLoop {
         this.renderer.drawAllies(this.gameState.allies);
         this.renderer.drawProjectiles(this.gameState.projectiles);
         
+        // Render traps
+        if (this.gameState.traps) {
+            this.renderer.drawTraps(this.gameState.traps);
+        }
+        
         // Render frost zones
         if (this.gameState.frostZones) {
             this.renderer.drawFrostZones(this.gameState.frostZones);
@@ -73,6 +78,9 @@ export class GameLoop {
         if (particleEngine) {
             this.renderer.drawParticles(particleEngine);
         }
+
+        // Render umbrella rain effect
+        this.renderer.drawUmbrellaRain();
     }
 
     handleFloorProgression() {
@@ -99,7 +107,12 @@ export class GameLoop {
 
     updatePlayerProgress() {
         if (this.gameState.currentFloor > this.gameState.player.highestFloor) {
+            const floorsProgressed = this.gameState.currentFloor - this.gameState.player.highestFloor;
             this.gameState.player.highestFloor = this.gameState.currentFloor;
+            
+            // Award weapon tree points for floors survived (1 point per floor)
+            this.gameState.addWeaponTreePoints(floorsProgressed);
+            console.log(`Awarded ${floorsProgressed} weapon tree points. Total: ${this.gameState.player.weaponTreePoints}`);
         }
     }
 

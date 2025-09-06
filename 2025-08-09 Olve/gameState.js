@@ -18,6 +18,7 @@ export class GameState {
         this.player = this.createPlayer();
         this.enemies = [];
         this.projectiles = [];
+        this.traps = []; // Array to store deployed traps
         this.openWorld = this.createOpenWorldState();
         this.settings = this.loadSettings();
         this.checkStorageAvailability();
@@ -63,7 +64,6 @@ export class GameState {
             scrollableSettingsMenu: false,
             menuSounds: true,
             gameOverSounds: true,
-            gameSounds: true,
             gameMusic: true,
             virtualJoystick: false
         };
@@ -185,7 +185,9 @@ export class GameState {
             highestFloor: 0,
             skinsUnlocked: savedSkinsUnlocked,
             cheatsEnabled: false,
-            oneHitKill: false
+            oneHitKill: false,
+            weaponTreePoints: this.loadWeaponTreePoints(),
+            weaponTreeUpgrades: this.loadWeaponTreeUpgrades()
         };
     }
 
@@ -198,6 +200,345 @@ export class GameState {
             DAY_DURATION: 90000,
             NIGHT_DURATION: 120000
         };
+    }
+
+    loadWeaponTreePoints() {
+        try {
+            const savedPoints = localStorage.getItem('weaponTreePoints');
+            return savedPoints ? parseInt(savedPoints, 10) : 0;
+        } catch (error) {
+            console.log('Failed to load weapon tree points:', error);
+            return 0;
+        }
+    }
+
+    loadWeaponTreeUpgrades() {
+        try {
+            const savedUpgrades = localStorage.getItem('weaponTreeUpgrades');
+            return savedUpgrades ? JSON.parse(savedUpgrades) : {};
+        } catch (error) {
+            console.log('Failed to load weapon tree upgrades:', error);
+            return {};
+        }
+    }
+
+    saveWeaponTreePoints(points) {
+        try {
+            localStorage.setItem('weaponTreePoints', points.toString());
+            console.log('Weapon tree points saved:', points);
+        } catch (error) {
+            console.log('Failed to save weapon tree points:', error);
+        }
+    }
+
+    saveWeaponTreeUpgrades(upgrades) {
+        try {
+            localStorage.setItem('weaponTreeUpgrades', JSON.stringify(upgrades));
+            console.log('Weapon tree upgrades saved:', upgrades);
+        } catch (error) {
+            console.log('Failed to save weapon tree upgrades:', error);
+        }
+    }
+
+    addWeaponTreePoints(floors) {
+        this.player.weaponTreePoints += floors;
+        this.saveWeaponTreePoints(this.player.weaponTreePoints);
+    }
+
+    // Get weapon tree structure - One big interconnected tree
+    getWeaponTree() {
+        return {
+            // Single unified weapon tree
+            unified: {
+                name: 'Weapon Mastery Tree',
+                color: '#FFD700', // Gold color for the unified tree
+                unlocked: true,
+                weapons: {
+                    // Starting weapons (Row 0) - Free basic weapons
+                    sword: { 
+                        name: 'Sword', 
+                        weaponId: 'SWORD',
+                        cost: 0,
+                        position: { row: 0, col: 3 } 
+                    },
+                    scythe: { 
+                        name: 'Scythe', 
+                        weaponId: 'SCYTHE',
+                        cost: 0,
+                        position: { row: 0, col: 4 } 
+                    },
+                    bow: { 
+                        name: 'Bow', 
+                        weaponId: 'BOW',
+                        cost: 0,
+                        position: { row: 0, col: 5 } 
+                    },
+
+                    // First tier (Row 1)
+                    dragonSword: { 
+                        name: 'Dragon Sword', 
+                        weaponId: 'DRAGON_SWORD',
+                        cost: 15, 
+                        requires: ['sword'],
+                        position: { row: 1, col: 3 } 
+                    },
+
+                    // Second tier (Row 2)
+                    dragonBow: { 
+                        name: 'Dragon Bow', 
+                        weaponId: 'DRAGON_BOW',
+                        cost: 20, 
+                        requires: ['dragonSword'],
+                        position: { row: 2, col: 4 } 
+                    },
+
+                    // Third tier (Row 3)
+                    fireStaff: { 
+                        name: 'Fire Staff', 
+                        weaponId: 'FIRE_STAFF',
+                        cost: 25, 
+                        requires: ['dragonBow'],
+                        position: { row: 3, col: 4 } 
+                    },
+
+                    // Fourth tier (Row 4) - Staff branches
+                    healingStaff: { 
+                        name: 'Healing Staff', 
+                        weaponId: 'HEALING_STAFF',
+                        cost: 18, 
+                        requires: ['fireStaff'],
+                        position: { row: 4, col: 3 } 
+                    },
+                    iceStaff: { 
+                        name: 'Ice Staff', 
+                        weaponId: 'ICE_STAFF',
+                        cost: 20, 
+                        requires: ['fireStaff'],
+                        position: { row: 4, col: 4 } 
+                    },
+                    lightningStaff: { 
+                        name: 'Lightning Staff', 
+                        weaponId: 'LIGHTNING_STAFF',
+                        cost: 22, 
+                        requires: ['fireStaff'],
+                        position: { row: 4, col: 5 } 
+                    },
+
+                    // Boomerang branch (Row 2-3)
+                    boomerang: { 
+                        name: 'Boomerang', 
+                        weaponId: 'BOOMERANG',
+                        cost: 30, 
+                        requires: ['dragonBow', 'dragonSword'],
+                        position: { row: 2, col: 3 } 
+                    },
+
+                    // Throwing weapons (Row 3-4)
+                    throwingAxe: { 
+                        name: 'Throwing Axe', 
+                        weaponId: 'THROWING_AXE',
+                        cost: 12, 
+                        requires: ['boomerang'],
+                        position: { row: 3, col: 3 } 
+                    },
+
+                    // Scythe progression (Row 5-6)
+                    natureScythe: { 
+                        name: 'Nature Scythe', 
+                        weaponId: 'NATURE_SCYTHE',
+                        cost: 25, 
+                        requires: ['healingStaff', 'boomerang'],
+                        position: { row: 5, col: 4 } 
+                    },
+
+                    // Spirit blade (Row 4)
+                    spiritBlade: { 
+                        name: 'Spirit Blade', 
+                        weaponId: 'SPIRIT_BLADE',
+                        cost: 35, 
+                        requires: ['boomerang', 'throwingAxe', 'fireStaff'],
+                        position: { row: 4, col: 2 } 
+                    },
+
+                    // Crystal scythe (Row 6)
+                    crystalScythe: { 
+                        name: 'Crystal Scythe', 
+                        weaponId: 'CRYSTAL_SCYTHE',
+                        cost: 40, 
+                        requires: ['natureScythe', 'spiritBlade'],
+                        position: { row: 6, col: 3 } 
+                    },
+
+                    // Dragon scythe (Row 7)
+                    dragonScythe: { 
+                        name: 'Dragon Scythe', 
+                        weaponId: 'DRAGON_SCYTHE',
+                        cost: 50, 
+                        requires: ['natureScythe', 'crystalScythe'],
+                        position: { row: 7, col: 4 } 
+                    },
+
+                    // Flaming skull (Row 8)
+                    flamingSkull: { 
+                        name: 'Flaming Skull', 
+                        weaponId: 'FLAMING_SKULL',
+                        cost: 60, 
+                        requires: ['dragonScythe', 'lightningStaff'],
+                        position: { row: 8, col: 4 } 
+                    },
+
+                    // Chakram (Row 5)
+                    chakram: { 
+                        name: 'Chakram', 
+                        weaponId: 'CHAKRAM',
+                        cost: 45, 
+                        requires: ['throwingAxe', 'flamingSkull'],
+                        position: { row: 5, col: 2 } 
+                    },
+
+                    // Cursed orb (Row 6)
+                    cursedOrb: { 
+                        name: 'Cursed Orb', 
+                        weaponId: 'CURSED_ORB',
+                        cost: 80, 
+                        requires: ['chakram', 'flamingSkull', 'iceStaff'],
+                        position: { row: 6, col: 4 } 
+                    },
+
+                    // Trap weapons (Row 5-7)
+                    spikeTrap: { 
+                        name: 'Spike Trap', 
+                        weaponId: 'SPIKE_TRAP',
+                        cost: 35, 
+                        requires: ['dragonSword', 'crystalScythe'],
+                        position: { row: 5, col: 3 } 
+                    },
+
+                    explosiveMine: { 
+                        name: 'Explosive Mine', 
+                        weaponId: 'EXPLOSIVE_MINE',
+                        cost: 40, 
+                        requires: ['spikeTrap', 'fireStaff'],
+                        position: { row: 6, col: 5 } 
+                    },
+
+                    webLauncher: { 
+                        name: 'Web Launcher', 
+                        weaponId: 'WEB_LAUNCHER',
+                        cost: 45, 
+                        requires: ['spikeTrap', 'chakram'],
+                        position: { row: 6, col: 2 } 
+                    },
+
+                    poisonCloud: { 
+                        name: 'Poison Cloud', 
+                        weaponId: 'POISON_CLOUD',
+                        cost: 55, 
+                        requires: ['webLauncher', 'explosiveMine'],
+                        position: { row: 7, col: 3 } 
+                    },
+
+                    // Ultimate weapon (Row 9)
+                    umbrella: { 
+                        name: 'The Umbrella', 
+                        weaponId: 'UMBRELLA',
+                        cost: 100, 
+                        requires: ['poisonCloud', 'flamingSkull', 'cursedOrb', 'chakram'],
+                        position: { row: 9, col: 4 } 
+                    }
+                }
+            }
+        };
+    }
+
+    // Purchase a weapon unlock
+    purchaseWeapon(branch, weaponKey) {
+        const tree = this.getWeaponTree();
+        const weapon = tree[branch]?.weapons[weaponKey];
+        
+        if (!weapon) return false;
+        if (this.player.weaponTreePoints < weapon.cost) return false;
+        
+        // Check requirements
+        if (weapon.requires) {
+            const purchased = this.loadWeaponTreeUpgrades();
+            const branchPurchased = purchased[branch] || {};
+            
+            for (const req of weapon.requires) {
+                if (!branchPurchased[req]) {
+                    return false; // Requirement not met
+                }
+            }
+        }
+        
+        // Purchase the weapon
+        this.player.weaponTreePoints -= weapon.cost;
+        this.saveWeaponTreePoints(this.player.weaponTreePoints);
+        
+        // Save purchase
+        const purchased = this.loadWeaponTreeUpgrades();
+        if (!purchased[branch]) purchased[branch] = {};
+        purchased[branch][weaponKey] = true;
+        this.saveWeaponTreeUpgrades(purchased);
+        
+        return true;
+    }
+
+    // Check if a weapon is unlocked
+    isWeaponUnlocked(branch, weaponKey) {
+        const purchased = this.loadWeaponTreeUpgrades();
+        return !!(purchased[branch] && purchased[branch][weaponKey]);
+    }
+
+    // Get all unlocked weapons for weapon selection
+    getUnlockedWeapons() {
+        const tree = this.getWeaponTree();
+        const unlocked = [];
+        
+        Object.entries(tree).forEach(([branchKey, branch]) => {
+            Object.entries(branch.weapons).forEach(([weaponKey, weapon]) => {
+                if (this.isWeaponUnlocked(branchKey, weaponKey)) {
+                    unlocked.push(weapon.weaponId);
+                }
+            });
+        });
+        
+        return unlocked;
+    }
+
+    // Reset weapon tree progress to just basic weapons
+    resetWeaponTree() {
+        try {
+            // Clear all saved upgrades
+            localStorage.removeItem('weaponTreeUpgrades');
+            
+            // Reset weapon tree points to 0
+            this.player.weaponTreePoints = 0;
+            this.saveWeaponTreePoints(0);
+            
+            // Reset the player's weapon tree upgrades in memory
+            this.player.weaponTreeUpgrades = {};
+            
+            // Auto-unlock basic weapons again
+            const basicWeapons = ['sword', 'scythe', 'bow'];
+            const upgrades = {
+                unified: {}
+            };
+            
+            basicWeapons.forEach(weaponKey => {
+                upgrades.unified[weaponKey] = true;
+            });
+            
+            // Save the basic weapons as unlocked
+            this.saveWeaponTreeUpgrades(upgrades);
+            this.player.weaponTreeUpgrades = upgrades;
+            
+            console.log('Weapon tree progress reset successfully');
+            return true;
+        } catch (error) {
+            console.log('Failed to reset weapon tree progress:', error);
+            return false;
+        }
     }
 
     reset() {
