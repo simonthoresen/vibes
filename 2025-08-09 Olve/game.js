@@ -1826,6 +1826,11 @@ function gameLoop() {
 
 // Function to return to main menu
 function returnToMainMenu() {
+    // Save current points before returning to menu
+    if (gameState.player && gameState.player.weaponTreePoints !== undefined) {
+        gameState.saveWeaponTreePoints(gameState.player.weaponTreePoints);
+    }
+    
     gameLoopRunning = false;
     document.getElementById('pauseMenu').style.display = 'none';
     document.getElementById('gameOver').style.display = 'none';

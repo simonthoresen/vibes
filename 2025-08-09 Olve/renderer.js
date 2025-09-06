@@ -1336,6 +1336,52 @@ export class Renderer {
         }
     }
 
+    drawHUD(gameState) {
+        this.ctx.save();
+        
+        // Check if new weapons are available and show notification
+        const availableWeapons = this.checkAvailableWeapons(gameState);
+        if (availableWeapons > 0) {
+            // Draw notification for new weapons with flashing effect
+            const flashIntensity = Math.sin(Date.now() / 300) * 0.3 + 0.7; // Flash between 0.4 and 1.0
+            this.ctx.fillStyle = `rgba(255, 215, 0, ${flashIntensity})`; // Gold background with flash
+            this.ctx.fillRect(10, 10, 180, 30);
+            
+            this.ctx.fillStyle = '#000000'; // Black text
+            this.ctx.font = '14px Arial';
+            this.ctx.textAlign = 'left';
+            this.ctx.textBaseline = 'top';
+            this.ctx.fillText(`${availableWeapons} weapon${availableWeapons > 1 ? 's' : ''} available!`, 20, 20);
+        }
+        
+        this.ctx.restore();
+    }
+
+    checkAvailableWeapons(gameState) {
+        // Count weapons that can be purchased
+        if (!gameState.getWeaponTree || !gameState.getPurchasedWeapons) return 0;
+        
+        const weaponTree = gameState.getWeaponTree();
+        const purchased = gameState.getPurchasedWeapons();
+        let available = 0;
+        
+        Object.entries(weaponTree.unified.weapons).forEach(([weaponKey, weapon]) => {
+            const isPurchased = purchased.unified && purchased.unified[weaponKey];
+            const canAfford = gameState.player.weaponTreePoints >= weapon.cost;
+            
+            // Check if requirements are met
+            let requirementsMet = true;
+            if (weapon.requires && !isPurchased) {
+                requirementsMet = weapon.requires.every(req => purchased.unified && purchased.unified[req]);
+            }
+            
+            const canPurchase = canAfford && !isPurchased && requirementsMet && weapon.cost > 0;
+            if (canPurchase) available++;
+        });
+        
+        return available;
+    }
+
     drawTrapWeapon(weapon, count, playerCenterX, playerCenterY, player) {
         // Trap weapon deployment indicators removed - no visual indicators drawn
     }
@@ -1692,36 +1738,193 @@ export class Renderer {
         const rainDroplets = this.weaponSystem.rainState.rainDroplets;
         if (!rainDroplets || rainDroplets.length === 0) return;
 
+        const isThunderStorm = this.weaponSystem.rainState.thunderStormActive;
+        const isExtremeRain = this.weaponSystem.rainState.extremeRainActive;
+
         this.ctx.save();
 
         // Draw rain droplets
         rainDroplets.forEach(droplet => {
-            // Draw rain droplet as a blue line/streak
-            this.ctx.strokeStyle = '#87CEEB'; // Sky blue color
-            this.ctx.lineWidth = 2;
-            this.ctx.globalAlpha = 0.7;
+            const stormType = droplet.stormType;
+            
+            if (stormType === 'thunder') {
+                // Thunder storm droplets - electric blue with sparks and random variation
+                this.ctx.strokeStyle = '#1E90FF'; // Electric blue
+                this.ctx.lineWidth = 3;
+                this.ctx.globalAlpha = 0.95;
 
-            this.ctx.beginPath();
-            this.ctx.moveTo(droplet.x, droplet.y);
-            this.ctx.lineTo(droplet.x + 2, droplet.y + 15); // Small streak effect
-            this.ctx.stroke();
+                // Create jagged, organic line with connected random points
+                this.ctx.beginPath();
+                const segments = 6;
+                const segmentHeight = 30 / segments;
+                this.ctx.moveTo(droplet.x, droplet.y);
+                
+                for (let i = 1; i <= segments; i++) {
+                    const randomOffsetX = (Math.random() - 0.5) * 3; // Random horizontal variation
+                    const randomOffsetY = Math.random() * 2; // Slight vertical variation
+                    const x = droplet.x + 5 * (i / segments) + randomOffsetX;
+                    const y = droplet.y + (segmentHeight * i) + randomOffsetY;
+                    this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
 
-            // Add a small droplet at the bottom
-            this.ctx.fillStyle = '#00BFFF'; // Deep sky blue
-            this.ctx.globalAlpha = 0.8;
-            this.ctx.beginPath();
-            this.ctx.arc(droplet.x + 1, droplet.y + 15, 1.5, 0, Math.PI * 2);
-            this.ctx.fill();
+                // Electric droplet with stronger glow at final position
+                const finalX = droplet.x + 5 + (Math.random() - 0.5) * 2;
+                const finalY = droplet.y + 30;
+                this.ctx.fillStyle = '#00FFFF';
+                this.ctx.globalAlpha = 1.0;
+                this.ctx.shadowBlur = 12;
+                this.ctx.shadowColor = '#00FFFF';
+                this.ctx.beginPath();
+                this.ctx.arc(finalX, finalY, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+            } else if (stormType === 'extreme') {
+                // Extreme rain droplets - bigger, brighter with organic variation
+                this.ctx.strokeStyle = '#00BFFF'; // Bright blue
+                this.ctx.lineWidth = 3;
+                this.ctx.globalAlpha = 0.9;
+
+                // Create connected random path
+                this.ctx.beginPath();
+                const segments = 5;
+                const segmentHeight = 25 / segments;
+                this.ctx.moveTo(droplet.x, droplet.y);
+                
+                for (let i = 1; i <= segments; i++) {
+                    const randomOffsetX = (Math.random() - 0.5) * 2; // Random horizontal variation
+                    const randomOffsetY = Math.random() * 1.5; // Slight vertical variation
+                    const x = droplet.x + 4 * (i / segments) + randomOffsetX;
+                    const y = droplet.y + (segmentHeight * i) + randomOffsetY;
+                    this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // Bigger droplet at the bottom with random position variation
+                const finalX = droplet.x + 4 + (Math.random() - 0.5) * 1.5;
+                const finalY = droplet.y + 25;
+                this.ctx.fillStyle = '#00BFFF';
+                this.ctx.globalAlpha = 1.0;
+                this.ctx.shadowBlur = 8;
+                this.ctx.shadowColor = '#00BFFF';
+                this.ctx.beginPath();
+                this.ctx.arc(finalX, finalY, 2.5, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+            } else {
+                // Normal rain droplets with subtle organic variation
+                this.ctx.strokeStyle = '#87CEEB'; // Sky blue color
+                this.ctx.lineWidth = 2;
+                this.ctx.globalAlpha = 0.7;
+
+                // Create slightly wavy connected line
+                this.ctx.beginPath();
+                const segments = 3;
+                const segmentHeight = 15 / segments;
+                this.ctx.moveTo(droplet.x, droplet.y);
+                
+                for (let i = 1; i <= segments; i++) {
+                    const randomOffsetX = (Math.random() - 0.5) * 1; // Subtle horizontal variation
+                    const randomOffsetY = Math.random() * 0.5; // Very slight vertical variation
+                    const x = droplet.x + 2 * (i / segments) + randomOffsetX;
+                    const y = droplet.y + (segmentHeight * i) + randomOffsetY;
+                    this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // Add a small droplet at the bottom with slight position variation
+                const finalX = droplet.x + 2 + (Math.random() - 0.5) * 1;
+                const finalY = droplet.y + 15;
+                this.ctx.fillStyle = '#00BFFF'; // Deep sky blue
+                this.ctx.globalAlpha = 0.8;
+                this.ctx.beginPath();
+                this.ctx.arc(finalX, finalY, 1.5, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
         });
 
         this.ctx.restore();
 
+        // Draw thunder strikes
+        if (this.weaponSystem.rainState.thunderStrikes) {
+            this.drawThunderStrikes();
+        }
+
         // Add rain overlay effect for atmosphere
         if (rainDroplets.length > 0) {
             this.ctx.save();
-            this.ctx.fillStyle = 'rgba(135, 206, 235, 0.05)'; // Very light blue overlay
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            if (isThunderStorm) {
+                // Dark stormy overlay with electric flashes
+                const flashIntensity = Math.sin(Date.now() / 150) * 0.15 + 0.25; // More dramatic flashing
+                this.ctx.fillStyle = `rgba(25, 25, 112, ${flashIntensity})`; // Midnight blue with flash
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            } else if (isExtremeRain) {
+                // Intense storm overlay during extreme rain
+                const flashIntensity = Math.sin(Date.now() / 100) * 0.1 + 0.15; // Flashing effect
+                this.ctx.fillStyle = `rgba(70, 130, 180, ${flashIntensity})`; // Darker blue with flash
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            } else {
+                // Normal rain overlay
+                this.ctx.fillStyle = 'rgba(135, 206, 235, 0.05)'; // Very light blue overlay
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+            
             this.ctx.restore();
         }
+    }
+
+    drawThunderStrikes() {
+        if (!this.weaponSystem.rainState.thunderStrikes) return;
+
+        this.ctx.save();
+
+        this.weaponSystem.rainState.thunderStrikes.forEach(strike => {
+            const age = Date.now() - strike.createdAt;
+            const progress = Math.min(age / strike.duration, 1); // Clamp progress to max 1
+            const alpha = Math.max(0, 1 - progress); // Ensure alpha never goes negative
+
+            // Only draw if still visible
+            if (alpha > 0) {
+                // Draw lightning bolt from top of screen to target
+                this.ctx.strokeStyle = '#FFFF00'; // Bright yellow
+                this.ctx.lineWidth = 4;
+                this.ctx.globalAlpha = alpha;
+                this.ctx.shadowBlur = 15;
+                this.ctx.shadowColor = '#FFFF00';
+
+                // Create zigzag lightning pattern
+                this.ctx.beginPath();
+                const startY = 0;
+                const endY = strike.y;
+                const segments = 8;
+                const segmentHeight = endY / segments;
+                
+                this.ctx.moveTo(strike.x, startY);
+                
+                for (let i = 1; i <= segments; i++) {
+                    const y = startY + (segmentHeight * i);
+                    const offset = (Math.random() - 0.5) * 30; // Random zigzag
+                    const x = strike.x + offset;
+                    this.ctx.lineTo(x, y);
+                }
+                
+                this.ctx.stroke();
+
+                // Add impact flash at target location
+                const radius = Math.max(1, 15 * alpha); // Ensure radius is never negative or zero
+                this.ctx.fillStyle = '#FFFFFF';
+                this.ctx.globalAlpha = alpha * 0.8;
+                this.ctx.shadowBlur = 20;
+                this.ctx.shadowColor = '#FFFF00';
+                this.ctx.beginPath();
+                this.ctx.arc(strike.x, strike.y, radius, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+
+            this.ctx.shadowBlur = 0;
+        });
+
+        this.ctx.restore();
     }
 }

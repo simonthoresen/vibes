@@ -1248,24 +1248,113 @@ export class WeaponSystem {
         if (!this.rainState) {
             this.rainState = {
                 lastRainTick: 0,
-                rainDroplets: []
+                rainDroplets: [],
+                extremeRainActive: false,
+                extremeRainStart: 0,
+                extremeRainDuration: 3000, // 3 seconds
+                lastExtremeRainCheck: 0,
+                extremeRainCooldown: 15000, // 15 seconds between possible extreme rain
+                thunderStormActive: false,
+                thunderStormStart: 0,
+                thunderStormDuration: 60000, // 60 seconds
+                lastThunderStormCheck: 0,
+                thunderStormCooldown: 120000, // 2 minutes between possible thunder storms
+                lastThunderStrike: 0,
+                thunderStrikeCooldown: 1000 // 1 second between thunder strikes
             };
         }
 
-        const rainInterval = 200; // Rain drops every 200ms
+        // Check for thunder storms (less frequent, longer duration)
+        if (now - this.rainState.lastThunderStormCheck >= 5000) { // Check every 5 seconds
+            this.rainState.lastThunderStormCheck = now;
+            
+            // 5% chance every 5 seconds to trigger thunder storm (if not on cooldown)
+            if (!this.rainState.thunderStormActive && !this.rainState.extremeRainActive &&
+                now - (this.rainState.thunderStormStart + this.rainState.thunderStormDuration) >= this.rainState.thunderStormCooldown) {
+                
+                if (Math.random() < 0.05) {
+                    this.rainState.thunderStormActive = true;
+                    this.rainState.thunderStormStart = now;
+                    console.log("THUNDER STORM ACTIVATED!");
+                }
+            }
+        }
+
+        // Check for extreme rain bursts (only if no thunder storm)
+        if (!this.rainState.thunderStormActive && now - this.rainState.lastExtremeRainCheck >= 1000) { // Check every second
+            this.rainState.lastExtremeRainCheck = now;
+            
+            // 8% chance per second to trigger extreme rain (if not on cooldown)
+            if (!this.rainState.extremeRainActive && 
+                now - (this.rainState.extremeRainStart + this.rainState.extremeRainDuration) >= this.rainState.extremeRainCooldown) {
+                
+                if (Math.random() < 0.08) {
+                    this.rainState.extremeRainActive = true;
+                    this.rainState.extremeRainStart = now;
+                    console.log("EXTREME RAIN BURST ACTIVATED!");
+                }
+            }
+        }
+
+        // Check if thunder storm should end
+        if (this.rainState.thunderStormActive && 
+            now - this.rainState.thunderStormStart >= this.rainState.thunderStormDuration) {
+            this.rainState.thunderStormActive = false;
+            console.log("Thunder storm ended");
+        }
+
+        // Check if extreme rain should end
+        if (this.rainState.extremeRainActive && 
+            now - this.rainState.extremeRainStart >= this.rainState.extremeRainDuration) {
+            this.rainState.extremeRainActive = false;
+            console.log("Extreme rain burst ended");
+        }
+
+        // Process thunder strikes during thunder storm
+        if (this.rainState.thunderStormActive && 
+            now - this.rainState.lastThunderStrike >= this.rainState.thunderStrikeCooldown) {
+            this.processThunderStrike(now);
+            this.rainState.lastThunderStrike = now;
+        }
+
+        // Determine rain intensity based on storm type
+        const isThunderStorm = this.rainState.thunderStormActive;
+        const isExtremeRain = this.rainState.extremeRainActive && !isThunderStorm;
+        
+        let rainInterval, dropletsPerTick, speedMultiplier, damageMultiplier;
+        
+        if (isThunderStorm) {
+            // Thunder storm: 1.5x more rain than extreme rain
+            rainInterval = 35; // Even faster than extreme rain
+            dropletsPerTick = 67; // 1.5x the extreme rain amount (45 * 1.5)
+            speedMultiplier = 1.3;
+            damageMultiplier = 1.5;
+        } else if (isExtremeRain) {
+            // Extreme rain burst
+            rainInterval = 50;
+            dropletsPerTick = 45;
+            speedMultiplier = 1.2;
+            damageMultiplier = 1.5;
+        } else {
+            // Normal rain
+            rainInterval = 200;
+            dropletsPerTick = 15;
+            speedMultiplier = 1.0;
+            damageMultiplier = 1.0;
+        }
         
         // Create new rain droplets
         if (now - this.rainState.lastRainTick >= rainInterval) {
             // Create multiple rain droplets across the screen
-            const dropletsPerTick = 15;
             for (let i = 0; i < dropletsPerTick; i++) {
                 const droplet = {
                     x: Math.random() * (CANVAS_WIDTH + 200) - 100, // Slightly wider than screen
                     y: -50, // Start above screen
-                    speed: 300 + Math.random() * 200, // Fall speed
-                    damage: 0.1, // 10% max health damage
+                    speed: (300 + Math.random() * 200) * speedMultiplier,
+                    damage: 0.1 * damageMultiplier,
                     createdAt: now,
-                    hitEnemies: new Set() // Track which enemies this droplet has hit
+                    hitEnemies: new Set(), // Track which enemies this droplet has hit
+                    stormType: isThunderStorm ? 'thunder' : (isExtremeRain ? 'extreme' : 'normal')
                 };
                 this.rainState.rainDroplets.push(droplet);
             }
@@ -1318,5 +1407,97 @@ export class WeaponSystem {
 
             return true;
         });
+    }
+
+    processThunderStrike(now) {
+        // Create list of all possible targets (enemies + player if they have 20+ umbrellas)
+        const possibleTargets = [...this.gameState.enemies];
+        
+        // Players with 20+ umbrellas can be hit by thunder (only source of damage for them)
+        const umbrellaWeapons = this.gameState.player.weapons.filter(weapon => weapon.id === 'UMBRELLA');
+        if (umbrellaWeapons.length >= 20) {
+            possibleTargets.push({
+                isPlayer: true,
+                x: this.gameState.player.x,
+                y: this.gameState.player.y,
+                width: this.gameState.player.width,
+                height: this.gameState.player.height
+            });
+        }
+
+        if (possibleTargets.length === 0) return;
+
+        // Select random target
+        const target = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+        
+        // For player targets, add 30% hit chance
+        if (target.isPlayer && Math.random() > 0.3) {
+            console.log("Thunder strike missed the player (70% chance to miss)");
+            return; // Thunder strike misses the player
+        }
+        
+        const targetCenterX = target.x + target.width / 2;
+        const targetCenterY = target.y + target.height / 2;
+
+        // Create thunder strike effect
+        if (!this.rainState.thunderStrikes) {
+            this.rainState.thunderStrikes = [];
+        }
+
+        const thunderStrike = {
+            x: targetCenterX,
+            y: targetCenterY,
+            createdAt: now,
+            duration: 500, // Thunder visual lasts 0.5 seconds
+            target: target
+        };
+
+        this.rainState.thunderStrikes.push(thunderStrike);
+
+        // Apply damage
+        if (target.isPlayer) {
+            // Thunder damage CANNOT be dodged - bypasses all umbrella dodge mechanics
+            // This is the only way players with 20+ umbrellas can take damage
+            const oldHealth = this.gameState.player.health;
+            this.gameState.player.health = Math.max(0, this.gameState.player.health - 25);
+            
+            console.log(`Thunder struck player for 25 damage! Health: ${oldHealth} -> ${this.gameState.player.health} (UNDODGEABLE)`);
+            
+            // Set brief invulnerability frames to prevent multiple hits in the same frame
+            this.gameState.player.invulnerable = true;
+            this.gameState.player.lastHit = Date.now();
+            
+            // Remove invulnerability after a short period
+            setTimeout(() => {
+                if (this.gameState.player.invulnerable) {
+                    this.gameState.player.invulnerable = false;
+                }
+            }, 100); // Very short invulnerability, just to prevent frame-perfect double hits
+            
+            if (this.gameState.player.health <= 0) {
+                // Player death will be handled by the main game loop
+                console.log("Player killed by thunder strike!");
+            }
+        } else {
+            // Damage enemy
+            target.health -= 25;
+            if (target.health <= 0) {
+                target.markedForDeath = true;
+            }
+        }
+
+        // Create visual effect
+        if (this.particleEngine) {
+            this.particleEngine.createEnemyHitEffect(
+                targetCenterX,
+                targetCenterY,
+                '#FFFF00' // Yellow for thunder effect
+            );
+        }
+
+        // Clean up old thunder strikes
+        this.rainState.thunderStrikes = this.rainState.thunderStrikes.filter(
+            strike => now - strike.createdAt < strike.duration
+        );
     }
 }

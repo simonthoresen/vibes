@@ -81,6 +81,9 @@ export class GameLoop {
 
         // Render umbrella rain effect
         this.renderer.drawUmbrellaRain();
+        
+        // Render HUD (points, floor, etc.)
+        this.renderer.drawHUD(this.gameState);
     }
 
     handleFloorProgression() {

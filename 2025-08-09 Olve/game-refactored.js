@@ -53,6 +53,15 @@ class DungeonCrawlerGame {
         // Connect particle engine to systems that need it
         this.enemySystem.setParticleEngine(this.particleEngine);
         
+        // Set up points change callback to refresh weapon tree
+        this.gameState.onPointsChanged(() => {
+            if (this.menuManager) {
+                this.menuManager.refreshWeaponTree();
+                // Also update connection line colors
+                this.menuManager.updateConnectionLineColors();
+            }
+        });
+        
         // Connect playerController to enemySystem for umbrella dodge functionality
         this.enemySystem.setPlayerController(this.playerController);
         
@@ -480,6 +489,11 @@ class DungeonCrawlerGame {
     }
 
     quitToMenuImmediate() {
+        // Save current points before quitting
+        if (this.gameState.player && this.gameState.player.weaponTreePoints !== undefined) {
+            this.gameState.saveWeaponTreePoints(this.gameState.player.weaponTreePoints);
+        }
+        
         // Immediate quit from pause menu (no transition like the original)
         this.gameLoop.stop();
         this.hidePauseMenu();
@@ -495,6 +509,9 @@ class DungeonCrawlerGame {
         this.gameState.isPaused = false;
         this.gameState.gameStarted = false;
         this.gameState.gameCompleted = false;
+        
+        // Trigger points changed to update any UI that might be showing
+        this.gameState.triggerPointsChanged();
     }
 
     pushEnemiesAwayFromPlayer() {

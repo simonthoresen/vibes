@@ -15,6 +15,9 @@ export class GameState {
         this.timeScale = 1;
         this.storageAvailable = false; // Track if storage is working
         
+        // Callback system for when points change
+        this.onPointsChangedCallbacks = [];
+        
         this.player = this.createPlayer();
         this.enemies = [];
         this.projectiles = [];
@@ -191,6 +194,28 @@ export class GameState {
         };
     }
 
+    // Method to register callbacks for when points change
+    onPointsChanged(callback) {
+        if (!this.onPointsChangedCallbacks) {
+            this.onPointsChangedCallbacks = [];
+        }
+        this.onPointsChangedCallbacks.push(callback);
+    }
+
+    // Method to trigger all point change callbacks
+    triggerPointsChanged() {
+        if (!this.onPointsChangedCallbacks) {
+            return;
+        }
+        this.onPointsChangedCallbacks.forEach(callback => {
+            try {
+                callback(this.player.weaponTreePoints);
+            } catch (error) {
+                console.error('Error in points changed callback:', error);
+            }
+        });
+    }
+
     createOpenWorldState() {
         return {
             time: 0,
@@ -243,6 +268,9 @@ export class GameState {
     addWeaponTreePoints(floors) {
         this.player.weaponTreePoints += floors;
         this.saveWeaponTreePoints(this.player.weaponTreePoints);
+        
+        // Trigger callbacks to notify about points change
+        this.triggerPointsChanged();
     }
 
     // Get weapon tree structure - One big interconnected tree
@@ -254,12 +282,12 @@ export class GameState {
                 color: '#FFD700', // Gold color for the unified tree
                 unlocked: true,
                 weapons: {
-                    // Starting weapons (Row 0) - Free basic weapons
+                    // ROW 0: Starting weapons (Free)
                     sword: { 
                         name: 'Sword', 
                         weaponId: 'SWORD',
                         cost: 0,
-                        position: { row: 0, col: 3 } 
+                        position: { row: 0, col: 1 } 
                     },
                     scythe: { 
                         name: 'Scythe', 
@@ -271,180 +299,166 @@ export class GameState {
                         name: 'Bow', 
                         weaponId: 'BOW',
                         cost: 0,
-                        position: { row: 0, col: 5 } 
+                        position: { row: 0, col: 7 } 
                     },
 
-                    // First tier (Row 1)
+                    // ROW 1: First tier upgrades
                     dragonSword: { 
                         name: 'Dragon Sword', 
                         weaponId: 'DRAGON_SWORD',
                         cost: 15, 
                         requires: ['sword'],
-                        position: { row: 1, col: 3 } 
+                        position: { row: 1, col: 1 } 
                     },
-
-                    // Second tier (Row 2)
+                    dragonScythe: { 
+                        name: 'Dragon Scythe', 
+                        weaponId: 'DRAGON_SCYTHE',
+                        cost: 50, 
+                        requires: ['scythe'],
+                        position: { row: 1, col: 4 } 
+                    },
                     dragonBow: { 
                         name: 'Dragon Bow', 
                         weaponId: 'DRAGON_BOW',
                         cost: 20, 
-                        requires: ['dragonSword'],
-                        position: { row: 2, col: 4 } 
+                        requires: ['bow'],
+                        position: { row: 1, col: 7 } 
                     },
 
-                    // Third tier (Row 3)
+                    // ROW 2: Second tier (requires first tier)
                     fireStaff: { 
                         name: 'Fire Staff', 
                         weaponId: 'FIRE_STAFF',
                         cost: 25, 
                         requires: ['dragonBow'],
-                        position: { row: 3, col: 4 } 
+                        position: { row: 2, col: 8 } 
                     },
 
-                    // Fourth tier (Row 4) - Staff branches
+                    // ROW 3: Third tier (staff branches)
                     healingStaff: { 
                         name: 'Healing Staff', 
                         weaponId: 'HEALING_STAFF',
                         cost: 18, 
                         requires: ['fireStaff'],
-                        position: { row: 4, col: 3 } 
+                        position: { row: 3, col: 6 } 
                     },
                     iceStaff: { 
                         name: 'Ice Staff', 
                         weaponId: 'ICE_STAFF',
                         cost: 20, 
                         requires: ['fireStaff'],
-                        position: { row: 4, col: 4 } 
+                        position: { row: 3, col: 8 } 
                     },
                     lightningStaff: { 
                         name: 'Lightning Staff', 
                         weaponId: 'LIGHTNING_STAFF',
                         cost: 22, 
                         requires: ['fireStaff'],
-                        position: { row: 4, col: 5 } 
+                        position: { row: 3, col: 9 } 
                     },
 
-                    // Boomerang branch (Row 2-3)
-                    boomerang: { 
-                        name: 'Boomerang', 
-                        weaponId: 'BOOMERANG',
-                        cost: 30, 
-                        requires: ['dragonBow', 'dragonSword'],
-                        position: { row: 2, col: 3 } 
-                    },
-
-                    // Throwing weapons (Row 3-4)
-                    throwingAxe: { 
-                        name: 'Throwing Axe', 
-                        weaponId: 'THROWING_AXE',
-                        cost: 12, 
-                        requires: ['boomerang'],
-                        position: { row: 3, col: 3 } 
-                    },
-
-                    // Scythe progression (Row 5-6)
+                    // ROW 4: Cross-branch combinations
                     natureScythe: { 
                         name: 'Nature Scythe', 
                         weaponId: 'NATURE_SCYTHE',
                         cost: 25, 
-                        requires: ['healingStaff', 'boomerang'],
-                        position: { row: 5, col: 4 } 
+                        requires: ['dragonScythe', 'healingStaff'],
+                        position: { row: 4, col: 4 } 
+                    },
+                    boomerang: { 
+                        name: 'Boomerang', 
+                        weaponId: 'BOOMERANG',
+                        cost: 30, 
+                        requires: ['dragonBow'],
+                        position: { row: 4, col: 7 } 
                     },
 
-                    // Spirit blade (Row 4)
+                    // ROW 5: Advanced combinations requiring cross-branch
+                    throwingAxe: { 
+                        name: 'Throwing Axe', 
+                        weaponId: 'THROWING_AXE',
+                        cost: 12, 
+                        requires: ['dragonSword', 'boomerang'],
+                        position: { row: 5, col: 0 } 
+                    },
+                    
                     spiritBlade: { 
                         name: 'Spirit Blade', 
                         weaponId: 'SPIRIT_BLADE',
                         cost: 35, 
-                        requires: ['boomerang', 'throwingAxe', 'fireStaff'],
-                        position: { row: 4, col: 2 } 
+                        requires: ['dragonSword', 'throwingAxe'],
+                        position: { row: 5, col: 2 } 
                     },
 
-                    // Crystal scythe (Row 6)
-                    crystalScythe: { 
-                        name: 'Crystal Scythe', 
-                        weaponId: 'CRYSTAL_SCYTHE',
-                        cost: 40, 
-                        requires: ['natureScythe', 'spiritBlade'],
-                        position: { row: 6, col: 3 } 
-                    },
-
-                    // Dragon scythe (Row 7)
-                    dragonScythe: { 
-                        name: 'Dragon Scythe', 
-                        weaponId: 'DRAGON_SCYTHE',
-                        cost: 50, 
-                        requires: ['natureScythe', 'crystalScythe'],
-                        position: { row: 7, col: 4 } 
-                    },
-
-                    // Flaming skull (Row 8)
-                    flamingSkull: { 
-                        name: 'Flaming Skull', 
-                        weaponId: 'FLAMING_SKULL',
-                        cost: 60, 
-                        requires: ['dragonScythe', 'lightningStaff'],
-                        position: { row: 8, col: 4 } 
-                    },
-
-                    // Chakram (Row 5)
+                    // ROW 6: Higher tier combinations
                     chakram: { 
                         name: 'Chakram', 
                         weaponId: 'CHAKRAM',
                         cost: 45, 
-                        requires: ['throwingAxe', 'flamingSkull'],
-                        position: { row: 5, col: 2 } 
+                        requires: ['throwingAxe', 'spiritBlade'],
+                        position: { row: 6, col: 1 } 
                     },
-
-                    // Cursed orb (Row 6)
-                    cursedOrb: { 
-                        name: 'Cursed Orb', 
-                        weaponId: 'CURSED_ORB',
-                        cost: 80, 
-                        requires: ['chakram', 'flamingSkull', 'iceStaff'],
+                    crystalScythe: { 
+                        name: 'Crystal Scythe', 
+                        weaponId: 'CRYSTAL_SCYTHE',
+                        cost: 40, 
+                        requires: ['natureScythe', 'dragonScythe', 'spiritBlade'],
                         position: { row: 6, col: 4 } 
                     },
-
-                    // Trap weapons (Row 5-7)
                     spikeTrap: { 
                         name: 'Spike Trap', 
                         weaponId: 'SPIKE_TRAP',
                         cost: 35, 
-                        requires: ['dragonSword', 'crystalScythe'],
-                        position: { row: 5, col: 3 } 
+                        requires: ['spiritBlade', 'healingStaff'],
+                        position: { row: 6, col: 6 } 
                     },
 
+                    // ROW 7: Elite weapons
+                    flamingSkull: { 
+                        name: 'Flaming Skull', 
+                        weaponId: 'FLAMING_SKULL',
+                        cost: 60, 
+                        requires: ['crystalScythe', 'lightningStaff'],
+                        position: { row: 7, col: 5 } 
+                    },
                     explosiveMine: { 
                         name: 'Explosive Mine', 
                         weaponId: 'EXPLOSIVE_MINE',
                         cost: 40, 
-                        requires: ['spikeTrap', 'fireStaff'],
-                        position: { row: 6, col: 5 } 
+                        requires: ['spikeTrap'],
+                        position: { row: 7, col: 6 } 
                     },
-
                     webLauncher: { 
                         name: 'Web Launcher', 
                         weaponId: 'WEB_LAUNCHER',
                         cost: 45, 
                         requires: ['spikeTrap', 'chakram'],
-                        position: { row: 6, col: 2 } 
+                        position: { row: 7, col: 2 } 
                     },
 
+                    // ROW 8: Master tier
+                    cursedOrb: { 
+                        name: 'Cursed Orb', 
+                        weaponId: 'CURSED_ORB',
+                        cost: 80, 
+                        requires: ['flamingSkull', 'iceStaff'],
+                        position: { row: 8, col: 5 } 
+                    },
                     poisonCloud: { 
                         name: 'Poison Cloud', 
                         weaponId: 'POISON_CLOUD',
                         cost: 55, 
                         requires: ['webLauncher', 'explosiveMine'],
-                        position: { row: 7, col: 3 } 
+                        position: { row: 8, col: 3 } 
                     },
 
-                    // Ultimate weapon (Row 9)
+                    // ROW 10: Ultimate weapon
                     umbrella: { 
                         name: 'The Umbrella', 
                         weaponId: 'UMBRELLA',
                         cost: 100, 
                         requires: ['poisonCloud', 'flamingSkull', 'cursedOrb', 'chakram'],
-                        position: { row: 9, col: 4 } 
+                        position: { row: 10, col: 4 } 
                     }
                 }
             }
@@ -480,6 +494,9 @@ export class GameState {
         if (!purchased[branch]) purchased[branch] = {};
         purchased[branch][weaponKey] = true;
         this.saveWeaponTreeUpgrades(purchased);
+        
+        // Trigger callbacks to notify about points change AFTER everything is saved
+        this.triggerPointsChanged();
         
         return true;
     }

@@ -384,7 +384,10 @@ export class MenuManager {
         }
         
         this.showElement('weaponTreeMenu');
+        
+        // Always refresh the weapon tree display when showing it
         this.updatePointsDisplay();
+        this.updateWeaponNodeStates();
     }
 
     createWeaponTreeMenu() {
@@ -405,12 +408,13 @@ export class MenuManager {
         `;
 
         const content = this.createMenuContent();
-        content.style.height = '80vh';
-        content.style.overflow = 'visible';
+        content.style.height = '90vh';
+        content.style.overflow = 'auto';
         content.style.display = 'flex';
         content.style.flexDirection = 'column';
         content.style.alignItems = 'center';
-        content.style.justifyContent = 'center';
+        content.style.justifyContent = 'flex-start';
+        content.style.padding = '20px';
         const title = this.createTitle('Weapon Tree');
         
         // Add points display in top left corner
@@ -436,13 +440,15 @@ export class MenuManager {
             display: flex;
             flex-direction: column;
             gap: 20px;
-            height: 60vh;
-            width: 80vw;
-            max-width: 800px;
-            overflow: auto;
+            height: auto;
+            min-height: 80vh;
+            width: 95vw;
+            max-width: 1600px;
+            overflow-x: hidden;
+            overflow-y: auto;
             background: rgba(0, 0, 0, 0.8);
-            padding: 20px;
-            border-radius: 10px;
+            padding: 40px;
+            border-radius: 20px;
             border: 2px solid #444;
             justify-content: flex-start;
             align-items: center;
@@ -484,15 +490,16 @@ export class MenuManager {
             text-shadow: 2px 2px 0px #000;
         `;
 
-        // Create more compact grid for the unified tree (10 rows x 9 columns)
+        // Create very spacious grid for the unified tree (12 rows x 10 columns)
         const weaponsGrid = document.createElement('div');
         weaponsGrid.style.cssText = `
             display: grid;
-            grid-template-columns: repeat(9, 60px);
-            grid-template-rows: repeat(10, 60px);
-            gap: 8px;
+            grid-template-columns: repeat(10, 110px);
+            grid-template-rows: repeat(12, 110px);
+            gap: 25px;
             position: relative;
             justify-content: center;
+            padding: 20px;
         `;
 
         // Create connection lines container
@@ -538,27 +545,36 @@ export class MenuManager {
             canPurchase = canPurchase && weapon.requires.every(req => purchasedWeapons[req]);
         }
 
-        // Auto-unlock free weapons
-        if (weapon.cost === 0 && !isPurchased) {
-            this.gameState.purchaseWeapon(branchKey, weaponKey);
-            isPurchased = true;
-            canPurchase = false;
+        // Auto-unlock free weapons ONLY (cost must be exactly 0)
+        if (weapon.cost === 0 && !isPurchased && typeof weapon.cost === 'number') {
+            console.log(`Auto-unlocking free weapon: ${weapon.name} (${weaponKey}) with cost: ${weapon.cost}`);
+            // Additional safety check to prevent any possibility of auto-unlocking paid weapons
+            if (weapon.cost !== 0 || weapon.cost > 0) {
+                console.error(`ERROR: Prevented auto-unlock of non-free weapon ${weapon.name} with cost ${weapon.cost}`);
+            } else {
+                this.gameState.purchaseWeapon(branchKey, weaponKey);
+                isPurchased = true;
+                canPurchase = false;
+            }
         }
 
         const nodeDiv = document.createElement('div');
+        nodeDiv.className = 'weapon-node'; // Add class for easier selection
+        nodeDiv.dataset.weaponId = weaponKey; // Store weapon ID for updates
         nodeDiv.style.cssText = `
-            width: 60px;
-            height: 60px;
-            border: 2px solid ${isPurchased ? '#0f0' : canPurchase ? branchColor : '#666'};
-            border-radius: 8px;
-            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? `rgba(255, 255, 255, 0.1)` : 'rgba(60, 60, 60, 0.5)'};
+            width: 100px;
+            height: 100px;
+            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? branchColor : '#666'};
+            border-radius: 15px;
+            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? `rgba(255, 255, 255, 0.15)` : 'rgba(60, 60, 60, 0.5)'};
             cursor: ${canPurchase ? 'pointer' : 'default'};
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: all 0.2s;
+            transition: all 0.3s;
             position: relative;
+            box-shadow: ${isPurchased ? '0 0 15px rgba(0, 255, 0, 0.5)' : canPurchase ? '0 0 10px rgba(255, 215, 0, 0.3)' : 'none'};
         `;
 
         const title = document.createElement('div');
@@ -566,27 +582,55 @@ export class MenuManager {
         title.style.cssText = `
             color: ${isPurchased ? '#0f0' : '#fff'};
             font-weight: bold;
-            font-size: 8px;
+            font-size: 12px;
             text-align: center;
-            margin-bottom: 2px;
-            text-shadow: 1px 1px 0px #000;
-            line-height: 1;
+            margin-bottom: 4px;
+            text-shadow: 2px 2px 0px #000;
+            line-height: 1.1;
+            max-width: 90px;
+            word-wrap: break-word;
         `;
 
         const cost = document.createElement('div');
         if (weapon.cost > 0) {
             cost.textContent = `${weapon.cost}pts`;
             cost.style.cssText = `
-                color: ${canAfford || isPurchased ? '#ccc' : '#f44'};
-                font-size: 8px;
+                color: ${canAfford || isPurchased ? '#ffd700' : '#f44'};
+                font-size: 11px;
                 text-align: center;
                 text-shadow: 1px 1px 0px #000;
+                font-weight: bold;
+                margin-top: 3px;
             `;
         }
 
         nodeDiv.appendChild(title);
         if (weapon.cost > 0) {
             nodeDiv.appendChild(cost);
+        }
+
+        // Add requirement indicators
+        if (weapon.requires && weapon.requires.length > 0) {
+            const reqIndicator = document.createElement('div');
+            reqIndicator.style.cssText = `
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                width: 20px;
+                height: 20px;
+                background: #ff6b35;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: bold;
+                color: white;
+                text-shadow: 1px 1px 0px #000;
+            `;
+            reqIndicator.textContent = weapon.requires.length;
+            reqIndicator.title = `Requires: ${weapon.requires.join(', ')}`;
+            nodeDiv.appendChild(reqIndicator);
         }
 
         if (canPurchase) {
@@ -597,13 +641,15 @@ export class MenuManager {
             });
 
             nodeDiv.addEventListener('mouseenter', () => {
-                nodeDiv.style.background = 'rgba(255, 255, 255, 0.3)';
-                nodeDiv.style.transform = 'scale(1.05)';
+                nodeDiv.style.background = 'rgba(255, 255, 255, 0.25)';
+                nodeDiv.style.transform = 'scale(1.1)';
+                nodeDiv.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.6)';
             });
 
             nodeDiv.addEventListener('mouseleave', () => {
-                nodeDiv.style.background = 'rgba(255, 255, 255, 0.1)';
+                nodeDiv.style.background = 'rgba(255, 255, 255, 0.15)';
                 nodeDiv.style.transform = 'scale(1)';
+                nodeDiv.style.boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
             });
         }
 
@@ -626,21 +672,39 @@ export class MenuManager {
                 weapon.requires.forEach(reqKey => {
                     const reqWeapon = weapons[reqKey];
                     if (reqWeapon) {
-                        // Calculate line positions (68px = 60px width + 8px gap)
-                        const fromX = (reqWeapon.position.col * 68) + 30;
-                        const fromY = (reqWeapon.position.row * 68) + 30;
-                        const toX = (weapon.position.col * 68) + 30;
-                        const toY = (weapon.position.row * 68) + 30;
+                        // Calculate line positions with new spacing (135px = 110px width + 25px gap)
+                        const fromX = (reqWeapon.position.col * 135) + 55 + 20; // +20 for padding
+                        const fromY = (reqWeapon.position.row * 135) + 55 + 20;
+                        const toX = (weapon.position.col * 135) + 55 + 20;
+                        const toY = (weapon.position.row * 135) + 55 + 20;
 
-                        // Create line
+                        // Determine line color based on weapon status
+                        const isPurchased = !!purchasedWeapons[weaponKey];
+                        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+                        const canPurchase = canAfford && !isPurchased && weapon.cost > 0;
+                        let requirementsMet = true;
+                        if (weapon.requires && !isPurchased) {
+                            requirementsMet = weapon.requires.every(req => purchasedWeapons[req]);
+                        }
+
+                        let lineColor;
+                        if (isPurchased) {
+                            lineColor = '#00ff00'; // Green - player owns this weapon
+                        } else if (canPurchase && requirementsMet) {
+                            lineColor = '#ffff00'; // Yellow - player can afford and unlock
+                        } else {
+                            lineColor = '#ff4444'; // Red - cannot afford or missing requirements
+                        }
+
+                        // Create line with dynamic color
                         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                         line.setAttribute('x1', fromX);
                         line.setAttribute('y1', fromY);
                         line.setAttribute('x2', toX);
                         line.setAttribute('y2', toY);
-                        line.setAttribute('stroke', purchasedWeapons[reqKey] ? branchColor : '#444');
+                        line.setAttribute('stroke', lineColor);
                         line.setAttribute('stroke-width', '2');
-                        line.setAttribute('opacity', purchasedWeapons[reqKey] ? '0.8' : '0.3');
+                        line.setAttribute('opacity', '0.7');
 
                         svg.appendChild(line);
                     }
@@ -793,6 +857,125 @@ export class MenuManager {
             const pointsText = display.querySelector('div');
             if (pointsText) {
                 pointsText.textContent = `Points: ${this.gameState.player.weaponTreePoints}`;
+            }
+        });
+    }
+
+    updateWeaponNodeStates() {
+        const weaponNodes = document.querySelectorAll('.weapon-node');
+        const purchased = this.gameState.getPurchasedWeapons();
+        const weaponTree = this.gameState.getWeaponTree();
+        
+        weaponNodes.forEach(node => {
+            const weaponId = node.dataset.weaponId;
+            if (!weaponId || !weaponTree.unified.weapons[weaponId]) return;
+            
+            const weapon = weaponTree.unified.weapons[weaponId];
+            const isPurchased = purchased.unified && purchased.unified[weaponId];
+            const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+            
+            // Debug logging for Dragon Sword specifically
+            if (weaponId === 'dragonSword') {
+                console.log(`Dragon Sword update - isPurchased: ${isPurchased}, canAfford: ${canAfford}, cost: ${weapon.cost}, points: ${this.gameState.player.weaponTreePoints}`);
+            }
+            
+            // Check if requirements are met
+            let requirementsMet = true;
+            if (weapon.requires && !isPurchased) {
+                requirementsMet = weapon.requires.every(req => purchased.unified && purchased.unified[req]);
+            }
+            
+            const canPurchase = canAfford && !isPurchased && requirementsMet && weapon.cost > 0;
+            
+            // Update node appearance based on current state
+            if (isPurchased) {
+                node.style.backgroundColor = 'rgba(0, 150, 0, 0.4)'; // Green for purchased
+                node.style.border = '3px solid #0f0';
+                node.style.cursor = 'default';
+                node.style.boxShadow = '0 0 15px rgba(0, 255, 0, 0.5)';
+            } else if (canPurchase) {
+                node.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'; // Light for purchasable
+                node.style.border = '3px solid #FFD700';
+                node.style.cursor = 'pointer';
+                node.style.boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
+            } else if (!requirementsMet) {
+                node.style.backgroundColor = 'rgba(60, 60, 60, 0.5)'; // Dark for locked
+                node.style.border = '3px solid #666';
+                node.style.cursor = 'default';
+                node.style.boxShadow = 'none';
+            } else if (!canAfford) {
+                node.style.backgroundColor = 'rgba(60, 60, 60, 0.5)'; // Dark for unaffordable
+                node.style.border = '3px solid #666';
+                node.style.cursor = 'default';
+                node.style.boxShadow = 'none';
+            }
+            
+            // Update cost text color
+            const costElement = node.querySelector('div:last-child');
+            if (costElement && weapon.cost > 0) {
+                costElement.style.color = (canAfford || isPurchased) ? '#ffd700' : '#f44';
+                costElement.style.fontWeight = 'bold';
+            }
+        });
+        
+        // Update connection line colors
+        this.updateConnectionLineColors();
+    }
+
+    updateConnectionLineColors() {
+        const svg = document.querySelector('svg');
+        if (!svg) return;
+        
+        const purchased = this.gameState.getPurchasedWeapons();
+        const weaponTree = this.gameState.getWeaponTree();
+        const weapons = weaponTree.unified.weapons;
+        
+        // Clear existing lines
+        svg.innerHTML = '';
+        
+        // Recreate lines with updated colors
+        Object.entries(weapons).forEach(([weaponKey, weapon]) => {
+            if (weapon.requires) {
+                weapon.requires.forEach(reqKey => {
+                    const reqWeapon = weapons[reqKey];
+                    if (reqWeapon) {
+                        // Calculate line positions with new spacing (135px = 110px width + 25px gap)
+                        const fromX = (reqWeapon.position.col * 135) + 55 + 20; // +20 for padding
+                        const fromY = (reqWeapon.position.row * 135) + 55 + 20;
+                        const toX = (weapon.position.col * 135) + 55 + 20;
+                        const toY = (weapon.position.row * 135) + 55 + 20;
+
+                        // Determine line color based on weapon status
+                        const isPurchased = !!(purchased.unified && purchased.unified[weaponKey]);
+                        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+                        const canPurchase = canAfford && !isPurchased && weapon.cost > 0;
+                        let requirementsMet = true;
+                        if (weapon.requires && !isPurchased) {
+                            requirementsMet = weapon.requires.every(req => purchased.unified && purchased.unified[req]);
+                        }
+
+                        let lineColor;
+                        if (isPurchased) {
+                            lineColor = '#00ff00'; // Green - player owns this weapon
+                        } else if (canPurchase && requirementsMet) {
+                            lineColor = '#ffff00'; // Yellow - player can afford and unlock
+                        } else {
+                            lineColor = '#ff4444'; // Red - cannot afford or missing requirements
+                        }
+
+                        // Create line with dynamic color
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', fromX);
+                        line.setAttribute('y1', fromY);
+                        line.setAttribute('x2', toX);
+                        line.setAttribute('y2', toY);
+                        line.setAttribute('stroke', lineColor);
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('opacity', '0.7');
+                        
+                        svg.appendChild(line);
+                    }
+                });
             }
         });
     }
