@@ -326,6 +326,7 @@ export class MenuManager {
 
     startGame() {
         this.hideMainMenu();
+        this.hideWeaponTree(); // Ensure weapon tree is hidden
         this.dispatchEvent('game-start');
     }
 
@@ -592,6 +593,7 @@ export class MenuManager {
         `;
 
         const cost = document.createElement('div');
+        cost.className = 'weapon-cost'; // Add class for easy targeting
         if (weapon.cost > 0) {
             cost.textContent = `${weapon.cost}pts`;
             cost.style.cssText = `
@@ -612,6 +614,7 @@ export class MenuManager {
         // Add requirement indicators
         if (weapon.requires && weapon.requires.length > 0) {
             const reqIndicator = document.createElement('div');
+            reqIndicator.className = 'weapon-requirement'; // Add class for easy targeting
             reqIndicator.style.cssText = `
                 position: absolute;
                 top: -8px;
@@ -863,7 +866,7 @@ export class MenuManager {
 
     updateWeaponNodeStates() {
         const weaponNodes = document.querySelectorAll('.weapon-node');
-        const purchased = this.gameState.getPurchasedWeapons();
+        const purchased = this.gameState.getUnlockedWeapons();
         const weaponTree = this.gameState.getWeaponTree();
         
         weaponNodes.forEach(node => {
@@ -871,7 +874,7 @@ export class MenuManager {
             if (!weaponId || !weaponTree.unified.weapons[weaponId]) return;
             
             const weapon = weaponTree.unified.weapons[weaponId];
-            const isPurchased = purchased.unified && purchased.unified[weaponId];
+            const isPurchased = purchased.includes(weaponId);
             const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
             
             // Debug logging for Dragon Sword specifically
@@ -882,7 +885,7 @@ export class MenuManager {
             // Check if requirements are met
             let requirementsMet = true;
             if (weapon.requires && !isPurchased) {
-                requirementsMet = weapon.requires.every(req => purchased.unified && purchased.unified[req]);
+                requirementsMet = weapon.requires.every(req => purchased.includes(req));
             }
             
             const canPurchase = canAfford && !isPurchased && requirementsMet && weapon.cost > 0;
@@ -911,10 +914,16 @@ export class MenuManager {
             }
             
             // Update cost text color
-            const costElement = node.querySelector('div:last-child');
+            const costElement = node.querySelector('.weapon-cost');
             if (costElement && weapon.cost > 0) {
                 costElement.style.color = (canAfford || isPurchased) ? '#ffd700' : '#f44';
                 costElement.style.fontWeight = 'bold';
+            }
+            
+            // Update requirement indicator color
+            const reqElement = node.querySelector('.weapon-requirement');
+            if (reqElement) {
+                reqElement.style.color = isPurchased ? '#0f0' : 'white';
             }
         });
         
@@ -926,7 +935,7 @@ export class MenuManager {
         const svg = document.querySelector('svg');
         if (!svg) return;
         
-        const purchased = this.gameState.getPurchasedWeapons();
+        const purchased = this.gameState.getUnlockedWeapons();
         const weaponTree = this.gameState.getWeaponTree();
         const weapons = weaponTree.unified.weapons;
         
@@ -946,12 +955,12 @@ export class MenuManager {
                         const toY = (weapon.position.row * 135) + 55 + 20;
 
                         // Determine line color based on weapon status
-                        const isPurchased = !!(purchased.unified && purchased.unified[weaponKey]);
+                        const isPurchased = purchased.includes(weaponKey);
                         const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
                         const canPurchase = canAfford && !isPurchased && weapon.cost > 0;
                         let requirementsMet = true;
                         if (weapon.requires && !isPurchased) {
-                            requirementsMet = weapon.requires.every(req => purchased.unified && purchased.unified[req]);
+                            requirementsMet = weapon.requires.every(req => purchased.includes(req));
                         }
 
                         let lineColor;

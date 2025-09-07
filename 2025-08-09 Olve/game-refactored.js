@@ -56,9 +56,13 @@ class DungeonCrawlerGame {
         // Set up points change callback to refresh weapon tree
         this.gameState.onPointsChanged(() => {
             if (this.menuManager) {
-                this.menuManager.refreshWeaponTree();
-                // Also update connection line colors
-                this.menuManager.updateConnectionLineColors();
+                // Only refresh weapon tree if it's currently visible
+                const weaponTreeMenu = document.getElementById('weaponTreeMenu');
+                if (weaponTreeMenu && weaponTreeMenu.style.display !== 'none') {
+                    this.menuManager.refreshWeaponTree();
+                    // Also update connection line colors
+                    this.menuManager.updateConnectionLineColors();
+                }
             }
         });
         
@@ -87,17 +91,17 @@ class DungeonCrawlerGame {
     initializeBackgroundAudio() {
         this.backgroundAudio = new Audio('sounds/cave-dripping-water.wav');
         this.backgroundAudio.loop = true;
-        this.backgroundAudio.volume = 1.0; // Set to 100% volume
+        this.backgroundAudio.volume = this.gameState.settings.menuSoundsVolume || 1.0;
     }
 
     initializeGameplayMusic() {
         this.gameplayMusic = new Audio('sounds/Banya-BeethovenVirusFullVersion.mp3');
         this.gameplayMusic.loop = true;
-        this.gameplayMusic.volume = 0.5; // Set to 50% volume
+        this.gameplayMusic.volume = this.gameState.settings.gameMusicVolume || 0.5;
     }
 
     startBackgroundAudio() {
-        if (this.backgroundAudio && this.gameState.settings.menuSounds) {
+        if (this.backgroundAudio && (this.gameState.settings.menuSoundsVolume || 0) > 0) {
             this.backgroundAudio.play().catch(error => {
                 console.log('Background audio failed to play:', error);
             });
@@ -112,7 +116,7 @@ class DungeonCrawlerGame {
     }
 
     startGameplayMusic() {
-        if (this.gameplayMusic && this.gameState.settings.gameMusic) {
+        if (this.gameplayMusic && (this.gameState.settings.gameMusicVolume || 0) > 0) {
             this.gameplayMusic.play().catch(error => {
                 console.log('Gameplay music failed to play:', error);
             });
@@ -197,51 +201,76 @@ class DungeonCrawlerGame {
             };
         }
 
-        // Settings toggle for menu sounds
-        const menuSoundsSetting = document.getElementById('menuSoundsSetting');
-        if (menuSoundsSetting) {
-            menuSoundsSetting.checked = !!this.gameState.settings.menuSounds;
-            menuSoundsSetting.onchange = (e) => {
-                this.gameState.settings.menuSounds = menuSoundsSetting.checked;
+        // Settings volume slider for menu sounds
+        const menuSoundsVolumeSetting = document.getElementById('menuSoundsVolumeSetting');
+        const menuSoundsVolumeDisplay = document.getElementById('menuSoundsVolumeDisplay');
+        if (menuSoundsVolumeSetting && menuSoundsVolumeDisplay) {
+            menuSoundsVolumeSetting.value = this.gameState.settings.menuSoundsVolume || 1.0;
+            menuSoundsVolumeDisplay.textContent = Math.round(menuSoundsVolumeSetting.value * 100) + '%';
+            menuSoundsVolumeSetting.oninput = (e) => {
+                const volume = parseFloat(e.target.value);
+                this.gameState.settings.menuSoundsVolume = volume;
+                menuSoundsVolumeDisplay.textContent = Math.round(volume * 100) + '%';
                 this.gameState.saveSettings();
-                // Immediately affect background audio if it's currently playing
-                if (!this.gameState.settings.menuSounds && this.backgroundAudio && !this.backgroundAudio.paused) {
-                    this.backgroundAudio.pause();
-                } else if (this.gameState.settings.menuSounds && this.backgroundAudio && this.backgroundAudio.paused && 
-                          (this.gameState.showMainMenu || this.isGameOverVisible())) {
-                    this.backgroundAudio.play().catch(e => console.log('Could not resume background audio:', e));
+                // Update background audio volume
+                if (this.backgroundAudio) {
+                    this.backgroundAudio.volume = volume;
+                    // If volume is 0, pause audio, otherwise resume if should be playing
+                    if (volume === 0 && !this.backgroundAudio.paused) {
+                        this.backgroundAudio.pause();
+                    } else if (volume > 0 && this.backgroundAudio.paused && 
+                              (this.gameState.showMainMenu || this.isGameOverVisible())) {
+                        this.backgroundAudio.play().catch(e => console.log('Could not resume background audio:', e));
+                    }
                 }
             };
         }
 
-        // Settings toggle for game over sounds
-        const gameOverSoundsSetting = document.getElementById('gameOverSoundsSetting');
-        if (gameOverSoundsSetting) {
-            gameOverSoundsSetting.checked = !!this.gameState.settings.gameOverSounds;
-            gameOverSoundsSetting.onchange = (e) => {
-                this.gameState.settings.gameOverSounds = gameOverSoundsSetting.checked;
+        // Settings volume slider for game over sounds
+        const gameOverSoundsVolumeSetting = document.getElementById('gameOverSoundsVolumeSetting');
+        const gameOverSoundsVolumeDisplay = document.getElementById('gameOverSoundsVolumeDisplay');
+        if (gameOverSoundsVolumeSetting && gameOverSoundsVolumeDisplay) {
+            gameOverSoundsVolumeSetting.value = this.gameState.settings.gameOverSoundsVolume || 1.0;
+            gameOverSoundsVolumeDisplay.textContent = Math.round(gameOverSoundsVolumeSetting.value * 100) + '%';
+            gameOverSoundsVolumeSetting.oninput = (e) => {
+                const volume = parseFloat(e.target.value);
+                this.gameState.settings.gameOverSoundsVolume = volume;
+                gameOverSoundsVolumeDisplay.textContent = Math.round(volume * 100) + '%';
                 this.gameState.saveSettings();
-                // Immediately affect background audio if we're on game over screen
-                if (!this.gameState.settings.gameOverSounds && this.backgroundAudio && !this.backgroundAudio.paused && this.isGameOverVisible()) {
-                    this.backgroundAudio.pause();
-                } else if (this.gameState.settings.gameOverSounds && this.backgroundAudio && this.backgroundAudio.paused && this.isGameOverVisible()) {
-                    this.backgroundAudio.play().catch(e => console.log('Could not resume background audio:', e));
+                // Update background audio volume if on game over screen
+                if (this.backgroundAudio && this.isGameOverVisible()) {
+                    this.backgroundAudio.volume = volume;
+                    // If volume is 0, pause audio, otherwise resume if should be playing
+                    if (volume === 0 && !this.backgroundAudio.paused) {
+                        this.backgroundAudio.pause();
+                    } else if (volume > 0 && this.backgroundAudio.paused) {
+                        this.backgroundAudio.play().catch(e => console.log('Could not resume background audio:', e));
+                    }
                 }
             };
         }
 
-        // Settings toggle for game music
-        const gameMusicSetting = document.getElementById('gameMusicSetting');
-        if (gameMusicSetting) {
-            gameMusicSetting.checked = !!this.gameState.settings.gameMusic;
-            gameMusicSetting.onchange = (e) => {
-                this.gameState.settings.gameMusic = gameMusicSetting.checked;
+        // Settings volume slider for game music
+        const gameMusicVolumeSetting = document.getElementById('gameMusicVolumeSetting');
+        const gameMusicVolumeDisplay = document.getElementById('gameMusicVolumeDisplay');
+        if (gameMusicVolumeSetting && gameMusicVolumeDisplay) {
+            gameMusicVolumeSetting.value = this.gameState.settings.gameMusicVolume || 0.5;
+            gameMusicVolumeDisplay.textContent = Math.round(gameMusicVolumeSetting.value * 100) + '%';
+            gameMusicVolumeSetting.oninput = (e) => {
+                const volume = parseFloat(e.target.value);
+                this.gameState.settings.gameMusicVolume = volume;
+                gameMusicVolumeDisplay.textContent = Math.round(volume * 100) + '%';
                 this.gameState.saveSettings();
-                // Immediately affect music playback
-                if (!this.gameState.settings.gameMusic && this.gameplayMusic && !this.gameplayMusic.paused) {
-                    this.gameplayMusic.pause();
-                } else if (this.gameState.settings.gameMusic && this.gameplayMusic && this.gameplayMusic.paused && this.gameState.gameStarted && !this.gameState.showMainMenu) {
-                    this.gameplayMusic.play().catch(e => console.log('Could not resume music:', e));
+                // Update gameplay music volume
+                if (this.gameplayMusic) {
+                    this.gameplayMusic.volume = volume;
+                    // If volume is 0, pause music, otherwise resume if should be playing
+                    if (volume === 0 && !this.gameplayMusic.paused) {
+                        this.gameplayMusic.pause();
+                    } else if (volume > 0 && this.gameplayMusic.paused && 
+                              this.gameState.gameStarted && !this.gameState.showMainMenu) {
+                        this.gameplayMusic.play().catch(e => console.log('Could not resume music:', e));
+                    }
                 }
             };
         }

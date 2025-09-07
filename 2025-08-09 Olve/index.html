@@ -366,6 +366,44 @@
             100% { transform: scale(1); }
         }
 
+        /* Volume Slider Styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 150px;
+            height: 8px;
+            border-radius: 5px;
+            background: #333;
+            outline: none;
+            margin: 0 10px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+            border: 2px solid #FFF;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #FFA500;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+            border: 2px solid #FFF;
+        }
+        .keybind-row span:last-child {
+            min-width: 50px;
+            text-align: center;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
         /* Virtual Joystick Styles */
         .virtual-joystick {
             position: absolute;
@@ -457,16 +495,19 @@
                 <input type="checkbox" id="scrollableSettingsMenuSetting" />
             </div>
             <div class="keybind-row">
-                <span>Menu Sounds</span>
-                <input type="checkbox" id="menuSoundsSetting" />
+                <span>Menu Sounds Volume</span>
+                <input type="range" id="menuSoundsVolumeSetting" min="0" max="1" step="0.01" value="1.0" />
+                <span id="menuSoundsVolumeDisplay">100%</span>
             </div>
             <div class="keybind-row">
-                <span>Game Over Sounds</span>
-                <input type="checkbox" id="gameOverSoundsSetting" />
+                <span>Game Over Sounds Volume</span>
+                <input type="range" id="gameOverSoundsVolumeSetting" min="0" max="1" step="0.01" value="1.0" />
+                <span id="gameOverSoundsVolumeDisplay">100%</span>
             </div>
             <div class="keybind-row">
-                <span>Game Music</span>
-                <input type="checkbox" id="gameMusicSetting" />
+                <span>Game Music Volume</span>
+                <input type="range" id="gameMusicVolumeSetting" min="0" max="1" step="0.01" value="0.5" />
+                <span id="gameMusicVolumeDisplay">50%</span>
             </div>
             <div class="keybind-row">
                 <span>Virtual Joystick</span>
