@@ -24,6 +24,7 @@ export class GameState {
         this.traps = []; // Array to store deployed traps
         this.openWorld = this.createOpenWorldState();
         this.settings = this.loadSettings();
+        console.log('GameState constructor - loaded settings:', this.settings);
         this.checkStorageAvailability();
     }
 
@@ -71,10 +72,29 @@ export class GameState {
             virtualJoystick: false
         };
 
+        // Check for old format settings and clear them
+        try {
+            const oldSettings = localStorage.getItem('gameSettings');
+            if (oldSettings) {
+                const parsed = JSON.parse(oldSettings);
+                // If we find old boolean format, clear localStorage and use defaults
+                if (typeof parsed.menuSounds === 'boolean' || 
+                    typeof parsed.gameMusic === 'boolean' || 
+                    typeof parsed.gameOverSounds === 'boolean') {
+                    console.log('Found old boolean audio settings, clearing localStorage and using new volume format');
+                    localStorage.removeItem('gameSettings');
+                    return defaultSettings;
+                }
+            }
+        } catch (error) {
+            console.log('Error checking for old settings format:', error);
+        }
+
         // Try localStorage first
         let savedSettings = null;
         try {
             savedSettings = localStorage.getItem('gameSettings');
+            console.log('Raw saved settings from localStorage:', savedSettings);
         } catch (error) {
             console.log('Failed to access localStorage:', error);
         }
@@ -92,18 +112,22 @@ export class GameState {
         if (savedSettings) {
             try {
                 const parsed = JSON.parse(savedSettings);
+                console.log('Parsed saved settings:', parsed);
                 // Merge with defaults to ensure all settings exist
-                return {
+                const mergedSettings = {
                     ...defaultSettings,
                     ...parsed,
                     keybinds: { ...defaultSettings.keybinds, ...(parsed.keybinds || {}) }
                 };
+                console.log('Final merged settings:', mergedSettings);
+                return mergedSettings;
             } catch (error) {
                 console.log('Failed to parse saved settings, using defaults:', error);
                 return defaultSettings;
             }
         }
         
+        console.log('No saved settings found, using defaults:', defaultSettings);
         return defaultSettings;
     }
 

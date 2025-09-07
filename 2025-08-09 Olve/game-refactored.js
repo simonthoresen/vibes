@@ -91,17 +91,17 @@ class DungeonCrawlerGame {
     initializeBackgroundAudio() {
         this.backgroundAudio = new Audio('sounds/cave-dripping-water.wav');
         this.backgroundAudio.loop = true;
-        this.backgroundAudio.volume = this.gameState.settings.menuSoundsVolume || 1.0;
+        this.backgroundAudio.volume = this.gameState.settings.menuSoundsVolume !== undefined ? this.gameState.settings.menuSoundsVolume : 1.0;
     }
 
     initializeGameplayMusic() {
         this.gameplayMusic = new Audio('sounds/Banya-BeethovenVirusFullVersion.mp3');
         this.gameplayMusic.loop = true;
-        this.gameplayMusic.volume = this.gameState.settings.gameMusicVolume || 0.5;
+        this.gameplayMusic.volume = this.gameState.settings.gameMusicVolume !== undefined ? this.gameState.settings.gameMusicVolume : 0.5;
     }
 
     startBackgroundAudio() {
-        if (this.backgroundAudio && (this.gameState.settings.menuSoundsVolume || 0) > 0) {
+        if (this.backgroundAudio && (this.gameState.settings.menuSoundsVolume !== undefined ? this.gameState.settings.menuSoundsVolume : 1.0) > 0) {
             this.backgroundAudio.play().catch(error => {
                 console.log('Background audio failed to play:', error);
             });
@@ -116,7 +116,7 @@ class DungeonCrawlerGame {
     }
 
     startGameplayMusic() {
-        if (this.gameplayMusic && (this.gameState.settings.gameMusicVolume || 0) > 0) {
+        if (this.gameplayMusic && (this.gameState.settings.gameMusicVolume !== undefined ? this.gameState.settings.gameMusicVolume : 0.5) > 0) {
             this.gameplayMusic.play().catch(error => {
                 console.log('Gameplay music failed to play:', error);
             });
@@ -205,13 +205,20 @@ class DungeonCrawlerGame {
         const menuSoundsVolumeSetting = document.getElementById('menuSoundsVolumeSetting');
         const menuSoundsVolumeDisplay = document.getElementById('menuSoundsVolumeDisplay');
         if (menuSoundsVolumeSetting && menuSoundsVolumeDisplay) {
-            menuSoundsVolumeSetting.value = this.gameState.settings.menuSoundsVolume || 1.0;
-            menuSoundsVolumeDisplay.textContent = Math.round(menuSoundsVolumeSetting.value * 100) + '%';
+            const savedVolume = this.gameState.settings.menuSoundsVolume !== undefined ? this.gameState.settings.menuSoundsVolume : 1.0;
+            console.log('Loading menu sounds volume from settings:', savedVolume);
+            menuSoundsVolumeSetting.value = savedVolume;
+            menuSoundsVolumeDisplay.textContent = Math.round(savedVolume * 100) + '%';
             menuSoundsVolumeSetting.oninput = (e) => {
                 const volume = parseFloat(e.target.value);
+                console.log('Menu sounds volume changed to:', volume);
+                console.log('Before change - settings object:', JSON.stringify(this.gameState.settings));
                 this.gameState.settings.menuSoundsVolume = volume;
+                console.log('After change - settings object:', JSON.stringify(this.gameState.settings));
                 menuSoundsVolumeDisplay.textContent = Math.round(volume * 100) + '%';
+                console.log('Calling saveSettings...');
                 this.gameState.saveSettings();
+                console.log('saveSettings completed');
                 // Update background audio volume
                 if (this.backgroundAudio) {
                     this.backgroundAudio.volume = volume;
@@ -230,10 +237,13 @@ class DungeonCrawlerGame {
         const gameOverSoundsVolumeSetting = document.getElementById('gameOverSoundsVolumeSetting');
         const gameOverSoundsVolumeDisplay = document.getElementById('gameOverSoundsVolumeDisplay');
         if (gameOverSoundsVolumeSetting && gameOverSoundsVolumeDisplay) {
-            gameOverSoundsVolumeSetting.value = this.gameState.settings.gameOverSoundsVolume || 1.0;
-            gameOverSoundsVolumeDisplay.textContent = Math.round(gameOverSoundsVolumeSetting.value * 100) + '%';
+            const savedVolume = this.gameState.settings.gameOverSoundsVolume !== undefined ? this.gameState.settings.gameOverSoundsVolume : 1.0;
+            console.log('Loading game over sounds volume from settings:', savedVolume);
+            gameOverSoundsVolumeSetting.value = savedVolume;
+            gameOverSoundsVolumeDisplay.textContent = Math.round(savedVolume * 100) + '%';
             gameOverSoundsVolumeSetting.oninput = (e) => {
                 const volume = parseFloat(e.target.value);
+                console.log('Game over sounds volume changed to:', volume);
                 this.gameState.settings.gameOverSoundsVolume = volume;
                 gameOverSoundsVolumeDisplay.textContent = Math.round(volume * 100) + '%';
                 this.gameState.saveSettings();
@@ -254,10 +264,13 @@ class DungeonCrawlerGame {
         const gameMusicVolumeSetting = document.getElementById('gameMusicVolumeSetting');
         const gameMusicVolumeDisplay = document.getElementById('gameMusicVolumeDisplay');
         if (gameMusicVolumeSetting && gameMusicVolumeDisplay) {
-            gameMusicVolumeSetting.value = this.gameState.settings.gameMusicVolume || 0.5;
-            gameMusicVolumeDisplay.textContent = Math.round(gameMusicVolumeSetting.value * 100) + '%';
+            const savedVolume = this.gameState.settings.gameMusicVolume !== undefined ? this.gameState.settings.gameMusicVolume : 0.5;
+            console.log('Loading game music volume from settings:', savedVolume);
+            gameMusicVolumeSetting.value = savedVolume;
+            gameMusicVolumeDisplay.textContent = Math.round(savedVolume * 100) + '%';
             gameMusicVolumeSetting.oninput = (e) => {
                 const volume = parseFloat(e.target.value);
+                console.log('Game music volume changed to:', volume);
                 this.gameState.settings.gameMusicVolume = volume;
                 gameMusicVolumeDisplay.textContent = Math.round(volume * 100) + '%';
                 this.gameState.saveSettings();
