@@ -175,15 +175,41 @@ export class WeaponSystem {
         const predictedX = closestEnemy.x + (closestEnemy.dx || 0) * leadTime;
         const predictedY = closestEnemy.y + (closestEnemy.dy || 0) * leadTime;
         
-        // Create multiple projectiles based on weapon count
-        for (let i = 0; i < count; i++) {
-            const spreadAngle = (i - (count - 1) / 2) * 0.1;
-            const leadAngle = Math.atan2(
-                predictedY + closestEnemy.height / 2 - playerCenterY,
-                predictedX + closestEnemy.width / 2 - playerCenterX
-            ) + spreadAngle;
-
-            this.createProjectile(weapon, playerCenterX, playerCenterY, leadAngle);
+        const baseAngle = Math.atan2(
+            predictedY + closestEnemy.height / 2 - playerCenterY,
+            predictedX + closestEnemy.width / 2 - playerCenterX
+        );
+        
+        // Handle multi-shot weapons (like Triple Bow)
+        if (weapon.multiShot && weapon.multiShot > 1) {
+            const shotsPerInstance = weapon.multiShot;
+            const spreadAngle = weapon.spreadAngle || 0.2; // Default spread if not specified
+            
+            for (let i = 0; i < count; i++) {
+                // For each weapon instance, create multiple shots
+                for (let j = 0; j < shotsPerInstance; j++) {
+                    let shotSpread;
+                    if (weapon.name === 'Triple Bow' && shotsPerInstance === 3 && j === 1) {
+                        // Middle arrow: random angle between the two outer arrows
+                        const left = -(spreadAngle);
+                        const right = spreadAngle;
+                        shotSpread = left + Math.random() * (right - left);
+                    } else {
+                        shotSpread = (j - (shotsPerInstance - 1) / 2) * spreadAngle;
+                    }
+                    // Add random inaccuracy to ALL shots (including center shot)
+                    const randomInaccuracy = (Math.random() - 0.5) * spreadAngle * 0.5;
+                    const finalAngle = baseAngle + shotSpread + randomInaccuracy;
+                    this.createProjectile(weapon, playerCenterX, playerCenterY, finalAngle);
+                }
+            }
+        } else {
+            // Create multiple projectiles based on weapon count (normal behavior)
+            for (let i = 0; i < count; i++) {
+                const spreadAngle = (i - (count - 1) / 2) * 0.1;
+                const leadAngle = baseAngle + spreadAngle;
+                this.createProjectile(weapon, playerCenterX, playerCenterY, leadAngle);
+            }
         }
     }
 
@@ -409,12 +435,18 @@ export class WeaponSystem {
             damage: this.gameState.player.oneHitKill ? 9999 : weapon.damage,
             color: weapon.color,
             piercing: weapon.piercing,
-            hitEnemies: new Set()
+            hitEnemies: new Set(),
+            weapon: weapon // Add weapon reference for sprite rendering
         });
     }
 
     damageEnemy(enemy, weapon, hitTime) {
-        const damage = this.gameState.player.oneHitKill ? enemy.maxHealth || 9999 : weapon.damage;
+        let damage = this.gameState.player.oneHitKill ? enemy.maxHealth || 9999 : weapon.damage;
+        
+        // Add set bonus damage if applicable
+        const setBonusDamage = this.calculateSetBonusDamage(enemy, weapon);
+        damage += setBonusDamage;
+        
         const enemyWillDie = enemy.health - damage <= 0;
         
         enemy.health -= damage;
@@ -430,6 +462,11 @@ export class WeaponSystem {
             } else {
                 this.particleEngine.createEnemyHitEffect(centerX, centerY, enemy.color);
             }
+        }
+        
+        // Log set bonus damage for debugging (can be removed later)
+        if (setBonusDamage > 0) {
+            console.log(`Scythe set bonus! Extra ${setBonusDamage} damage (1% of ${enemy.maxHealth || enemy.health} max HP)`);
         }
     }
 
@@ -1494,5 +1531,39 @@ export class WeaponSystem {
         this.rainState.thunderStrikes = this.rainState.thunderStrikes.filter(
             strike => now - strike.createdAt < strike.duration
         );
+    }
+
+    // Check if player has complete scythe set (at least one of each scythe type)
+    hasCompleteScytheSet() {
+        const scytheTypes = ['SCYTHE', 'DRAGON_SCYTHE', 'NATURE_SCYTHE', 'CRYSTAL_SCYTHE'];
+        const unlockedWeapons = this.gameState.getUnlockedWeapons();
+        
+        return scytheTypes.every(scytheType => unlockedWeapons.includes(scytheType));
+    }
+
+    // Calculate additional damage based on set bonuses
+    calculateSetBonusDamage(enemy, weapon) {
+        let bonusDamage = 0;
+        
+        // Scythe set bonus
+        const scytheTypes = ['SCYTHE', 'DRAGON_SCYTHE', 'NATURE_SCYTHE', 'CRYSTAL_SCYTHE'];
+        if (scytheTypes.includes(weapon.id) && this.hasCompleteScytheSet()) {
+            bonusDamage += Math.max(1, Math.round((enemy.maxHealth || enemy.health) * 0.01));
+        }
+
+        // Bow set bonus
+        const bowTypes = ['BOW', 'DRAGON_BOW', 'TRIPLE_BOW'];
+        if (bowTypes.includes(weapon.id) && this.hasCompleteBowSet()) {
+            bonusDamage += Math.max(1, Math.round((enemy.maxHealth || enemy.health) * 0.01));
+        }
+
+        return bonusDamage;
+    }
+
+    hasCompleteBowSet() {
+        // Check if player has at least 1 of each bow type
+        const bowTypes = ['BOW', 'DRAGON_BOW', 'TRIPLE_BOW'];
+        const playerWeapons = this.gameState.player.weapons.map(w => w.id);
+        return bowTypes.every(type => playerWeapons.includes(type));
     }
 }

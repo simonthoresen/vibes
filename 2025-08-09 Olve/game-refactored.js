@@ -779,6 +779,10 @@ class DungeonCrawlerGame {
     showMainMenu() { 
         this.showElement('mainMenu'); 
         this.startBackgroundAudio();
+        // Trigger points animation when returning to main menu
+        if (this.menuManager) {
+            this.menuManager.updatePointsDisplay();
+        }
     }
     hideMainMenu() { 
         this.hideElement('mainMenu'); 
@@ -1168,7 +1172,7 @@ class DungeonCrawlerGame {
             'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
             'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
             'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
-            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Umbrella'
+            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Triple Bow', 'Umbrella'
         ];
         
         // Add amount selector

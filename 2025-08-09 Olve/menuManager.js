@@ -191,7 +191,7 @@ export class MenuManager {
             transform: translateY(-50%);
             text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 1px -1px 0px #000, -1px 1px 0px #000;
         `;
-        pointsText.textContent = `Points: ${this.gameState.player.weaponTreePoints}`;
+        pointsText.textContent = `Points: ${this.gameState.player.displayedWeaponTreePoints}`;
 
         pointsDisplay.appendChild(pointBarImg);
         pointsDisplay.appendChild(pointsText);
@@ -388,7 +388,11 @@ export class MenuManager {
         
         // Always refresh the weapon tree display when showing it
         this.updatePointsDisplay();
-        this.updateWeaponNodeStates();
+        
+        // Use setTimeout to ensure DOM is fully rendered before updating styles
+        setTimeout(() => {
+            this.updateWeaponNodeStates();
+        }, 50);
     }
 
     createWeaponTreeMenu() {
@@ -410,7 +414,7 @@ export class MenuManager {
 
         const content = this.createMenuContent();
         content.style.height = '90vh';
-        content.style.overflow = 'auto';
+        content.style.overflow = 'hidden';
         content.style.display = 'flex';
         content.style.flexDirection = 'column';
         content.style.alignItems = 'center';
@@ -425,6 +429,11 @@ export class MenuManager {
         const treeContent = this.createWeaponTreeContent();
         
         const backButton = this.createButton('Back', () => this.hideWeaponTree());
+        // Style back button to span full width of content
+        backButton.style.cssText += `
+            width: 100%;
+            margin-top: 20px;
+        `;
 
         weaponTreeMenu.appendChild(pointsDisplay);
         content.appendChild(title);
@@ -442,11 +451,11 @@ export class MenuManager {
             flex-direction: column;
             gap: 20px;
             height: auto;
-            min-height: 80vh;
+            max-height: 80vh;
             width: 95vw;
             max-width: 1600px;
-            overflow-x: hidden;
             overflow-y: auto;
+            overflow-x: hidden;
             background: rgba(0, 0, 0, 0.8);
             padding: 40px;
             border-radius: 20px;
@@ -458,6 +467,11 @@ export class MenuManager {
 
         const tree = this.gameState.getWeaponTree();
         const purchased = this.gameState.loadWeaponTreeUpgrades();
+        
+        // Debug: Compare the two data sources
+        const purchasedList = this.gameState.getUnlockedWeapons();
+        console.log('loadWeaponTreeUpgrades():', purchased);
+        console.log('getUnlockedWeapons():', purchasedList);
 
         // Create the unified weapon tree
         const unifiedBranch = tree.unified;
@@ -538,12 +552,22 @@ export class MenuManager {
 
     createUnifiedWeaponNode(branchKey, weaponKey, weapon, purchasedWeapons, branchColor) {
         let isPurchased = !!purchasedWeapons[weaponKey];
-        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+        const canAfford = this.gameState.player.displayedWeaponTreePoints >= weapon.cost;
         
         // Check if requirements are met
         let canPurchase = canAfford && !isPurchased && weapon.cost > 0;
         if (weapon.requires && !isPurchased) {
             canPurchase = canPurchase && weapon.requires.every(req => purchasedWeapons[req]);
+        }
+
+        // Temporary debug for specific weapons
+        if (weapon.name === 'Dragon Bow' || weapon.name === 'Fire Staff') {
+            console.log(`${weapon.name}: isPurchased=${isPurchased}, canPurchase=${canPurchase}, weaponKey=${weaponKey}`);
+            console.log(`purchasedWeapons[${weaponKey}] = ${purchasedWeapons[weaponKey]}`);
+            
+            // Temporary: Force these weapons to show as purchased for testing
+            // isPurchased = true;
+            // canPurchase = false;
         }
 
         // Auto-unlock free weapons ONLY (cost must be exactly 0)
@@ -562,12 +586,21 @@ export class MenuManager {
         const nodeDiv = document.createElement('div');
         nodeDiv.className = 'weapon-node'; // Add class for easier selection
         nodeDiv.dataset.weaponId = weaponKey; // Store weapon ID for updates
+        
+        // Additional debug for Dragon weapons
+        if (weapon.name.includes('Dragon')) {
+            console.log(`Creating Dragon node: ${weapon.name}, isPurchased: ${isPurchased}, canPurchase: ${canPurchase}`);
+            console.log('Current styling will be:');
+            console.log(`- Border: ${isPurchased ? '#0f0' : canPurchase ? '#FFD700' : '#666'}`);
+            console.log(`- Background: ${isPurchased ? 'rgba(0, 255, 0, 0.6)' : canPurchase ? 'rgba(255, 215, 0, 0.15)' : 'rgba(60, 60, 60, 0.5)'}`);
+        }
+        
         nodeDiv.style.cssText = `
             width: 100px;
             height: 100px;
-            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? branchColor : '#666'};
+            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? '#FFD700' : '#666666'};
             border-radius: 15px;
-            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? `rgba(255, 255, 255, 0.15)` : 'rgba(60, 60, 60, 0.5)'};
+            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? 'rgba(255, 215, 0, 0.15)' : 'rgba(60, 60, 60, 0.5)'};
             cursor: ${canPurchase ? 'pointer' : 'default'};
             display: flex;
             flex-direction: column;
@@ -681,22 +714,54 @@ export class MenuManager {
                         const toX = (weapon.position.col * 135) + 55 + 20;
                         const toY = (weapon.position.row * 135) + 55 + 20;
 
-                        // Determine line color based on weapon status
-                        const isPurchased = !!purchasedWeapons[weaponKey];
-                        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
-                        const canPurchase = canAfford && !isPurchased && weapon.cost > 0;
+                        // Determine line color based on both source and target weapon status
+                        const targetIsPurchased = !!purchasedWeapons[weaponKey];
+                        const sourceIsPurchased = !!purchasedWeapons[reqKey];
+                        const canAfford = Number(this.gameState.player.weaponTreePoints) >= Number(weapon.cost);
+                        
+                        // Check if all requirements for target weapon are met
                         let requirementsMet = true;
-                        if (weapon.requires && !isPurchased) {
-                            requirementsMet = weapon.requires.every(req => purchasedWeapons[req]);
+                        if (weapon.requires && !targetIsPurchased) {
+                            requirementsMet = weapon.requires.every(req => !!purchasedWeapons[req]);
                         }
 
                         let lineColor;
-                        if (isPurchased) {
-                            lineColor = '#00ff00'; // Green - player owns this weapon
-                        } else if (canPurchase && requirementsMet) {
-                            lineColor = '#ffff00'; // Yellow - player can afford and unlock
+                        let lineOpacity;
+                        
+                        if (sourceIsPurchased && targetIsPurchased) {
+                            // Green: Both source and target are unlocked
+                            lineColor = '#00ff00';
+                            lineOpacity = '0.8';
+                        } else if (sourceIsPurchased && !targetIsPurchased && requirementsMet && canAfford && weapon.cost > 0) {
+                            // Yellow: Source is unlocked, all requirements met, AND player can afford target
+                            lineColor = '#FFD700';
+                            lineOpacity = '0.7';
+                        } else if (sourceIsPurchased && !targetIsPurchased && requirementsMet && !canAfford) {
+                            // Orange: Source is unlocked, requirements met, but can't afford target
+                            lineColor = '#CC6600';
+                            lineOpacity = '0.6';
+                        } else if (sourceIsPurchased && !targetIsPurchased && !requirementsMet) {
+                            // Light Red: Source is unlocked but other requirements not met
+                            lineColor = '#FF6666';
+                            lineOpacity = '0.5';
                         } else {
-                            lineColor = '#ff4444'; // Red - cannot afford or missing requirements
+                            // Red: Source is not unlocked (requirement not met)
+                            lineColor = '#FF4444';
+                            lineOpacity = '0.3';
+                        }
+
+                        // Debug logging for Fire Staff connections specifically
+                        if (weapon.name === 'Fire Staff') {
+                            // Force numeric comparison for Fire Staff
+                            const actualCanAfford = Number(this.gameState.player.weaponTreePoints) >= Number(weapon.cost);
+                            console.log(`🔥 Fire Staff line from ${reqKey}: ${lineColor === '#FFD700' ? 'YELLOW' : lineColor === '#CC6600' ? 'ORANGE' : 'OTHER'}`);
+                            console.log(`- canAfford: ${canAfford} (${this.gameState.player.displayedWeaponTreePoints} >= ${weapon.cost})`);
+                            console.log(`- actualCanAfford: ${actualCanAfford}`);
+                            console.log(`- Player points type: ${typeof this.gameState.player.displayedWeaponTreePoints}, value: ${this.gameState.player.displayedWeaponTreePoints}`);
+                            console.log(`- Weapon cost type: ${typeof weapon.cost}, value: ${weapon.cost}`);
+                            console.log(`- Comparison result: ${this.gameState.player.weaponTreePoints >= weapon.cost}`);
+                            console.log(`- Manual comparison: ${Number(this.gameState.player.weaponTreePoints) >= Number(weapon.cost)}`);
+                            console.log(`- All conditions: sourceIsPurchased=${sourceIsPurchased}, !targetIsPurchased=${!targetIsPurchased}, requirementsMet=${requirementsMet}, canAfford=${canAfford}, cost>0=${weapon.cost > 0}`);
                         }
 
                         // Create line with dynamic color
@@ -707,7 +772,7 @@ export class MenuManager {
                         line.setAttribute('y2', toY);
                         line.setAttribute('stroke', lineColor);
                         line.setAttribute('stroke-width', '2');
-                        line.setAttribute('opacity', '0.7');
+                        line.setAttribute('opacity', lineOpacity);
 
                         svg.appendChild(line);
                     }
@@ -739,9 +804,9 @@ export class MenuManager {
         nodeDiv.style.cssText = `
             width: 80px;
             height: 80px;
-            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? branchColor : '#666'};
+            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? '#FFD700' : '#666'};
             border-radius: 8px;
-            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? `rgba(255, 255, 255, 0.1)` : 'rgba(60, 60, 60, 0.5)'};
+            background: ${isPurchased ? 'rgba(0, 255, 0, 0.6)' : canPurchase ? `rgba(255, 215, 0, 0.15)` : 'rgba(60, 60, 60, 0.5)'};
             cursor: ${canPurchase ? 'pointer' : 'default'};
             display: flex;
             flex-direction: column;
@@ -749,6 +814,7 @@ export class MenuManager {
             align-items: center;
             transition: all 0.2s;
             position: relative;
+            box-shadow: ${isPurchased ? '0 0 15px rgba(0, 255, 0, 0.8)' : canPurchase ? '0 0 8px rgba(255, 215, 0, 0.3)' : 'none'};
         `;
 
         const title = document.createElement('div');
@@ -855,37 +921,74 @@ export class MenuManager {
     }
 
     updatePointsDisplay() {
+        // Check if there are pending points to animate
+        if (this.gameState.hasPendingPointsAnimation()) {
+            this.animatePointsUpdate();
+        } else {
+            // Direct update if no animation needed
+            this.updatePointsDisplayText(this.gameState.player.weaponTreePoints);
+        }
+    }
+
+    updatePointsDisplayText(points) {
         const pointsDisplays = document.querySelectorAll('#pointsDisplay');
         pointsDisplays.forEach(display => {
             const pointsText = display.querySelector('div');
             if (pointsText) {
-                pointsText.textContent = `Points: ${this.gameState.player.weaponTreePoints}`;
+                pointsText.textContent = `Points: ${points}`;
             }
         });
     }
 
+    animatePointsUpdate() {
+        // Start the smooth animation
+        this.gameState.startPointsAnimation(
+            // onUpdate callback - called during animation
+            (currentPoints) => {
+                this.updatePointsDisplayText(currentPoints);
+            },
+            // onComplete callback - called when animation finishes
+            () => {
+                // Update weapon tree display since affordability may have changed
+                this.updateWeaponNodeStates();
+                console.log('Points animation completed');
+            }
+        );
+    }
+
     updateWeaponNodeStates() {
         const weaponNodes = document.querySelectorAll('.weapon-node');
-        const purchased = this.gameState.getUnlockedWeapons();
+        const purchasedData = this.gameState.loadWeaponTreeUpgrades();
+        const purchasedWeapons = purchasedData.unified || {};
         const weaponTree = this.gameState.getWeaponTree();
+        
+        console.log(`updateWeaponNodeStates: Found ${weaponNodes.length} weapon nodes`);
+        console.log('Purchased weapons data:', purchasedWeapons);
         
         weaponNodes.forEach(node => {
             const weaponId = node.dataset.weaponId;
             if (!weaponId || !weaponTree.unified.weapons[weaponId]) return;
             
             const weapon = weaponTree.unified.weapons[weaponId];
-            const isPurchased = purchased.includes(weaponId);
-            const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
+            const isPurchased = !!purchasedWeapons[weaponId];
+            const canAfford = this.gameState.player.displayedWeaponTreePoints >= weapon.cost;
             
-            // Debug logging for Dragon Sword specifically
+            // Debug logging for all weapons to see the comparison
+            console.log(`${weapon.name} (${weaponId}): isPurchased = ${isPurchased}, purchasedWeapons[${weaponId}] = ${purchasedWeapons[weaponId]}`);
+            
+            // Debug logging for Dragon weapons specifically
             if (weaponId === 'dragonSword') {
                 console.log(`Dragon Sword update - isPurchased: ${isPurchased}, canAfford: ${canAfford}, cost: ${weapon.cost}, points: ${this.gameState.player.weaponTreePoints}`);
+            }
+            if (weaponId === 'dragonBow') {
+                console.log(`Dragon Bow update - isPurchased: ${isPurchased}, canAfford: ${canAfford}, cost: ${weapon.cost}, points: ${this.gameState.player.weaponTreePoints}`);
+                console.log(`Dragon Bow node style before update:`, node.style.backgroundColor, node.style.border);
             }
             
             // Check if requirements are met
             let requirementsMet = true;
             if (weapon.requires && !isPurchased) {
-                requirementsMet = weapon.requires.every(req => purchased.includes(req));
+                requirementsMet = weapon.requires.every(req => !!purchasedWeapons[req]);
             }
             
             const canPurchase = canAfford && !isPurchased && requirementsMet && weapon.cost > 0;
@@ -896,6 +999,11 @@ export class MenuManager {
                 node.style.border = '3px solid #0f0';
                 node.style.cursor = 'default';
                 node.style.boxShadow = '0 0 15px rgba(0, 255, 0, 0.5)';
+                
+                // Debug logging for Dragon Bow after style application
+                if (weaponId === 'dragonBow') {
+                    console.log(`Dragon Bow styled as purchased - backgroundColor: ${node.style.backgroundColor}, border: ${node.style.border}`);
+                }
             } else if (canPurchase) {
                 node.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'; // Light for purchasable
                 node.style.border = '3px solid #FFD700';
@@ -935,7 +1043,8 @@ export class MenuManager {
         const svg = document.querySelector('svg');
         if (!svg) return;
         
-        const purchased = this.gameState.getUnlockedWeapons();
+        const purchasedData = this.gameState.loadWeaponTreeUpgrades();
+        const purchasedWeapons = purchasedData.unified || {};
         const weaponTree = this.gameState.getWeaponTree();
         const weapons = weaponTree.unified.weapons;
         
@@ -954,25 +1063,49 @@ export class MenuManager {
                         const toX = (weapon.position.col * 135) + 55 + 20;
                         const toY = (weapon.position.row * 135) + 55 + 20;
 
-                        // Determine line color based on weapon status
-                        const isPurchased = purchased.includes(weaponKey);
-                        const canAfford = this.gameState.player.weaponTreePoints >= weapon.cost;
-                        const canPurchase = canAfford && !isPurchased && weapon.cost > 0;
+                        // Determine line color based on both source and target weapon status
+                        const targetIsPurchased = !!purchasedWeapons[weaponKey];
+                        const sourceIsPurchased = !!purchasedWeapons[reqKey];
+                        const canAfford = Number(this.gameState.player.weaponTreePoints) >= Number(weapon.cost);
+                        
+                        // Check if all requirements for target weapon are met
                         let requirementsMet = true;
-                        if (weapon.requires && !isPurchased) {
-                            requirementsMet = weapon.requires.every(req => purchased.includes(req));
+                        if (weapon.requires && !targetIsPurchased) {
+                            requirementsMet = weapon.requires.every(req => !!purchasedWeapons[req]);
                         }
 
                         let lineColor;
-                        if (isPurchased) {
-                            lineColor = '#00ff00'; // Green - player owns this weapon
-                        } else if (canPurchase && requirementsMet) {
-                            lineColor = '#ffff00'; // Yellow - player can afford and unlock
+                        let lineOpacity;
+                        
+                        if (sourceIsPurchased && targetIsPurchased) {
+                            // Green: Both source and target are unlocked
+                            lineColor = '#00ff00';
+                            lineOpacity = '0.8';
+                        } else if (sourceIsPurchased && !targetIsPurchased && requirementsMet && canAfford && weapon.cost > 0) {
+                            // Yellow: Source is unlocked, all requirements met, AND player can afford target
+                            lineColor = '#FFD700';
+                            lineOpacity = '0.7';
+                        } else if (sourceIsPurchased && !targetIsPurchased && requirementsMet && !canAfford) {
+                            // Orange: Source is unlocked, requirements met, but can't afford target
+                            lineColor = '#CC6600';
+                            lineOpacity = '0.6';
+                        } else if (sourceIsPurchased && !targetIsPurchased && !requirementsMet) {
+                            // Light Red: Source is unlocked but other requirements not met
+                            lineColor = '#FF6666';
+                            lineOpacity = '0.5';
                         } else {
-                            lineColor = '#ff4444'; // Red - cannot afford or missing requirements
+                            // Red: Source is not unlocked (requirement not met)
+                            lineColor = '#FF4444';
+                            lineOpacity = '0.3';
                         }
 
-                        // Create line with dynamic color
+                        // Debug logging for Fire Staff connections in update function
+                        if (weapon.name === 'Fire Staff') {
+                            console.log(`🔥 UPDATE Fire Staff line from ${reqKey}: ${lineColor === '#FFD700' ? 'YELLOW' : lineColor === '#CC6600' ? 'ORANGE' : 'OTHER'}`);
+                            console.log(`- UPDATE canAfford: ${canAfford} (${this.gameState.player.weaponTreePoints} >= ${weapon.cost})`);
+                        }
+
+                        // Create line with dynamic color and opacity
                         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                         line.setAttribute('x1', fromX);
                         line.setAttribute('y1', fromY);
@@ -980,7 +1113,7 @@ export class MenuManager {
                         line.setAttribute('y2', toY);
                         line.setAttribute('stroke', lineColor);
                         line.setAttribute('stroke-width', '2');
-                        line.setAttribute('opacity', '0.7');
+                        line.setAttribute('opacity', lineOpacity);
                         
                         svg.appendChild(line);
                     }

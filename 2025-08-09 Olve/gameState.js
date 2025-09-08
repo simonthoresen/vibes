@@ -64,7 +64,7 @@ export class GameState {
         const defaultSettings = {
             keybinds: { ...DEFAULT_KEYBINDS },
             showPauseBtn: true,
-            scrollableCheatMenu: false,
+            scrollableCheatMenu: true,
             scrollableSettingsMenu: false,
             menuSoundsVolume: 1.0,        // Changed from boolean to volume level (0.0 - 1.0)
             gameOverSoundsVolume: 1.0,    // Changed from boolean to volume level (0.0 - 1.0)
@@ -214,7 +214,10 @@ export class GameState {
             cheatsEnabled: false,
             oneHitKill: false,
             weaponTreePoints: this.loadWeaponTreePoints(),
-            weaponTreeUpgrades: this.loadWeaponTreeUpgrades()
+            weaponTreeUpgrades: this.loadWeaponTreeUpgrades(),
+            displayedWeaponTreePoints: this.loadWeaponTreePoints(), // For smooth animation
+            pendingWeaponTreePoints: 0, // Points earned but not yet shown in menu
+            lastMenuPoints: this.loadWeaponTreePoints() // Points last seen in menu
         };
     }
 
@@ -291,10 +294,76 @@ export class GameState {
 
     addWeaponTreePoints(floors) {
         this.player.weaponTreePoints += floors;
+        this.player.pendingWeaponTreePoints += floors;
         this.saveWeaponTreePoints(this.player.weaponTreePoints);
+        
+        console.log(`Earned ${floors} weapon tree points (total: ${this.player.weaponTreePoints}, pending: ${this.player.pendingWeaponTreePoints})`);
         
         // Trigger callbacks to notify about points change
         this.triggerPointsChanged();
+    }
+
+    // Smooth points animation system
+    startPointsAnimation(onUpdate, onComplete) {
+        if (this.player.pendingWeaponTreePoints <= 0) {
+            onComplete && onComplete();
+            return;
+        }
+
+        const startPoints = this.player.displayedWeaponTreePoints;
+        const targetPoints = this.player.weaponTreePoints;
+        const totalDifference = targetPoints - startPoints;
+        
+        if (totalDifference <= 0) {
+            onComplete && onComplete();
+            return;
+        }
+
+        const animationDuration = Math.min(2000, totalDifference * 100); // Max 2 seconds, 100ms per point
+        const startTime = Date.now();
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / animationDuration, 1);
+            
+            // Ease-out animation for smoother feeling
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+            
+            const currentDisplayed = Math.floor(startPoints + (totalDifference * easeProgress));
+            this.player.displayedWeaponTreePoints = currentDisplayed;
+            
+            onUpdate && onUpdate(currentDisplayed);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Animation complete
+                this.player.displayedWeaponTreePoints = targetPoints;
+                this.player.pendingWeaponTreePoints = 0;
+                this.player.lastMenuPoints = targetPoints;
+                onUpdate && onUpdate(targetPoints);
+                onComplete && onComplete();
+            }
+        };
+        
+        requestAnimationFrame(animate);
+    }
+
+    // Check if there are points to animate
+    hasPendingPointsAnimation() {
+        return this.player.pendingWeaponTreePoints > 0;
+    }
+
+    // Reset animation state (for immediate updates)
+    syncDisplayedPoints() {
+        this.player.displayedWeaponTreePoints = this.player.weaponTreePoints;
+        this.player.pendingWeaponTreePoints = 0;
+        this.player.lastMenuPoints = this.player.weaponTreePoints;
+    }
+
+    // Get current display points for UI
+    getDisplayedWeaponTreePoints() {
+        return this.player.displayedWeaponTreePoints;
     }
 
     // Get weapon tree structure - One big interconnected tree
@@ -458,6 +527,13 @@ export class GameState {
                         cost: 45, 
                         requires: ['spikeTrap', 'chakram'],
                         position: { row: 7, col: 2 } 
+                    },
+                    tripleBow: { 
+                        name: 'Triple Bow', 
+                        weaponId: 'TRIPLE_BOW',
+                        cost: 55, 
+                        requires: ['lightningStaff', 'crystalScythe'],
+                        position: { row: 7, col: 8 } 
                     },
 
                     // ROW 8: Master tier

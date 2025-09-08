@@ -185,6 +185,19 @@ export const WEAPONS = {
         spinSpeed: 0.25,
         piercing: true
     },
+    TRIPLE_BOW: {
+        name: 'Triple Bow',
+        damage: 35,
+        range: TILE_SIZE * 8,
+        cooldown: 267, // 1.5x attack speed of Dragon Bow (400 / 1.5)
+        projectileSpeed: 12,
+        color: '#9d4edd', // purple
+        type: 'ranged',
+        piercing: true,
+        multiShot: 3, // Shoots 3 arrows at once
+        spreadAngle: 0.8, // Very bad accuracy - much wider spread between arrows
+        sprite: 'fast_arrow.png'
+    },
     SPIRIT_BLADE: {
         name: 'Spirit Blade',
         damage: 45,

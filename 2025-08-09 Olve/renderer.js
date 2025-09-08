@@ -18,6 +18,13 @@ export class Renderer {
             this.dragonArrowImageLoaded = true;
         };
         
+        this.fastArrowImage = new Image();
+        this.fastArrowImage.src = 'images/fast_arrow.png';
+        this.fastArrowImageLoaded = false;
+        this.fastArrowImage.onload = () => {
+            this.fastArrowImageLoaded = true;
+        };
+        
         // Load sword sprites
         this.swordImage = new Image();
         this.swordImage.src = 'images/Sword.png';
@@ -47,6 +54,14 @@ export class Renderer {
         this.dragonBowImageLoaded = false;
         this.dragonBowImage.onload = () => {
             this.dragonBowImageLoaded = true;
+        };
+        
+        // Load fast bow sprite
+        this.fastBowImage = new Image();
+        this.fastBowImage.src = 'images/fast_bow.png';
+        this.fastBowImageLoaded = false;
+        this.fastBowImage.onload = () => {
+            this.fastBowImageLoaded = true;
         };
         
         // Load scythe sprites
@@ -413,10 +428,11 @@ export class Renderer {
 
     drawProjectiles(projectiles) {
         projectiles.forEach(proj => {
-            // Check projectile type by color
+            // Check projectile type by color and weapon reference
             const isPiercingBow = proj.color === '#8b4513';
             const isDragonBow = proj.color === '#f77';
-            const isBowProjectile = isPiercingBow || isDragonBow;
+            const isTripleBow = proj.color === '#9d4edd' || (proj.weapon && proj.weapon.name === 'Triple Bow');
+            const isBowProjectile = isPiercingBow || isDragonBow || isTripleBow;
             const isStaffProjectile = proj.type === 'staff';
             
             if (isBowProjectile) {
@@ -424,12 +440,15 @@ export class Renderer {
                 let useSprite = false;
                 let spriteImage = null;
                 
-                if (isPiercingBow && this.arrowImageLoaded) {
+                if (isTripleBow && this.fastArrowImageLoaded) {
                     useSprite = true;
-                    spriteImage = this.arrowImage;
+                    spriteImage = this.fastArrowImage;
                 } else if (isDragonBow && this.dragonArrowImageLoaded) {
                     useSprite = true;
                     spriteImage = this.dragonArrowImage;
+                } else if (isPiercingBow && this.arrowImageLoaded) {
+                    useSprite = true;
+                    spriteImage = this.arrowImage;
                 }
                 
                 if (useSprite) {
@@ -445,14 +464,29 @@ export class Renderer {
                     // Rotate to match projectile direction + 90 degrees
                     this.ctx.rotate(angle + Math.PI / 2);
                     
-                    // Draw arrow sprite centered with very large size for maximum visibility
-                    const spriteSize = 60; // Increased from 40 to 60 for maximum visibility
+                    // Determine sprite size based on weapon type
+                    let spriteSize = 40; // Default size
+                    let spriteWidth = 40; // Default width
+                    let spriteHeight = 40; // Default height
+                    
+                    if (isTripleBow) {
+                            spriteWidth = 8.75; // Halved again for fast arrows
+                            spriteHeight = 35; // Keep original height
+                    } else if (isDragonBow) {
+                        spriteSize = 45; // Slightly larger for dragon arrows
+                        spriteWidth = spriteHeight = spriteSize;
+                    } else if (isPiercingBow) {
+                        spriteSize = 40; // Standard size for regular arrows
+                        spriteWidth = spriteHeight = spriteSize;
+                    }
+                    
+                    // Draw arrow sprite centered
                     this.ctx.drawImage(
                         spriteImage, 
-                        -spriteSize / 2, 
-                        -spriteSize / 2, 
-                        spriteSize, 
-                        spriteSize
+                        -spriteWidth / 2, 
+                        -spriteHeight / 2, 
+                        spriteWidth, 
+                        spriteHeight
                     );
                     
                     // Restore canvas state
@@ -636,9 +670,30 @@ export class Renderer {
 
         // Group weapons by their ID for stacking effects
         const weaponGroups = this.groupWeaponsByType(player.weapons);
+        
+        // Find the highest priority bow weapon for sprite rendering
+        const bowPriority = {
+            'TRIPLE_BOW': 3,
+            'DRAGON_BOW': 2,
+            'BOW': 1
+        };
+        
+        let highestPriorityBow = null;
+        let highestPriority = 0;
+        
+        Object.values(weaponGroups).forEach(weapons => {
+            const weapon = weapons[0];
+            if (weapon.type === 'ranged') {
+                const priority = bowPriority[weapon.id] || 0;
+                if (priority > highestPriority) {
+                    highestPriority = priority;
+                    highestPriorityBow = weapon.id;
+                }
+            }
+        });
 
         Object.values(weaponGroups).forEach(weapons => {
-            this.drawWeaponGroup(weapons, playerCenterX, playerCenterY, player);
+            this.drawWeaponGroup(weapons, playerCenterX, playerCenterY, player, highestPriorityBow);
         });
     }
 
@@ -653,7 +708,7 @@ export class Renderer {
         return weaponGroups;
     }
 
-    drawWeaponGroup(weapons, playerCenterX, playerCenterY, player) {
+    drawWeaponGroup(weapons, playerCenterX, playerCenterY, player, highestPriorityBow) {
         const weapon = weapons[0];
         const count = weapons.length;
 
@@ -665,7 +720,7 @@ export class Renderer {
                 this.drawSpinningWeapon(weapon, count, playerCenterX, playerCenterY);
                 break;
             case 'ranged':
-                this.drawBowAiming(weapon, count, playerCenterX, playerCenterY, player);
+                this.drawBowAiming(weapon, count, playerCenterX, playerCenterY, player, highestPriorityBow);
                 break;
             case 'staff':
                 this.drawStaffWeapon(weapon, count, playerCenterX, playerCenterY, player);
@@ -935,15 +990,24 @@ export class Renderer {
         }
     }
 
-    drawBowAiming(weapon, count, playerCenterX, playerCenterY, player) {
-        // Determine which bow sprite to use based on weapon color
+    drawBowAiming(weapon, count, playerCenterX, playerCenterY, player, highestPriorityBow) {
+        // Only show bow sprite if this is the highest priority bow
+        if (weapon.id !== highestPriorityBow) {
+            return; // Don't render sprite for lower priority bows
+        }
+        
+        // Determine which bow sprite to use based on weapon color and name
         const isDragonBow = weapon.color === '#f77'; // Dragon bow color
         const isPiercingBow = weapon.color === '#8b4513'; // Piercing bow color
+        const isTripleBow = weapon.color === '#9d4edd' || weapon.name === 'Triple Bow'; // Triple bow color or name
         
         let useBowSprite = false;
         let bowImage = null;
         
-        if (isDragonBow && this.dragonBowImageLoaded) {
+        if (isTripleBow && this.fastBowImageLoaded) {
+            useBowSprite = true;
+            bowImage = this.fastBowImage;
+        } else if (isDragonBow && this.dragonBowImageLoaded) {
             useBowSprite = true;
             bowImage = this.dragonBowImage;
         } else if (isPiercingBow && this.bowImageLoaded) {
@@ -954,14 +1018,28 @@ export class Renderer {
             useBowSprite = true;
             bowImage = this.bowImage;
         }
-        
+
         if (useBowSprite) {
-            // Draw bow sprite pointing in the aiming direction
-            const bowSize = 60; // Increased from 40 to 60 for better visibility
+            // Determine bow size based on weapon type
+            let bowSize = 50; // Default size
+            let bowWidth = 50; // Default width
+            let bowHeight = 50; // Default height
             
-            // Calculate position to draw the bow (touching the player)
-            const bowX = playerCenterX + Math.cos(player.rotation) * (bowSize * 0.3);
-            const bowY = playerCenterY + Math.sin(player.rotation) * (bowSize * 0.3);
+            if (isTripleBow) {
+                    bowWidth = 11.25; // Halved again for fast bow
+                    bowHeight = 45; // Keep original height
+            } else if (isDragonBow) {
+                bowSize = 55; // Larger for dragon bow
+                bowWidth = bowHeight = bowSize;
+            } else if (isPiercingBow) {
+                bowSize = 50; // Standard size for regular bow
+                bowWidth = bowHeight = bowSize;
+            }
+            
+            // Calculate position to draw the bow (Triple Bow moved further forward)
+            const distanceMultiplier = isTripleBow ? 0.5 : 0.3; // Move Triple Bow further forward
+            const bowX = playerCenterX + Math.cos(player.rotation) * (Math.max(bowWidth, bowHeight) * distanceMultiplier);
+            const bowY = playerCenterY + Math.sin(player.rotation) * (Math.max(bowWidth, bowHeight) * distanceMultiplier);
             
             // Save current canvas state
             this.ctx.save();
@@ -975,10 +1053,10 @@ export class Renderer {
             // Draw bow sprite centered
             this.ctx.drawImage(
                 bowImage,
-                -bowSize / 2,
-                -bowSize / 2,
-                bowSize,
-                bowSize
+                -bowWidth / 2,
+                -bowHeight / 2,
+                bowWidth,
+                bowHeight
             );
             
             // Restore canvas state
