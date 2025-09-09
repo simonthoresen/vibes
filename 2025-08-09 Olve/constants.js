@@ -1,14 +1,4 @@
 // Game constants
-// Dynamic canvas dimensions that adapt to screen size
-export function getCanvasWidth() {
-    return window.CURRENT_CANVAS_WIDTH || 800; // Fallback to 800 if not set
-}
-
-export function getCanvasHeight() {
-    return window.CURRENT_CANVAS_HEIGHT || 600; // Fallback to 600 if not set
-}
-
-// Legacy static constants for backward compatibility (use dynamic functions above)
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
 export const TILE_SIZE = 32;

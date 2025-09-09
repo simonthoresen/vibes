@@ -1,4 +1,4 @@
-import { WEAPONS, COMPANION_TYPES, getCanvasWidth, getCanvasHeight } from './constants.js';
+import { WEAPONS, COMPANION_TYPES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class WeaponSystem {
     constructor(gameState, particleEngine = null) {
@@ -863,8 +863,8 @@ export class WeaponSystem {
         const trapSize = weapon.area || 32;
         const margin = trapSize; // Keep traps away from edges
         
-        const x = margin + Math.random() * (getCanvasWidth() - 2 * margin);
-        const y = margin + Math.random() * (getCanvasHeight() - 2 * margin);
+        const x = margin + Math.random() * (CANVAS_WIDTH - 2 * margin);
+        const y = margin + Math.random() * (CANVAS_HEIGHT - 2 * margin);
 
         const trap = {
             id: `${weapon.id}_${now}_${index}`,
@@ -1385,7 +1385,7 @@ export class WeaponSystem {
             // Create multiple rain droplets across the screen
             for (let i = 0; i < dropletsPerTick; i++) {
                 const droplet = {
-                    x: Math.random() * (getCanvasWidth() + 200) - 100, // Slightly wider than screen
+                    x: Math.random() * (CANVAS_WIDTH + 200) - 100, // Slightly wider than screen
                     y: -50, // Start above screen
                     speed: (300 + Math.random() * 200) * speedMultiplier,
                     damage: 0.1 * damageMultiplier,
@@ -1405,7 +1405,7 @@ export class WeaponSystem {
             droplet.y = -50 + (droplet.speed * deltaTime);
 
             // Remove droplets that have fallen off screen
-            if (droplet.y > getCanvasHeight() + 50) {
+            if (droplet.y > CANVAS_HEIGHT + 50) {
                 return false;
             }
 
