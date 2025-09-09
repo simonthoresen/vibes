@@ -1,6 +1,7 @@
 export class ParticleEngine {
-    constructor() {
+    constructor(gameState = null) {
         this.particles = [];
+        this.gameState = gameState;
     }
 
     update(deltaTime) {
@@ -225,7 +226,16 @@ export class ParticleEngine {
             gravity = 0 // Add gravity support
         } = options;
 
-        for (let i = 0; i < particleCount; i++) {
+        // Apply particle multiplier from settings
+        const multiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        const adjustedParticleCount = Math.round(particleCount * multiplier);
+        
+        // Skip particle creation if multiplier is 0
+        if (adjustedParticleCount <= 0) {
+            return;
+        }
+
+        for (let i = 0; i < adjustedParticleCount; i++) {
             // Random angle for explosion direction
             const angle = Math.random() * Math.PI * 2;
             
@@ -516,8 +526,17 @@ export class ParticleEngine {
     }
 
     createIceCubeEffect(x, y, color) {
+        // Apply particle multiplier from settings
+        const multiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        
+        // Skip particle creation if multiplier is 0
+        if (multiplier <= 0) {
+            return;
+        }
+
         // Create ice cube particles with special cube shape
-        const cubeCount = 1 + Math.floor(Math.random() * 2); // 1-2 cubes per effect
+        const baseCubeCount = 1 + Math.floor(Math.random() * 2); // 1-2 cubes per effect
+        const cubeCount = Math.max(1, Math.round(baseCubeCount * multiplier)); // Ensure at least 1 cube when multiplier > 0
         
         for (let i = 0; i < cubeCount; i++) {
             // Random angle for ice cube direction
@@ -593,9 +612,19 @@ export class ParticleEngine {
 
     // Summoning and ally-related particle effects
     createSummonEffect(x, y, color) {
+        // Apply particle multiplier from settings
+        const multiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        const baseParticleCount = 20;
+        const adjustedParticleCount = Math.round(baseParticleCount * multiplier);
+        
+        // Skip particle creation if multiplier is 0
+        if (adjustedParticleCount <= 0) {
+            return;
+        }
+
         // Create a magical summoning circle effect
-        for (let i = 0; i < 20; i++) {
-            const angle = (i / 20) * Math.PI * 2;
+        for (let i = 0; i < adjustedParticleCount; i++) {
+            const angle = (i / adjustedParticleCount) * Math.PI * 2;
             const radius = 40 + Math.random() * 20;
             const particle = {
                 x: x + Math.cos(angle) * radius,
@@ -614,7 +643,8 @@ export class ParticleEngine {
         }
 
         // Add some sparkle effects
-        for (let i = 0; i < 15; i++) {
+        const sparkleCount = Math.round(15 * multiplier);
+        for (let i = 0; i < sparkleCount; i++) {
             const particle = {
                 x: x + (Math.random() - 0.5) * 60,
                 y: y + (Math.random() - 0.5) * 60,
@@ -633,8 +663,17 @@ export class ParticleEngine {
     }
 
     createAllyAttackEffect(x, y, color) {
+        // Apply particle multiplier from settings
+        const multiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        const adjustedParticleCount = Math.round(8 * multiplier);
+        
+        // Skip particle creation if multiplier is 0
+        if (adjustedParticleCount <= 0) {
+            return;
+        }
+
         // Create a burst effect when allies attack
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < adjustedParticleCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 2 + Math.random() * 3;
             const particle = {
@@ -677,8 +716,17 @@ export class ParticleEngine {
     }
 
     createAllyDeathEffect(x, y, color) {
+        // Apply particle multiplier from settings
+        const multiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        const adjustedParticleCount = Math.round(12 * multiplier);
+        
+        // Skip particle creation if multiplier is 0
+        if (adjustedParticleCount <= 0) {
+            return;
+        }
+
         // Create dramatic effect when allies die
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < adjustedParticleCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 2 + Math.random() * 4;
             const particle = {

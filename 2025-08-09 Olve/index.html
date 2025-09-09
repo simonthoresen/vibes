@@ -404,6 +404,46 @@
             color: #FFD700;
         }
 
+        /* Default value indicators for sliders */
+        .keybind-row {
+            position: relative;
+        }
+        
+        /* Container for slider with default indicator */
+        .keybind-row input[type="range"] {
+            position: relative;
+        }
+        
+        /* Default indicator line for volume sliders (100% = right side) */
+        #menuSoundsVolumeSetting::after,
+        #gameOverSoundsVolumeSetting::after {
+            content: '';
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 12px;
+            background: rgba(160, 160, 160, 0.6);
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        /* Default indicator line for game music and particle amount (50% = middle) */
+        #gameMusicVolumeSetting::after,
+        #particleMultiplierSetting::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 12px;
+            background: rgba(160, 160, 160, 0.6);
+            pointer-events: none;
+            z-index: 2;
+        }
+
         /* Virtual Joystick Styles */
         .virtual-joystick {
             position: absolute;
@@ -512,6 +552,11 @@
             <div class="keybind-row">
                 <span>Virtual Joystick</span>
                 <input type="checkbox" id="virtualJoystickSetting" />
+            </div>
+            <div class="keybind-row">
+                <span>Particle Amount</span>
+                <input type="range" id="particleMultiplierSetting" min="0" max="2" step="0.01" />
+                <span id="particleMultiplierDisplay">--</span>
             </div>
             <div class="keybind-row" style="border-top: 1px solid #444; margin-top: 20px; padding-top: 20px;">
                 <span style="color: #ff6666;">Reset Weapon Tree Progress</span>

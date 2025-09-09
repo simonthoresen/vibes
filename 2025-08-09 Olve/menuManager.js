@@ -89,7 +89,8 @@ export class MenuManager {
             // Setup reset weapon tree button
             const resetBtn = document.getElementById('resetWeaponTreeBtn');
             if (resetBtn) {
-                resetBtn.addEventListener('click', () => {
+                const handleReset = (e) => {
+                    e.preventDefault();
                     if (confirm('Are you sure you want to reset your weapon tree progress? This will unlock only Sword, Scythe, and Bow, and set your points to 0. This action cannot be undone!')) {
                         if (this.gameState.resetWeaponTree()) {
                             alert('Weapon tree progress has been reset successfully!');
@@ -98,11 +99,12 @@ export class MenuManager {
                             if (document.getElementById('weaponTreeMenu') && document.getElementById('weaponTreeMenu').style.display !== 'none') {
                                 this.refreshWeaponTree();
                             }
-                        } else {
-                            alert('Failed to reset weapon tree progress. Please try again.');
                         }
                     }
-                });
+                };
+                
+                resetBtn.addEventListener('click', handleReset);
+                resetBtn.addEventListener('touchend', handleReset);
             }
         }
     }
@@ -145,7 +147,13 @@ export class MenuManager {
             transition: all 0.3s ease;
         `;
         
+        // Add both click and touch support for iPad
         button.onclick = onClick;
+        button.addEventListener('touchend', (e) => {
+            e.preventDefault(); // Prevent double-firing with click
+            onClick();
+        });
+        
         this.addButtonHoverEffects(button, isStart);
         return button;
     }
@@ -232,11 +240,20 @@ export class MenuManager {
             if (this.gameState.player.skinsUnlocked) {
                 skinsButton.style.opacity = '1';
                 skinsButton.style.cursor = 'pointer';
-                skinsButton.onclick = () => this.showSkinMenu();
+                const handleSkinsClick = (e) => {
+                    e.preventDefault();
+                    this.showSkinMenu();
+                };
+                skinsButton.onclick = handleSkinsClick;
+                skinsButton.addEventListener('touchend', handleSkinsClick);
             } else {
                 skinsButton.style.opacity = '0.5';
                 skinsButton.style.cursor = 'not-allowed';
-                skinsButton.onclick = () => {}; // Do nothing when clicked
+                const handleDisabledClick = (e) => {
+                    e.preventDefault();
+                };
+                skinsButton.onclick = handleDisabledClick;
+                skinsButton.addEventListener('touchend', handleDisabledClick);
             }
         }
     }
@@ -275,6 +292,11 @@ export class MenuManager {
         `;
 
         skinOption.onclick = () => this.selectSkin(skin, skinOption);
+        const handleSkinClick = (e) => {
+            e.preventDefault();
+            this.selectSkin(skin, skinOption);
+        };
+        skinOption.addEventListener('touchend', handleSkinClick);
         this.addSkinHoverEffects(skinOption);
 
         const skinName = document.createElement('div');
@@ -292,25 +314,41 @@ export class MenuManager {
     }
 
     addButtonHoverEffects(button, isStart = false) {
-        button.addEventListener('mouseenter', () => {
+        const handleHover = () => {
             button.style.transform = 'scale(1.05)';
             button.style.backgroundColor = isStart ? '#4CAF50' : '#444';
-        });
+        };
         
-        button.addEventListener('mouseleave', () => {
+        const handleUnhover = () => {
             button.style.transform = 'scale(1)';
             button.style.backgroundColor = '#333';
-        });
+        };
+
+        // Mouse events
+        button.addEventListener('mouseenter', handleHover);
+        button.addEventListener('mouseleave', handleUnhover);
+        
+        // Touch events for iPad
+        button.addEventListener('touchstart', handleHover);
+        button.addEventListener('touchcancel', handleUnhover);
     }
 
     addSkinHoverEffects(skinOption) {
-        skinOption.addEventListener('mouseenter', () => {
+        const handleHover = () => {
             skinOption.style.transform = 'scale(1.1)';
-        });
+        };
         
-        skinOption.addEventListener('mouseleave', () => {
+        const handleUnhover = () => {
             skinOption.style.transform = 'scale(1)';
-        });
+        };
+
+        // Mouse events
+        skinOption.addEventListener('mouseenter', handleHover);
+        skinOption.addEventListener('mouseleave', handleUnhover);
+        
+        // Touch events for iPad
+        skinOption.addEventListener('touchstart', handleHover);
+        skinOption.addEventListener('touchcancel', handleUnhover);
     }
 
     selectSkin(skin, skinOption) {
@@ -670,23 +708,38 @@ export class MenuManager {
         }
 
         if (canPurchase) {
-            nodeDiv.addEventListener('click', () => {
+            const handlePurchase = () => {
                 if (this.gameState.purchaseWeapon(branchKey, weaponKey)) {
                     this.refreshWeaponTree();
                 }
+            };
+
+            // Add both click and touch support for iPad
+            nodeDiv.addEventListener('click', handlePurchase);
+            nodeDiv.addEventListener('touchend', (e) => {
+                e.preventDefault(); // Prevent double-firing with click
+                handlePurchase();
             });
 
-            nodeDiv.addEventListener('mouseenter', () => {
+            const handleHover = () => {
                 nodeDiv.style.background = 'rgba(255, 255, 255, 0.25)';
                 nodeDiv.style.transform = 'scale(1.1)';
                 nodeDiv.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.6)';
-            });
+            };
 
-            nodeDiv.addEventListener('mouseleave', () => {
+            const handleUnhover = () => {
                 nodeDiv.style.background = 'rgba(255, 255, 255, 0.15)';
                 nodeDiv.style.transform = 'scale(1)';
                 nodeDiv.style.boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
-            });
+            };
+
+            // Mouse events
+            nodeDiv.addEventListener('mouseenter', handleHover);
+            nodeDiv.addEventListener('mouseleave', handleUnhover);
+
+            // Touch events for iPad
+            nodeDiv.addEventListener('touchstart', handleHover);
+            nodeDiv.addEventListener('touchcancel', handleUnhover);
         }
 
         return nodeDiv;
@@ -845,21 +898,36 @@ export class MenuManager {
         }
 
         if (canPurchase) {
-            nodeDiv.addEventListener('click', () => {
+            const handlePurchase = () => {
                 if (this.gameState.purchaseWeapon(branchKey, weaponKey)) {
                     this.refreshWeaponTree();
                 }
+            };
+
+            // Add both click and touch support for iPad
+            nodeDiv.addEventListener('click', handlePurchase);
+            nodeDiv.addEventListener('touchend', (e) => {
+                e.preventDefault(); // Prevent double-firing with click
+                handlePurchase();
             });
 
-            nodeDiv.addEventListener('mouseenter', () => {
+            const handleHover = () => {
                 nodeDiv.style.background = 'rgba(255, 255, 255, 0.3)';
                 nodeDiv.style.transform = 'scale(1.05)';
-            });
+            };
 
-            nodeDiv.addEventListener('mouseleave', () => {
+            const handleUnhover = () => {
                 nodeDiv.style.background = 'rgba(255, 255, 255, 0.1)';
                 nodeDiv.style.transform = 'scale(1)';
-            });
+            };
+
+            // Mouse events
+            nodeDiv.addEventListener('mouseenter', handleHover);
+            nodeDiv.addEventListener('mouseleave', handleUnhover);
+
+            // Touch events for iPad
+            nodeDiv.addEventListener('touchstart', handleHover);
+            nodeDiv.addEventListener('touchcancel', handleUnhover);
         }
 
         return nodeDiv;

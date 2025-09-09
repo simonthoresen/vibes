@@ -43,7 +43,7 @@ class DungeonCrawlerGame {
 
         // Initialize game systems
         this.menuManager = new MenuManager(this.gameState);
-        this.particleEngine = new ParticleEngine();
+        this.particleEngine = new ParticleEngine(this.gameState);
         this.weaponSystem = new WeaponSystem(this.gameState, this.particleEngine);
         this.enemySystem = new EnemySystem(this.gameState);
         this.projectileSystem = new ProjectileSystem(this.gameState, this.particleEngine);
@@ -149,6 +149,15 @@ class DungeonCrawlerGame {
         this.setupPageVisibilityHandlers();
     }
 
+    // Helper function to snap slider values to defaults when close
+    snapToDefault(value, defaultValue, snapThreshold = 0.02) {
+        const distance = Math.abs(value - defaultValue);
+        if (distance <= snapThreshold) {
+            return defaultValue;
+        }
+        return value;
+    }
+
     setupUIEventHandlers() {
         // Pause/Resume
         document.addEventListener('keydown', (e) => {
@@ -210,7 +219,11 @@ class DungeonCrawlerGame {
             menuSoundsVolumeSetting.value = savedVolume;
             menuSoundsVolumeDisplay.textContent = Math.round(savedVolume * 100) + '%';
             menuSoundsVolumeSetting.oninput = (e) => {
-                const volume = parseFloat(e.target.value);
+                let volume = parseFloat(e.target.value);
+                // Snap to default value (1.0) when within 2%
+                volume = this.snapToDefault(volume, 1.0);
+                e.target.value = volume; // Update slider position if snapped
+                
                 console.log('Menu sounds volume changed to:', volume);
                 console.log('Before change - settings object:', JSON.stringify(this.gameState.settings));
                 this.gameState.settings.menuSoundsVolume = volume;
@@ -242,7 +255,11 @@ class DungeonCrawlerGame {
             gameOverSoundsVolumeSetting.value = savedVolume;
             gameOverSoundsVolumeDisplay.textContent = Math.round(savedVolume * 100) + '%';
             gameOverSoundsVolumeSetting.oninput = (e) => {
-                const volume = parseFloat(e.target.value);
+                let volume = parseFloat(e.target.value);
+                // Snap to default value (1.0) when within 2%
+                volume = this.snapToDefault(volume, 1.0);
+                e.target.value = volume; // Update slider position if snapped
+                
                 console.log('Game over sounds volume changed to:', volume);
                 this.gameState.settings.gameOverSoundsVolume = volume;
                 gameOverSoundsVolumeDisplay.textContent = Math.round(volume * 100) + '%';
@@ -269,7 +286,11 @@ class DungeonCrawlerGame {
             gameMusicVolumeSetting.value = savedVolume;
             gameMusicVolumeDisplay.textContent = Math.round(savedVolume * 100) + '%';
             gameMusicVolumeSetting.oninput = (e) => {
-                const volume = parseFloat(e.target.value);
+                let volume = parseFloat(e.target.value);
+                // Snap to default value (0.5) when within 2%
+                volume = this.snapToDefault(volume, 0.5);
+                e.target.value = volume; // Update slider position if snapped
+                
                 console.log('Game music volume changed to:', volume);
                 this.gameState.settings.gameMusicVolume = volume;
                 gameMusicVolumeDisplay.textContent = Math.round(volume * 100) + '%';
@@ -285,6 +306,27 @@ class DungeonCrawlerGame {
                         this.gameplayMusic.play().catch(e => console.log('Could not resume music:', e));
                     }
                 }
+            };
+        }
+
+        // Settings slider for particle density
+        const particleMultiplierSetting = document.getElementById('particleMultiplierSetting');
+        const particleMultiplierDisplay = document.getElementById('particleMultiplierDisplay');
+        if (particleMultiplierSetting && particleMultiplierDisplay) {
+            const savedMultiplier = this.gameState.settings.particleMultiplier !== undefined ? this.gameState.settings.particleMultiplier : 1.0;
+            console.log('Loading particle multiplier from settings:', savedMultiplier);
+            particleMultiplierSetting.value = savedMultiplier;
+            particleMultiplierDisplay.textContent = Math.round(savedMultiplier * 100) + '%';
+            particleMultiplierSetting.oninput = (e) => {
+                let multiplier = parseFloat(e.target.value);
+                // Snap to default value (1.0) when within 2%
+                multiplier = this.snapToDefault(multiplier, 1.0);
+                e.target.value = multiplier; // Update slider position if snapped
+                
+                console.log('Particle multiplier changed to:', multiplier);
+                this.gameState.settings.particleMultiplier = multiplier;
+                particleMultiplierDisplay.textContent = Math.round(multiplier * 100) + '%';
+                this.gameState.saveSettings();
             };
         }
 

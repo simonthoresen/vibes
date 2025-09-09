@@ -69,7 +69,8 @@ export class GameState {
             menuSoundsVolume: 1.0,        // Changed from boolean to volume level (0.0 - 1.0)
             gameOverSoundsVolume: 1.0,    // Changed from boolean to volume level (0.0 - 1.0)
             gameMusicVolume: 0.5,         // Changed from boolean to volume level (0.0 - 1.0)
-            virtualJoystick: false
+            virtualJoystick: false,
+            particleMultiplier: 1.0       // Particle density setting (0.0 - 2.0)
         };
 
         // Check for old format settings and clear them
