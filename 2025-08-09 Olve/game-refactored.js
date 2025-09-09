@@ -995,26 +995,18 @@ class DungeonCrawlerGame {
     updateSettingsMenuScrollable() {
         const settingsMenu = document.getElementById('settingsMenu');
         if (settingsMenu) {
-            const isIPad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const content = settingsMenu.querySelector('.content');
             
-            // Always make settings menu scrollable
+            // Always make settings menu scrollable for mobile support
             settingsMenu.classList.add('scrollable');
-            console.log('Settings menu made scrollable' + (isIPad ? ' (iPad detected)' : ''));
+            console.log('Settings menu made scrollable');
             
-            // Apply direct styles for iPad as fallback
-            if (isIPad && content) {
-                content.style.maxHeight = '600px';
-                content.style.overflowY = 'scroll';
+            // Apply direct styles for all devices
+            if (content) {
+                content.style.maxHeight = '70vh';
+                content.style.overflowY = 'auto';
                 content.style.overflowX = 'hidden';
                 content.style.webkitOverflowScrolling = 'touch';
-                console.log('Applied direct iPad styles');
-                
-                // Force a style recalculation
-                content.style.display = 'none';
-                content.offsetHeight; // Trigger reflow
-                content.style.display = '';
-                console.log('Forced style recalculation on iPad');
             }
         }
     }
