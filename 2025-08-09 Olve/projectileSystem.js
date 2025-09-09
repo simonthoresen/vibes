@@ -1,4 +1,4 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
+import { getCanvasWidth, getCanvasHeight } from './constants.js';
 
 export class ProjectileSystem {
     constructor(gameState, particleEngine = null) {
@@ -376,13 +376,13 @@ export class ProjectileSystem {
             // Spirit Blade can go slightly outside bounds to trigger edge detection
             // but should be removed if it goes too far beyond the screen
             const buffer = 50; // Allow 50 pixels beyond screen edge
-            return projectile.x >= -buffer && projectile.x <= CANVAS_WIDTH + buffer && 
-                   projectile.y >= -buffer && projectile.y <= CANVAS_HEIGHT + buffer;
+            return projectile.x >= -buffer && projectile.x <= getCanvasWidth() + buffer && 
+                   projectile.y >= -buffer && projectile.y <= getCanvasHeight() + buffer;
         }
         
         // Regular bounds checking for other projectiles
-        return projectile.x >= 0 && projectile.x <= CANVAS_WIDTH && 
-               projectile.y >= 0 && projectile.y <= CANVAS_HEIGHT;
+        return projectile.x >= 0 && projectile.x <= getCanvasWidth() && 
+               projectile.y >= 0 && projectile.y <= getCanvasHeight();
     }
 
     createProjectile(config) {
@@ -806,8 +806,8 @@ export class ProjectileSystem {
 
     updateSpiritBlade(projectile) {
         // Use actual canvas dimensions
-        const mapWidth = 800; // CANVAS_WIDTH
-        const mapHeight = 600; // CANVAS_HEIGHT
+        const mapWidth = getCanvasWidth();
+        const mapHeight = getCanvasHeight();
         
         // Check if Spirit Blade hit a screen edge
         if (!projectile.returning) {
@@ -856,8 +856,8 @@ export class ProjectileSystem {
         // This makes chakrams permanent until manually removed
         
         // Use actual canvas dimensions for bouncing
-        const mapWidth = 800; // CANVAS_WIDTH
-        const mapHeight = 600; // CANVAS_HEIGHT
+        const mapWidth = getCanvasWidth();
+        const mapHeight = getCanvasHeight();
         
         // Bounce off walls with proper boundary checking
         if (projectile.x <= 0) {

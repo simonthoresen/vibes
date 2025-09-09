@@ -1,4 +1,4 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
+import { getCanvasWidth, getCanvasHeight } from './constants.js';
 
 export class PlayerController {
     constructor(gameState, inputManager) {
@@ -74,10 +74,10 @@ export class PlayerController {
     wrapPosition() {
         const player = this.gameState.player;
         
-        if (player.x < 0) player.x = CANVAS_WIDTH;
-        if (player.x > CANVAS_WIDTH) player.x = 0;
-        if (player.y < 0) player.y = CANVAS_HEIGHT;
-        if (player.y > CANVAS_HEIGHT) player.y = 0;
+        if (player.x < 0) player.x = getCanvasWidth();
+        if (player.x > getCanvasWidth()) player.x = 0;
+        if (player.y < 0) player.y = getCanvasHeight();
+        if (player.y > getCanvasHeight()) player.y = 0;
     }
 
     takeDamage(damage) {
@@ -142,8 +142,8 @@ export class PlayerController {
 
     reset() {
         this.gameState.player.health = this.gameState.player.maxHealth;
-        this.gameState.player.x = CANVAS_WIDTH / 2;
-        this.gameState.player.y = CANVAS_HEIGHT / 2;
+        this.gameState.player.x = getCanvasWidth() / 2;
+        this.gameState.player.y = getCanvasHeight() / 2;
         this.gameState.player.invulnerable = false;
         this.gameState.player.rotation = 0;
         this.clearWeapons();

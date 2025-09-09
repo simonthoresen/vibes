@@ -20,6 +20,19 @@ class DungeonCrawlerGame {
     }
 
     initializeGame() {
+        // Initialize responsive canvas sizing
+        this.calculateCanvasDimensions();
+        this.setupCanvasSize();
+        
+        // Set up resize handler
+        window.addEventListener('resize', () => {
+            // Debounce resize events
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = setTimeout(() => {
+                this.handleResize();
+            }, 100);
+        });
+        
         // Initialize core systems
         this.gameState = new GameState();
         this.inputManager = new InputManager();
@@ -158,6 +171,169 @@ class DungeonCrawlerGame {
         return value;
     }
 
+    // Calculate optimal canvas dimensions based on screen size
+    calculateCanvasDimensions() {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Account for padding and UI elements
+        const availableWidth = viewportWidth - 40; // 20px padding each side
+        const availableHeight = viewportHeight - 80; // Extra space for UI elements
+        
+        // Define aspect ratio (4:3 like original 800x600)
+        const aspectRatio = 4 / 3;
+        
+        let canvasWidth, canvasHeight;
+        
+        // Determine optimal size based on available space
+        if (availableWidth / availableHeight > aspectRatio) {
+            // Height is the limiting factor
+            canvasHeight = Math.min(availableHeight, 600);
+            canvasWidth = canvasHeight * aspectRatio;
+        } else {
+            // Width is the limiting factor  
+            canvasWidth = Math.min(availableWidth, 800);
+            canvasHeight = canvasWidth / aspectRatio;
+        }
+        
+        // Set minimum dimensions for playability
+        const minWidth = 400;
+        const minHeight = 300;
+        
+        canvasWidth = Math.max(canvasWidth, minWidth);
+        canvasHeight = Math.max(canvasHeight, minHeight);
+        
+        // Set maximum dimensions to prevent huge displays
+        const maxWidth = 1200;
+        const maxHeight = 900;
+        
+        canvasWidth = Math.min(canvasWidth, maxWidth);
+        canvasHeight = Math.min(canvasHeight, maxHeight);
+        
+        // Store dimensions globally for other systems to use
+        window.CURRENT_CANVAS_WIDTH = Math.round(canvasWidth);
+        window.CURRENT_CANVAS_HEIGHT = Math.round(canvasHeight);
+        
+        console.log(`Canvas dimensions calculated: ${window.CURRENT_CANVAS_WIDTH}x${window.CURRENT_CANVAS_HEIGHT}`);
+    }
+
+    // Apply calculated dimensions to canvas element
+    setupCanvasSize() {
+        const canvas = document.getElementById('gameCanvas');
+        if (canvas) {
+            canvas.width = window.CURRENT_CANVAS_WIDTH;
+            canvas.height = window.CURRENT_CANVAS_HEIGHT;
+            
+            // Update CSS to maintain aspect ratio
+            canvas.style.width = window.CURRENT_CANVAS_WIDTH + 'px';
+            canvas.style.height = window.CURRENT_CANVAS_HEIGHT + 'px';
+            
+            console.log(`Canvas size applied: ${canvas.width}x${canvas.height}`);
+        }
+    }
+
+    // Handle window resize events
+    handleResize() {
+        this.calculateCanvasDimensions();
+        this.setupCanvasSize();
+        
+        // Trigger re-initialization of systems that depend on canvas size
+        if (this.renderer) {
+            // Force renderer to acknowledge new canvas size
+            this.renderer.canvas.width = window.CURRENT_CANVAS_WIDTH;
+            this.renderer.canvas.height = window.CURRENT_CANVAS_HEIGHT;
+        }
+    }
+
+    // Get default settings values
+    getDefaultSettings() {
+        return {
+            menuSoundsVolume: 1.0,
+            gameOverSoundsVolume: 1.0,
+            gameMusicVolume: 0.5,
+            particleMultiplier: 1.0,
+            virtualJoystick: false,
+            showPauseBtn: true
+        };
+    }
+
+    // Apply potato mode settings for best performance
+    applyPotatoMode() {
+        this.gameState.settings.menuSoundsVolume = 0.0;        // No menu sounds
+        this.gameState.settings.gameOverSoundsVolume = 0.0;    // No game over sounds
+        this.gameState.settings.gameMusicVolume = 0.0;         // No music
+        this.gameState.settings.particleMultiplier = 0.0;     // No particles
+        this.gameState.settings.virtualJoystick = false;      // Keep joystick off for performance
+        this.gameState.settings.showPauseBtn = true;          // Keep pause button for functionality
+        
+        this.gameState.saveSettings();
+        this.refreshAllSettings();
+    }
+
+    // Reset all settings to their defaults
+    resetToDefaults() {
+        const defaults = this.getDefaultSettings();
+        Object.assign(this.gameState.settings, defaults);
+        
+        this.gameState.saveSettings();
+        this.refreshAllSettings();
+    }
+
+    // Refresh all setting UI elements to match current values
+    refreshAllSettings() {
+        // Update volume sliders
+        const menuSoundsVolumeSetting = document.getElementById('menuSoundsVolumeSetting');
+        const menuSoundsVolumeDisplay = document.getElementById('menuSoundsVolumeDisplay');
+        if (menuSoundsVolumeSetting && menuSoundsVolumeDisplay) {
+            menuSoundsVolumeSetting.value = this.gameState.settings.menuSoundsVolume;
+            menuSoundsVolumeDisplay.textContent = Math.round(this.gameState.settings.menuSoundsVolume * 100) + '%';
+        }
+
+        const gameOverSoundsVolumeSetting = document.getElementById('gameOverSoundsVolumeSetting');
+        const gameOverSoundsVolumeDisplay = document.getElementById('gameOverSoundsVolumeDisplay');
+        if (gameOverSoundsVolumeSetting && gameOverSoundsVolumeDisplay) {
+            gameOverSoundsVolumeSetting.value = this.gameState.settings.gameOverSoundsVolume;
+            gameOverSoundsVolumeDisplay.textContent = Math.round(this.gameState.settings.gameOverSoundsVolume * 100) + '%';
+        }
+
+        const gameMusicVolumeSetting = document.getElementById('gameMusicVolumeSetting');
+        const gameMusicVolumeDisplay = document.getElementById('gameMusicVolumeDisplay');
+        if (gameMusicVolumeSetting && gameMusicVolumeDisplay) {
+            gameMusicVolumeSetting.value = this.gameState.settings.gameMusicVolume;
+            gameMusicVolumeDisplay.textContent = Math.round(this.gameState.settings.gameMusicVolume * 100) + '%';
+        }
+
+        const particleMultiplierSetting = document.getElementById('particleMultiplierSetting');
+        const particleMultiplierDisplay = document.getElementById('particleMultiplierDisplay');
+        if (particleMultiplierSetting && particleMultiplierDisplay) {
+            particleMultiplierSetting.value = this.gameState.settings.particleMultiplier;
+            particleMultiplierDisplay.textContent = Math.round(this.gameState.settings.particleMultiplier * 100) + '%';
+        }
+
+        // Update checkboxes
+        const virtualJoystickSetting = document.getElementById('virtualJoystickSetting');
+        if (virtualJoystickSetting) {
+            virtualJoystickSetting.checked = this.gameState.settings.virtualJoystick;
+        }
+
+        const showPauseBtnSetting = document.getElementById('showPauseBtnSetting');
+        if (showPauseBtnSetting) {
+            showPauseBtnSetting.checked = this.gameState.settings.showPauseBtn;
+        }
+
+        // Update audio volumes
+        if (this.backgroundAudio) {
+            this.backgroundAudio.volume = this.gameState.settings.menuSoundsVolume;
+        }
+        if (this.gameplayMusic) {
+            this.gameplayMusic.volume = this.gameState.settings.gameMusicVolume;
+        }
+
+        // Update other systems
+        this.updateVirtualJoystickVisibility();
+        this.updatePauseBtnVisibility();
+    }
+
     setupUIEventHandlers() {
         // Pause/Resume
         document.addEventListener('keydown', (e) => {
@@ -184,29 +360,6 @@ class DungeonCrawlerGame {
                 this.gameState.settings.showPauseBtn = showPauseBtnSetting.checked;
                 this.gameState.saveSettings();
                 this.updatePauseBtnVisibility();
-            };
-        }
-
-        // Settings toggle for scrollable cheat menu
-        const scrollableCheatMenuSetting = document.getElementById('scrollableCheatMenuSetting');
-        if (scrollableCheatMenuSetting) {
-            // Set initial state from gameState
-            scrollableCheatMenuSetting.checked = !!this.gameState.settings.scrollableCheatMenu;
-            scrollableCheatMenuSetting.onchange = (e) => {
-                this.gameState.settings.scrollableCheatMenu = scrollableCheatMenuSetting.checked;
-                this.gameState.saveSettings();
-            };
-        }
-
-        // Settings toggle for scrollable settings menu
-        const scrollableSettingsMenuSetting = document.getElementById('scrollableSettingsMenuSetting');
-        if (scrollableSettingsMenuSetting) {
-            // Set initial state from gameState
-            scrollableSettingsMenuSetting.checked = !!this.gameState.settings.scrollableSettingsMenu;
-            scrollableSettingsMenuSetting.onchange = (e) => {
-                this.gameState.settings.scrollableSettingsMenu = scrollableSettingsMenuSetting.checked;
-                this.gameState.saveSettings();
-                this.updateSettingsMenuScrollable();
             };
         }
 
@@ -343,6 +496,36 @@ class DungeonCrawlerGame {
             };
         } else {
             console.log('Virtual joystick setting element not found');
+        }
+
+        // Potato mode button
+        const potatoModeBtn = document.getElementById('potatoModeBtn');
+        if (potatoModeBtn) {
+            const handlePotatoMode = (e) => {
+                e.preventDefault();
+                if (confirm('Enable Potato Mode? This will optimize all settings for best performance (disable particles, sounds, and music). This action can be undone by resetting to defaults.')) {
+                    this.applyPotatoMode();
+                    alert('Potato Mode enabled! All settings optimized for performance.');
+                }
+            };
+            
+            potatoModeBtn.addEventListener('click', handlePotatoMode);
+            potatoModeBtn.addEventListener('touchend', handlePotatoMode);
+        }
+
+        // Reset to defaults button
+        const resetToDefaultBtn = document.getElementById('resetToDefaultBtn');
+        if (resetToDefaultBtn) {
+            const handleResetDefaults = (e) => {
+                e.preventDefault();
+                if (confirm('Reset all settings to their default values? This will restore recommended audio levels, particle amounts, and other preferences.')) {
+                    this.resetToDefaults();
+                    alert('Settings reset to defaults successfully!');
+                }
+            };
+            
+            resetToDefaultBtn.addEventListener('click', handleResetDefaults);
+            resetToDefaultBtn.addEventListener('touchend', handleResetDefaults);
         }
 
         // Update pause button visibility on game start
@@ -899,37 +1082,23 @@ class DungeonCrawlerGame {
             const isIPad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const content = settingsMenu.querySelector('.content');
             
-            if (this.gameState.settings.scrollableSettingsMenu) {
-                settingsMenu.classList.add('scrollable');
-                console.log('Settings menu made scrollable' + (isIPad ? ' (iPad detected)' : ''));
+            // Always make settings menu scrollable
+            settingsMenu.classList.add('scrollable');
+            console.log('Settings menu made scrollable' + (isIPad ? ' (iPad detected)' : ''));
+            
+            // Apply direct styles for iPad as fallback
+            if (isIPad && content) {
+                content.style.maxHeight = '600px';
+                content.style.overflowY = 'scroll';
+                content.style.overflowX = 'hidden';
+                content.style.webkitOverflowScrolling = 'touch';
+                console.log('Applied direct iPad styles');
                 
-                // Apply direct styles for iPad as fallback
-                if (isIPad && content) {
-                    content.style.maxHeight = '600px';
-                    content.style.overflowY = 'scroll';
-                    content.style.overflowX = 'hidden';
-                    content.style.webkitOverflowScrolling = 'touch';
-                    console.log('Applied direct iPad styles');
-                    
-                    // Force a style recalculation
-                    content.style.display = 'none';
-                    content.offsetHeight; // Trigger reflow
-                    content.style.display = '';
-                    console.log('Forced style recalculation on iPad');
-                }
-            } else {
-                settingsMenu.classList.remove('scrollable');
-                
-                // Remove direct styles for iPad
-                if (isIPad && content) {
-                    content.style.maxHeight = '';
-                    content.style.overflowY = '';
-                    content.style.overflowX = '';
-                    content.style.webkitOverflowScrolling = '';
-                    console.log('Removed direct iPad styles');
-                }
-                
-                console.log('Settings menu made non-scrollable' + (isIPad ? ' (iPad detected)' : ''));
+                // Force a style recalculation
+                content.style.display = 'none';
+                content.offsetHeight; // Trigger reflow
+                content.style.display = '';
+                console.log('Forced style recalculation on iPad');
             }
         }
     }
@@ -1122,29 +1291,19 @@ class DungeonCrawlerGame {
 
         const content = document.createElement('div');
         
-        // Check if scrollable mode is enabled
-        if (this.gameState.settings.scrollableCheatMenu) {
-            content.style.cssText = `
-                background-color: rgba(20, 20, 20, 0.95);
-                padding: 20px;
-                border-radius: 15px;
-                text-align: center;
-                max-width: 90vw;
-                max-height: 90vh;
-                overflow-y: auto;
-                overflow-x: hidden;
-                width: 900px;
-                min-width: 800px;
-            `;
-        } else {
-            content.style.cssText = `
-                background-color: rgba(20, 20, 20, 0.95);
-                padding: 40px;
-                border-radius: 15px;
-                text-align: center;
-                min-width: 300px;
-            `;
-        }
+        // Always use scrollable mode for cheat menu
+        content.style.cssText = `
+            background-color: rgba(20, 20, 20, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            width: 900px;
+            min-width: 800px;
+        `;
 
         const title = document.createElement('h1');
         title.textContent = 'Cheat Menu';

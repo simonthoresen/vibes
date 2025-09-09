@@ -64,8 +64,6 @@ export class GameState {
         const defaultSettings = {
             keybinds: { ...DEFAULT_KEYBINDS },
             showPauseBtn: true,
-            scrollableCheatMenu: true,
-            scrollableSettingsMenu: false,
             menuSoundsVolume: 1.0,        // Changed from boolean to volume level (0.0 - 1.0)
             gameOverSoundsVolume: 1.0,    // Changed from boolean to volume level (0.0 - 1.0)
             gameMusicVolume: 0.5,         // Changed from boolean to volume level (0.0 - 1.0)
