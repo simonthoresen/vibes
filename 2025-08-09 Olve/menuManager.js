@@ -1,3 +1,5 @@
+import { PLAYER_SKINS } from './constants.js';
+
 export class MenuManager {
     constructor(gameState) {
         this.gameState = gameState;
@@ -46,6 +48,12 @@ export class MenuManager {
     }
 
     setupSkinMenu() {
+        // Remove any existing skin menu first
+        const existingSkinMenu = document.getElementById('skinMenu');
+        if (existingSkinMenu) {
+            existingSkinMenu.remove();
+        }
+        
         const skinMenu = document.createElement('div');
         skinMenu.id = 'skinMenu';
         skinMenu.style.cssText = `
@@ -65,11 +73,22 @@ export class MenuManager {
         const content = this.createMenuContent();
         const title = this.createTitle('Select Skin');
         const skinsGrid = this.createSkinsGrid();
+        const openCanvasButton = this.createButton('🎨 Open Canvas', () => this.openCustomSkinDrawing());
+        
+        // Style the canvas button to make it stand out
+        openCanvasButton.style.backgroundColor = '#4CAF50';
+        openCanvasButton.style.marginBottom = '20px';
+        
+        console.log('Canvas button created:', openCanvasButton);
+        
         const backButton = this.createButton('Back', () => this.hideSkinMenu());
 
         content.appendChild(title);
         content.appendChild(skinsGrid);
+        content.appendChild(openCanvasButton);
         content.appendChild(backButton);
+        
+        console.log('Menu content structure:', content);
         skinMenu.appendChild(content);
         document.body.appendChild(skinMenu);
     }
@@ -267,13 +286,13 @@ export class MenuManager {
             margin-bottom: 20px;
         `;
 
-        // Import PLAYER_SKINS from constants
-        import('./constants.js').then(({ PLAYER_SKINS }) => {
-            PLAYER_SKINS.forEach(skin => {
-                const skinContainer = this.createSkinOption(skin);
-                skinsGrid.appendChild(skinContainer);
-            });
+        // Create skin options synchronously
+        PLAYER_SKINS.forEach(skin => {
+            const skinContainer = this.createSkinOption(skin);
+            skinsGrid.appendChild(skinContainer);
         });
+        
+        // Custom skin option removed - only using Open Canvas button now
 
         return skinsGrid;
     }
@@ -351,15 +370,335 @@ export class MenuManager {
         skinOption.addEventListener('touchcancel', handleUnhover);
     }
 
+    createCustomSkinOption() {
+        const customOption = document.createElement('div');
+        customOption.className = 'skin-option';
+        customOption.style.cssText = `
+            width: 80px;
+            height: 80px;
+            margin: 5px;
+            border: 2px solid ${this.gameState.player.skin === 'custom' ? '#fff' : '#555'};
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(45deg, #444, #666);
+            color: white;
+            font-size: 12px;
+            text-align: center;
+        `;
+
+        // Check if custom skin exists and show preview
+        const customSkinData = localStorage.getItem('customSkin');
+        if (customSkinData) {
+            customOption.innerHTML = `
+                <div style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; margin-bottom: 5px; background: white;">
+                    <img src="${customSkinData}" style="width: 100%; height: 100%; object-fit: cover;" />
+                </div>
+                <div>Custom</div>
+            `;
+        } else {
+            customOption.innerHTML = `
+                <div style="font-size: 24px; margin-bottom: 5px;">🎨</div>
+                <div>Custom</div>
+            `;
+        }
+
+        customOption.addEventListener('click', () => {
+            this.openCustomSkinDrawing();
+        });
+
+        this.addSkinHoverEffects(customOption);
+        
+        // Create container to match other skins
+        const container = document.createElement('div');
+        container.appendChild(customOption);
+        
+        return container;
+    }
+
+    openCustomSkinDrawing() {
+        // Create drawing interface overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        `;
+
+        // Create drawing container
+        const container = document.createElement('div');
+        container.style.cssText = `
+            background: #333;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        `;
+
+        // Title
+        const title = document.createElement('h2');
+        title.textContent = 'Draw Face & Accessories';
+        title.style.cssText = `
+            color: white;
+            text-align: center;
+            margin: 0 0 20px 0;
+        `;
+
+        // Canvas for drawing
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 200;
+        canvas.style.cssText = `
+            border: 2px solid #666;
+            background: white;
+            display: block;
+            margin: 0 auto 20px auto;
+            cursor: crosshair;
+        `;
+
+        // Color palette
+        const colorPalette = document.createElement('div');
+        colorPalette.style.cssText = `
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 20px;
+        `;
+
+        const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#FFC0CB', '#A52A2A', '#808080'];
+        let currentColor = '#000000';
+
+        colors.forEach(color => {
+            const colorBtn = document.createElement('button');
+            colorBtn.style.cssText = `
+                width: 30px;
+                height: 30px;
+                background: ${color};
+                border: 2px solid ${color === currentColor ? '#fff' : '#555'};
+                border-radius: 50%;
+                cursor: pointer;
+            `;
+            colorBtn.addEventListener('click', () => {
+                currentColor = color;
+                // Update all color button borders
+                colorPalette.querySelectorAll('button').forEach(btn => {
+                    btn.style.border = `2px solid ${btn.style.background === color ? '#fff' : '#555'}`;
+                });
+            });
+            colorPalette.appendChild(colorBtn);
+        });
+
+        // Brush size control
+        const brushContainer = document.createElement('div');
+        brushContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            color: white;
+        `;
+
+        const brushLabel = document.createElement('span');
+        brushLabel.textContent = 'Brush Size:';
+
+        const brushSize = document.createElement('input');
+        brushSize.type = 'range';
+        brushSize.min = '1';
+        brushSize.max = '20';
+        brushSize.value = '5';
+        brushSize.style.cssText = `
+            width: 100px;
+        `;
+
+        const brushValue = document.createElement('span');
+        brushValue.textContent = '5px';
+
+        brushSize.addEventListener('input', () => {
+            brushValue.textContent = brushSize.value + 'px';
+        });
+
+        brushContainer.appendChild(brushLabel);
+        brushContainer.appendChild(brushSize);
+        brushContainer.appendChild(brushValue);
+
+        // Action buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        `;
+
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Clear';
+        clearBtn.style.cssText = `
+            padding: 10px 20px;
+            background: #666;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        `;
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save & Use';
+        saveBtn.style.cssText = `
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        `;
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.cssText = `
+            padding: 10px 20px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        `;
+
+        // Canvas drawing functionality
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+
+        // Load existing custom accessories if any
+        const savedAccessories = localStorage.getItem('customAccessories');
+        if (savedAccessories) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = savedAccessories;
+        }
+
+        const startDrawing = (e) => {
+            isDrawing = true;
+            draw(e);
+        };
+
+        const draw = (e) => {
+            if (!isDrawing) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = parseInt(brushSize.value);
+            ctx.lineCap = 'round';
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        };
+
+        const stopDrawing = () => {
+            if (isDrawing) {
+                isDrawing = false;
+                ctx.beginPath();
+            }
+        };
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch events for iPad
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startDrawing(e);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            draw(e);
+        });
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopDrawing();
+        });
+
+        // Button events
+        clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        saveBtn.addEventListener('click', () => {
+            const dataURL = canvas.toDataURL();
+            localStorage.setItem('customAccessories', dataURL);
+            
+            // Refresh accessories in renderer
+            if (this.gameState.renderer) {
+                this.gameState.renderer.refreshCustomAccessories();
+            }
+            
+            document.body.removeChild(overlay);
+            
+            // No need to refresh skins grid since we're not changing the skin selection
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(overlay);
+        });
+
+        // Assemble the interface
+        buttonContainer.appendChild(clearBtn);
+        buttonContainer.appendChild(saveBtn);
+        buttonContainer.appendChild(cancelBtn);
+
+        container.appendChild(title);
+        container.appendChild(canvas);
+        container.appendChild(colorPalette);
+        container.appendChild(brushContainer);
+        container.appendChild(buttonContainer);
+
+        overlay.appendChild(container);
+        document.body.appendChild(overlay);
+    }
+
     selectSkin(skin, skinOption) {
         this.gameState.player.skin = skin;
+        
         // Save skin to localStorage
-        localStorage.setItem('selectedSkin', skin.name);
+        if (typeof skin === 'string') {
+            localStorage.setItem('playerSkin', skin);
+        } else {
+            localStorage.setItem('playerSkin', skin.name);
+        }
+        
         // Update visual selection
         document.querySelectorAll('#skinMenu .skin-option').forEach(opt => {
             opt.style.border = '3px solid transparent';
         });
-        skinOption.style.border = '3px solid #fff';
+        if (skinOption) {
+            skinOption.style.border = '3px solid #fff';
+        }
     }
 
     startGame() {

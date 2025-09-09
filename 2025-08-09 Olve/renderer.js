@@ -18,6 +18,10 @@ export class Renderer {
             this.dragonArrowImageLoaded = true;
         };
         
+        // Load custom accessories image if it exists
+        this.customAccessoriesImage = null;
+        this.loadCustomAccessories();
+        
         this.fastArrowImage = new Image();
         this.fastArrowImage.src = 'images/fast_arrow.png';
         this.fastArrowImageLoaded = false;
@@ -281,14 +285,36 @@ export class Renderer {
         // Draw poison aura if player has poison cloud weapon
         this.drawPoisonAura(player, centerX, centerY);
 
-        // Draw player with current skin color and invulnerability effect
+        // Draw player with current skin (color + optional custom accessories)
+        // First, always draw the base colored character
         this.ctx.fillStyle = player.invulnerable ?
-            (Math.floor(Date.now() / 100) % 2 === 0 ? '#ffffff' : player.skin.color) :
-            player.skin.color;
-        
+            (Math.floor(Date.now() / 100) % 2 === 0 ? '#ffffff' : (player.skin === 'custom' ? '#ff6b6b' : player.skin.color)) :
+            (player.skin === 'custom' ? '#ff6b6b' : player.skin.color);
         this.ctx.beginPath();
         this.ctx.arc(centerX, centerY, player.width / 2, 0, Math.PI * 2);
         this.ctx.fill();
+        
+        // Then, draw custom accessories on top if they exist
+        const customAccessories = localStorage.getItem('customAccessories');
+        if (customAccessories && this.customAccessoriesImage) {
+            // Create a circular clipping path for accessories too
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.arc(centerX, centerY, player.width / 2, 0, Math.PI * 2);
+            this.ctx.clip();
+            
+            // Draw the custom accessories on top
+            const size = player.width;
+            this.ctx.drawImage(
+                this.customAccessoriesImage, 
+                centerX - size/2, 
+                centerY - size/2, 
+                size, 
+                size
+            );
+            
+            this.ctx.restore();
+        }
 
         // Draw player health bar
         this.drawHealthBar(player.x, player.y - 15, player.width * 1.5, 6, player.health, player.maxHealth);
@@ -2004,5 +2030,20 @@ export class Renderer {
         });
 
         this.ctx.restore();
+    }
+
+    loadCustomAccessories() {
+        const customAccessoriesData = localStorage.getItem('customAccessories');
+        if (customAccessoriesData) {
+            this.customAccessoriesImage = new Image();
+            this.customAccessoriesImage.onload = () => {
+                console.log('Custom accessories loaded successfully');
+            };
+            this.customAccessoriesImage.src = customAccessoriesData;
+        }
+    }
+
+    refreshCustomAccessories() {
+        this.loadCustomAccessories();
     }
 }

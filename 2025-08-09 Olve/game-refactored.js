@@ -20,19 +20,6 @@ class DungeonCrawlerGame {
     }
 
     initializeGame() {
-        // Initialize responsive canvas sizing
-        this.calculateCanvasDimensions();
-        this.setupCanvasSize();
-        
-        // Set up resize handler
-        window.addEventListener('resize', () => {
-            // Debounce resize events
-            clearTimeout(this.resizeTimeout);
-            this.resizeTimeout = setTimeout(() => {
-                this.handleResize();
-            }, 100);
-        });
-        
         // Initialize core systems
         this.gameState = new GameState();
         this.inputManager = new InputManager();
@@ -53,6 +40,9 @@ class DungeonCrawlerGame {
             throw new Error('Game canvas not found');
         }
         this.renderer = new Renderer(canvas);
+        
+        // Add renderer to gameState so other systems can access it
+        this.gameState.renderer = this.renderer;
 
         // Initialize game systems
         this.menuManager = new MenuManager(this.gameState);
@@ -169,80 +159,6 @@ class DungeonCrawlerGame {
             return defaultValue;
         }
         return value;
-    }
-
-    // Calculate optimal canvas dimensions based on screen size
-    calculateCanvasDimensions() {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
-        // Account for padding and UI elements
-        const availableWidth = viewportWidth - 40; // 20px padding each side
-        const availableHeight = viewportHeight - 80; // Extra space for UI elements
-        
-        // Define aspect ratio (4:3 like original 800x600)
-        const aspectRatio = 4 / 3;
-        
-        let canvasWidth, canvasHeight;
-        
-        // Determine optimal size based on available space
-        if (availableWidth / availableHeight > aspectRatio) {
-            // Height is the limiting factor
-            canvasHeight = Math.min(availableHeight, 600);
-            canvasWidth = canvasHeight * aspectRatio;
-        } else {
-            // Width is the limiting factor  
-            canvasWidth = Math.min(availableWidth, 800);
-            canvasHeight = canvasWidth / aspectRatio;
-        }
-        
-        // Set minimum dimensions for playability
-        const minWidth = 400;
-        const minHeight = 300;
-        
-        canvasWidth = Math.max(canvasWidth, minWidth);
-        canvasHeight = Math.max(canvasHeight, minHeight);
-        
-        // Set maximum dimensions to prevent huge displays
-        const maxWidth = 1200;
-        const maxHeight = 900;
-        
-        canvasWidth = Math.min(canvasWidth, maxWidth);
-        canvasHeight = Math.min(canvasHeight, maxHeight);
-        
-        // Store dimensions globally for other systems to use
-        window.CURRENT_CANVAS_WIDTH = Math.round(canvasWidth);
-        window.CURRENT_CANVAS_HEIGHT = Math.round(canvasHeight);
-        
-        console.log(`Canvas dimensions calculated: ${window.CURRENT_CANVAS_WIDTH}x${window.CURRENT_CANVAS_HEIGHT}`);
-    }
-
-    // Apply calculated dimensions to canvas element
-    setupCanvasSize() {
-        const canvas = document.getElementById('gameCanvas');
-        if (canvas) {
-            canvas.width = window.CURRENT_CANVAS_WIDTH;
-            canvas.height = window.CURRENT_CANVAS_HEIGHT;
-            
-            // Update CSS to maintain aspect ratio
-            canvas.style.width = window.CURRENT_CANVAS_WIDTH + 'px';
-            canvas.style.height = window.CURRENT_CANVAS_HEIGHT + 'px';
-            
-            console.log(`Canvas size applied: ${canvas.width}x${canvas.height}`);
-        }
-    }
-
-    // Handle window resize events
-    handleResize() {
-        this.calculateCanvasDimensions();
-        this.setupCanvasSize();
-        
-        // Trigger re-initialization of systems that depend on canvas size
-        if (this.renderer) {
-            // Force renderer to acknowledge new canvas size
-            this.renderer.canvas.width = window.CURRENT_CANVAS_WIDTH;
-            this.renderer.canvas.height = window.CURRENT_CANVAS_HEIGHT;
-        }
     }
 
     // Get default settings values
