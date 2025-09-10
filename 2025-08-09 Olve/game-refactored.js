@@ -6,11 +6,11 @@ import { Renderer } from './renderer.js?v=2';
 import { MenuManager } from './menuManager.js?v=2';
 import { WeaponSystem } from './weaponSystem.js?v=2';
 import { EnemySystem } from './enemySystemFixed.js?v=2';
-import { ProjectileSystem } from './projectileSystem.js?v=2';
-import { PlayerController } from './playerController.js?v=2';
+import { ProjectileSystem } from './projectileSystemFixed.js?v=2';
+import { PlayerController } from './playerControllerFixed.js?v=2';
 import { GameLoop } from './gameLoop.js?v=2';
 import { ParticleEngine } from './particleEngine.js?v=2';
-import { AllySystem } from './allySystem.js?v=2';
+import { AllySystem } from './allySystemFixed.js?v=2';
 import { KONAMI_CODE, WEAPONS } from './constants.js?v=2';
 
 class DungeonCrawlerGame {
