@@ -2,16 +2,16 @@
 // Import all modules
 import { GameState } from './gameState.js';
 import { InputManager } from './inputManager.js';
-import { Renderer } from './renderer.js';
-import { MenuManager } from './menuManager.js';
-import { WeaponSystem } from './weaponSystem.js';
-import { EnemySystem } from './enemySystem.js';
-import { ProjectileSystem } from './projectileSystem.js';
-import { PlayerController } from './playerController.js';
-import { GameLoop } from './gameLoop.js';
-import { ParticleEngine } from './particleEngine.js';
-import { AllySystem } from './allySystem.js';
-import { KONAMI_CODE, WEAPONS } from './constants.js';
+import { Renderer } from './renderer.js?v=2';
+import { MenuManager } from './menuManager.js?v=2';
+import { WeaponSystem } from './weaponSystem.js?v=2';
+import { EnemySystem } from './enemySystemFixed.js?v=2';
+import { ProjectileSystem } from './projectileSystem.js?v=2';
+import { PlayerController } from './playerController.js?v=2';
+import { GameLoop } from './gameLoop.js?v=2';
+import { ParticleEngine } from './particleEngine.js?v=2';
+import { AllySystem } from './allySystem.js?v=2';
+import { KONAMI_CODE, WEAPONS } from './constants.js?v=2';
 
 class DungeonCrawlerGame {
     constructor() {
