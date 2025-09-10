@@ -1,4 +1,4 @@
-import { ENEMY_TYPES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
+import { ENEMY_TYPES, getCanvasWidth, getCanvasHeight } from './constants.js';
 
 export class EnemySystem {
     constructor(gameState) {
@@ -27,7 +27,7 @@ export class EnemySystem {
     spawnBoss() {
         const boss = {
             ...ENEMY_TYPES.DRAGON,
-            x: CANVAS_WIDTH / 2,
+            x: getCanvasWidth() / 2,
             y: -ENEMY_TYPES.DRAGON.height,
             maxHealth: ENEMY_TYPES.DRAGON.health * this.gameState.enemyHPMultiplier,
             health: ENEMY_TYPES.DRAGON.health * this.gameState.enemyHPMultiplier,
@@ -69,20 +69,20 @@ export class EnemySystem {
         
         switch(side) {
             case 0: // top
-                x = Math.random() * CANVAS_WIDTH;
+                x = Math.random() * getCanvasWidth();
                 y = -enemyType.height;
                 break;
             case 1: // right
-                x = CANVAS_WIDTH + enemyType.width;
-                y = Math.random() * CANVAS_HEIGHT;
+                x = getCanvasWidth() + enemyType.width;
+                y = Math.random() * getCanvasHeight();
                 break;
             case 2: // bottom
-                x = Math.random() * CANVAS_WIDTH;
-                y = CANVAS_HEIGHT + enemyType.height;
+                x = Math.random() * getCanvasWidth();
+                y = getCanvasHeight() + enemyType.height;
                 break;
             case 3: // left
                 x = -enemyType.width;
-                y = Math.random() * CANVAS_HEIGHT;
+                y = Math.random() * getCanvasHeight();
                 break;
         }
 
@@ -157,13 +157,13 @@ export class EnemySystem {
         let dy = this.gameState.player.y - enemy.y;
         
         // Check if wrapping around horizontally would be shorter
-        if (Math.abs(dx) > CANVAS_WIDTH / 2) {
-            dx = dx > 0 ? -(CANVAS_WIDTH - Math.abs(dx)) : CANVAS_WIDTH - Math.abs(dx);
+        if (Math.abs(dx) > getCanvasWidth() / 2) {
+            dx = dx > 0 ? -(getCanvasWidth() - Math.abs(dx)) : getCanvasWidth() - Math.abs(dx);
         }
         
         // Check if wrapping around vertically would be shorter
-        if (Math.abs(dy) > CANVAS_HEIGHT / 2) {
-            dy = dy > 0 ? -(CANVAS_HEIGHT - Math.abs(dy)) : CANVAS_HEIGHT - Math.abs(dy);
+        if (Math.abs(dy) > getCanvasHeight() / 2) {
+            dy = dy > 0 ? -(getCanvasHeight() - Math.abs(dy)) : getCanvasHeight() - Math.abs(dy);
         }
         
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -203,10 +203,10 @@ export class EnemySystem {
     }
 
     wrapEnemyPosition(enemy) {
-        if (enemy.x < 0) enemy.x = CANVAS_WIDTH;
-        if (enemy.x > CANVAS_WIDTH) enemy.x = 0;
-        if (enemy.y < 0) enemy.y = CANVAS_HEIGHT;
-        if (enemy.y > CANVAS_HEIGHT) enemy.y = 0;
+        if (enemy.x < 0) enemy.x = getCanvasWidth();
+        if (enemy.x > getCanvasWidth()) enemy.x = 0;
+        if (enemy.y < 0) enemy.y = getCanvasHeight();
+        if (enemy.y > getCanvasHeight()) enemy.y = 0;
     }
 
     handleBossDefeat() {
@@ -347,4 +347,3 @@ export class EnemySystem {
         document.dispatchEvent(event);
     }
 }
-
