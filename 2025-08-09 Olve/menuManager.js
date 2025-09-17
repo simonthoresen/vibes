@@ -23,87 +23,177 @@ export class MenuManager {
 
     // Mobile detection utility
     detectMobileDevice() {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+        console.log('Mobile detection:', isMobile, 'User agent:', navigator.userAgent);
+        return isMobile;
     }
 
     // Initialize weapon tree keyboard navigation for mobile devices
     initWeaponTreeNavigation() {
-        document.addEventListener('keydown', (e) => {
+        console.log('Initializing weapon tree navigation for mobile');
+        
+        const handleKeydown = (e) => {
             if (!this.isWeaponTreeVisible) return;
+            
+            console.log('Key pressed:', e.key, 'Weapon tree visible:', this.isWeaponTreeVisible);
+            
+            let handled = false;
             
             switch(e.key) {
                 case 'ArrowUp':
                 case 'w':
                 case 'W':
                     this.navigateWeaponTree('up');
-                    e.preventDefault();
+                    handled = true;
                     break;
                 case 'ArrowDown':
                 case 's':
                 case 'S':
                     this.navigateWeaponTree('down');
-                    e.preventDefault();
+                    handled = true;
                     break;
                 case 'ArrowLeft':
                 case 'a':
                 case 'A':
                     this.navigateWeaponTree('left');
-                    e.preventDefault();
+                    handled = true;
                     break;
                 case 'ArrowRight':
                 case 'd':
                 case 'D':
                     this.navigateWeaponTree('right');
-                    e.preventDefault();
+                    handled = true;
                     break;
                 case 'Enter':
                 case ' ':
                     this.activateSelectedWeaponNode();
-                    e.preventDefault();
+                    handled = true;
                     break;
+            }
+            
+            if (handled) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        
+        // Add keyboard event listener
+        document.addEventListener('keydown', handleKeydown);
+        
+        // Also add touch swipe support for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            if (!this.isWeaponTreeVisible) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            if (!this.isWeaponTreeVisible) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            const minSwipeDistance = 50;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
+                // Horizontal swipe
+                if (deltaX > 0) {
+                    this.navigateWeaponTree('right');
+                } else {
+                    this.navigateWeaponTree('left');
+                }
+                e.preventDefault();
+            } else if (Math.abs(deltaY) > minSwipeDistance) {
+                // Vertical swipe
+                if (deltaY > 0) {
+                    this.navigateWeaponTree('down');
+                } else {
+                    this.navigateWeaponTree('up');
+                }
+                e.preventDefault();
             }
         });
     }
 
     // Navigate through weapon tree nodes
     navigateWeaponTree(direction) {
+        console.log('Navigating weapon tree:', direction, 'Current index:', this.selectedNodeIndex);
+        
         if (this.weaponNodes.length === 0) {
             this.updateWeaponNodesArray();
         }
         
-        if (this.weaponNodes.length === 0) return;
+        if (this.weaponNodes.length === 0) {
+            console.log('No weapon nodes found');
+            return;
+        }
         
         // Remove current selection
         this.clearWeaponNodeSelection();
         
-        // Get current node position
-        const currentNode = this.weaponNodes[this.selectedNodeIndex];
-        if (!currentNode) return;
-        
-        const currentRow = parseInt(currentNode.dataset.row) || 0;
-        const currentCol = parseInt(currentNode.dataset.col) || 0;
-        
         let newIndex = this.selectedNodeIndex;
+        
+        // Simple navigation - convert linear array to 2D grid
+        const nodesPerRow = 3; // Assume 3 weapons per row
+        const currentRow = Math.floor(this.selectedNodeIndex / nodesPerRow);
+        const currentCol = this.selectedNodeIndex % nodesPerRow;
+        
+        console.log('Current position:', currentRow, currentCol);
         
         switch(direction) {
             case 'up':
-                newIndex = this.findNodeByPosition(currentRow - 1, currentCol, 'up');
+                if (currentRow > 0) {
+                    newIndex = (currentRow - 1) * nodesPerRow + currentCol;
+                    if (newIndex >= this.weaponNodes.length) {
+                        newIndex = this.weaponNodes.length - 1;
+                    }
+                }
                 break;
             case 'down':
-                newIndex = this.findNodeByPosition(currentRow + 1, currentCol, 'down');
+                const maxRow = Math.ceil(this.weaponNodes.length / nodesPerRow) - 1;
+                if (currentRow < maxRow) {
+                    newIndex = (currentRow + 1) * nodesPerRow + currentCol;
+                    if (newIndex >= this.weaponNodes.length) {
+                        newIndex = this.weaponNodes.length - 1;
+                    }
+                }
                 break;
             case 'left':
-                newIndex = this.findNodeByPosition(currentRow, currentCol - 1, 'left');
+                if (currentCol > 0) {
+                    newIndex = currentRow * nodesPerRow + (currentCol - 1);
+                } else if (currentRow > 0) {
+                    // Wrap to end of previous row
+                    newIndex = (currentRow - 1) * nodesPerRow + (nodesPerRow - 1);
+                    if (newIndex >= this.weaponNodes.length) {
+                        newIndex = this.weaponNodes.length - 1;
+                    }
+                }
                 break;
             case 'right':
-                newIndex = this.findNodeByPosition(currentRow, currentCol + 1, 'right');
+                if (currentCol < nodesPerRow - 1 && newIndex + 1 < this.weaponNodes.length) {
+                    newIndex = currentRow * nodesPerRow + (currentCol + 1);
+                } else {
+                    // Wrap to start of next row
+                    const nextRowStart = (currentRow + 1) * nodesPerRow;
+                    if (nextRowStart < this.weaponNodes.length) {
+                        newIndex = nextRowStart;
+                    }
+                }
                 break;
         }
         
-        if (newIndex !== -1) {
-            this.selectedNodeIndex = newIndex;
-        }
+        // Ensure index is within bounds
+        newIndex = Math.max(0, Math.min(newIndex, this.weaponNodes.length - 1));
+        
+        console.log('New index:', newIndex);
+        this.selectedNodeIndex = newIndex;
         
         // Apply selection to new node
         this.applyWeaponNodeSelection();
@@ -166,20 +256,21 @@ export class MenuManager {
     // Update the array of weapon nodes for navigation
     updateWeaponNodesArray() {
         this.weaponNodes = Array.from(document.querySelectorAll('.weapon-node')).filter(node => {
-            return node.style.display !== 'none';
+            return node.style.display !== 'none' && node.offsetParent !== null;
         });
         
-        // Add row/col data to nodes based on their position
-        this.weaponNodes.forEach((node, index) => {
-            const weaponId = node.dataset.weaponId;
-            if (weaponId) {
-                const tree = this.gameState.getWeaponTree();
-                const weapon = tree.unified.weapons[weaponId];
-                if (weapon && weapon.position) {
-                    node.dataset.row = weapon.position.row;
-                    node.dataset.col = weapon.position.col;
-                }
+        console.log('Updated weapon nodes array:', this.weaponNodes.length, 'nodes found');
+        
+        // Sort nodes by their position in the DOM (left to right, top to bottom)
+        this.weaponNodes.sort((a, b) => {
+            const rectA = a.getBoundingClientRect();
+            const rectB = b.getBoundingClientRect();
+            
+            // First sort by top position (row), then by left position (column)
+            if (Math.abs(rectA.top - rectB.top) > 10) {
+                return rectA.top - rectB.top;
             }
+            return rectA.left - rectB.left;
         });
     }
 
@@ -196,6 +287,8 @@ export class MenuManager {
     // Apply selection styling to current node
     applyWeaponNodeSelection() {
         const currentNode = this.weaponNodes[this.selectedNodeIndex];
+        console.log('Applying selection to node:', this.selectedNodeIndex, currentNode);
+        
         if (currentNode && this.isMobileDevice) {
             // Store original styling
             currentNode.dataset.originalBoxShadow = currentNode.style.boxShadow || 'none';
@@ -203,6 +296,9 @@ export class MenuManager {
             // Apply mobile-specific selection (white glow instead of yellow)
             currentNode.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.8), 0 0 40px rgba(255, 255, 255, 0.6)';
             currentNode.style.transform = 'scale(1.1)';
+            currentNode.style.zIndex = '1000';
+            
+            console.log('Applied mobile selection styling');
         }
     }
 
@@ -1188,6 +1284,8 @@ export class MenuManager {
         // Mobile-specific styling (no yellow borders)
         let borderColor, backgroundColor, boxShadow;
         
+        console.log('Creating weapon node - isMobile:', this.isMobileDevice, 'canPurchase:', canPurchase, 'isPurchased:', isPurchased);
+        
         if (isPurchased) {
             borderColor = '#0f0';
             backgroundColor = 'rgba(0, 150, 0, 0.4)';
@@ -1198,11 +1296,13 @@ export class MenuManager {
                 borderColor = '#999999';
                 backgroundColor = 'rgba(160, 160, 160, 0.15)';
                 boxShadow = 'none';
+                console.log('Applied mobile styling for purchasable weapon');
             } else {
                 // Desktop: keep yellow border
                 borderColor = '#FFD700';
                 backgroundColor = 'rgba(255, 215, 0, 0.15)';
                 boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
+                console.log('Applied desktop styling for purchasable weapon');
             }
         } else {
             borderColor = '#666666';
