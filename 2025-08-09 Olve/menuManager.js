@@ -78,48 +78,90 @@ export class MenuManager {
             }
         };
         
-        // Add keyboard event listener
+        // Add keyboard event listener (for external keyboards on iPad)
         document.addEventListener('keydown', handleKeydown);
         
-        // Also add touch swipe support for mobile
+        // Enhanced touch swipe support for mobile devices
+        this.initTouchNavigation();
+    }
+
+    // Initialize touch navigation specifically for mobile devices
+    initTouchNavigation() {
         let touchStartX = 0;
         let touchStartY = 0;
+        let touchStartTime = 0;
         
-        document.addEventListener('touchstart', (e) => {
-            if (!this.isWeaponTreeVisible) return;
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-        });
+        const weaponTreeContainer = () => document.getElementById('weaponTreeMenu');
         
-        document.addEventListener('touchend', (e) => {
-            if (!this.isWeaponTreeVisible) return;
+        const handleTouchStart = (e) => {
+            if (!this.isWeaponTreeVisible || !weaponTreeContainer()) return;
             
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchStartTime = Date.now();
+            
+            console.log('Touch start:', touchStartX, touchStartY);
+        };
+        
+        const handleTouchEnd = (e) => {
+            if (!this.isWeaponTreeVisible || !weaponTreeContainer()) return;
+            
+            const touch = e.changedTouches[0];
+            const touchEndX = touch.clientX;
+            const touchEndY = touch.clientY;
+            const touchEndTime = Date.now();
             
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
+            const deltaTime = touchEndTime - touchStartTime;
             
-            const minSwipeDistance = 50;
+            console.log('Touch end - deltaX:', deltaX, 'deltaY:', deltaY, 'time:', deltaTime);
             
-            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
-                // Horizontal swipe
-                if (deltaX > 0) {
-                    this.navigateWeaponTree('right');
-                } else {
-                    this.navigateWeaponTree('left');
-                }
-                e.preventDefault();
-            } else if (Math.abs(deltaY) > minSwipeDistance) {
-                // Vertical swipe
-                if (deltaY > 0) {
-                    this.navigateWeaponTree('down');
-                } else {
-                    this.navigateWeaponTree('up');
-                }
-                e.preventDefault();
+            // Only register swipes that are fast enough and long enough
+            const minSwipeDistance = 30; // Reduced for easier swiping
+            const maxSwipeTime = 500; // Max time for a swipe
+            
+            if (deltaTime > maxSwipeTime) {
+                console.log('Swipe too slow');
+                return;
             }
-        });
+            
+            const absX = Math.abs(deltaX);
+            const absY = Math.abs(deltaY);
+            
+            if (absX > minSwipeDistance || absY > minSwipeDistance) {
+                // Determine primary direction
+                if (absX > absY) {
+                    // Horizontal swipe
+                    if (deltaX > 0) {
+                        console.log('Swiped right');
+                        this.navigateWeaponTree('right');
+                    } else {
+                        console.log('Swiped left');
+                        this.navigateWeaponTree('left');
+                    }
+                } else {
+                    // Vertical swipe
+                    if (deltaY > 0) {
+                        console.log('Swiped down');
+                        this.navigateWeaponTree('down');
+                    } else {
+                        console.log('Swiped up');
+                        this.navigateWeaponTree('up');
+                    }
+                }
+                
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        
+        // Add touch event listeners to document
+        document.addEventListener('touchstart', handleTouchStart, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd, { passive: false });
+        
+        console.log('Touch navigation initialized');
     }
 
     // Navigate through weapon tree nodes
