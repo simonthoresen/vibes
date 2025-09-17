@@ -10,10 +10,8 @@ export class MenuManager {
         // Initialize mobile detection
         this.isMobileDevice = this.detectMobileDevice();
         
-        // Initialize weapon tree navigation if on mobile
-        if (this.isMobileDevice) {
-            this.initWeaponTreeNavigation();
-        }
+        // Initialize weapon tree navigation for all devices (mobile gets touch, all get keyboard)
+        this.initWeaponTreeNavigation();
         
         this.setupMainMenu();
         this.setupSkinMenu();
@@ -81,31 +79,81 @@ export class MenuManager {
         // Add keyboard event listener (for external keyboards on iPad)
         document.addEventListener('keydown', handleKeydown);
         
-        // Enhanced touch swipe support for mobile devices
+        // Enhanced touch swipe support - works for all devices
         this.initTouchNavigation();
     }
 
-    // Initialize touch navigation specifically for mobile devices
+    // Initialize touch navigation for all touch-capable devices
     initTouchNavigation() {
         let touchStartX = 0;
         let touchStartY = 0;
         let touchStartTime = 0;
-        
-        const weaponTreeContainer = () => document.getElementById('weaponTreeMenu');
+        let isNavigating = false;
         
         const handleTouchStart = (e) => {
-            if (!this.isWeaponTreeVisible || !weaponTreeContainer()) return;
+            if (!this.isWeaponTreeVisible) return;
             
             const touch = e.touches[0];
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
             touchStartTime = Date.now();
+            isNavigating = false;
             
             console.log('Touch start:', touchStartX, touchStartY);
         };
         
+        const handleTouchMove = (e) => {
+            if (!this.isWeaponTreeVisible || isNavigating) return;
+            
+            const touch = e.touches[0];
+            const currentX = touch.clientX;
+            const currentY = touch.clientY;
+            
+            const deltaX = currentX - touchStartX;
+            const deltaY = currentY - touchStartY;
+            
+            // Early detection for better responsiveness
+            const minDistance = 25; // Reduced for better responsiveness
+            const absX = Math.abs(deltaX);
+            const absY = Math.abs(deltaY);
+            
+            if (absX > minDistance || absY > minDistance) {
+                isNavigating = true;
+                
+                // Determine direction with priority to the larger movement
+                if (absX > absY) {
+                    // Horizontal movement
+                    if (deltaX > 0) {
+                        console.log('Swiped right (during move)');
+                        this.navigateWeaponTree('right');
+                    } else {
+                        console.log('Swiped left (during move)');
+                        this.navigateWeaponTree('left');
+                    }
+                } else {
+                    // Vertical movement
+                    if (deltaY > 0) {
+                        console.log('Swiped down (during move)');
+                        this.navigateWeaponTree('down');
+                    } else {
+                        console.log('Swiped up (during move)');
+                        this.navigateWeaponTree('up');
+                    }
+                }
+                
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        
         const handleTouchEnd = (e) => {
-            if (!this.isWeaponTreeVisible || !weaponTreeContainer()) return;
+            if (!this.isWeaponTreeVisible) return;
+            
+            // If we already handled navigation during touchmove, don't do it again
+            if (isNavigating) {
+                console.log('Navigation already handled during touchmove');
+                return;
+            }
             
             const touch = e.changedTouches[0];
             const touchEndX = touch.clientX;
@@ -119,8 +167,8 @@ export class MenuManager {
             console.log('Touch end - deltaX:', deltaX, 'deltaY:', deltaY, 'time:', deltaTime);
             
             // Only register swipes that are fast enough and long enough
-            const minSwipeDistance = 30; // Reduced for easier swiping
-            const maxSwipeTime = 500; // Max time for a swipe
+            const minSwipeDistance = 20; // Reduced for easier swiping
+            const maxSwipeTime = 800; // Increased time allowance
             
             if (deltaTime > maxSwipeTime) {
                 console.log('Swipe too slow');
@@ -133,7 +181,7 @@ export class MenuManager {
             if (absX > minSwipeDistance || absY > minSwipeDistance) {
                 // Determine primary direction
                 if (absX > absY) {
-                    // Horizontal swipe
+                    // Horizontal swipe - prioritize left/right
                     if (deltaX > 0) {
                         console.log('Swiped right');
                         this.navigateWeaponTree('right');
@@ -157,11 +205,12 @@ export class MenuManager {
             }
         };
         
-        // Add touch event listeners to document
+        // Add touch event listeners to document with better options
         document.addEventListener('touchstart', handleTouchStart, { passive: false });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
         document.addEventListener('touchend', handleTouchEnd, { passive: false });
         
-        console.log('Touch navigation initialized');
+        console.log('Enhanced touch navigation initialized for all devices');
     }
 
     // Navigate through weapon tree nodes
@@ -319,8 +368,8 @@ export class MenuManager {
     // Clear current selection styling
     clearWeaponNodeSelection() {
         const currentNode = this.weaponNodes[this.selectedNodeIndex];
-        if (currentNode && this.isMobileDevice) {
-            // Remove mobile selection border (no yellow border on mobile)
+        if (currentNode) {
+            // Remove selection border for all devices
             currentNode.style.boxShadow = currentNode.dataset.originalBoxShadow || 'none';
             currentNode.style.transform = 'scale(1)';
         }
@@ -331,16 +380,16 @@ export class MenuManager {
         const currentNode = this.weaponNodes[this.selectedNodeIndex];
         console.log('Applying selection to node:', this.selectedNodeIndex, currentNode);
         
-        if (currentNode && this.isMobileDevice) {
+        if (currentNode) {
             // Store original styling
             currentNode.dataset.originalBoxShadow = currentNode.style.boxShadow || 'none';
             
-            // Apply mobile-specific selection (white glow instead of yellow)
+            // Apply selection styling for all devices (white glow)
             currentNode.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.8), 0 0 40px rgba(255, 255, 255, 0.6)';
             currentNode.style.transform = 'scale(1.1)';
             currentNode.style.zIndex = '1000';
             
-            console.log('Applied mobile selection styling');
+            console.log('Applied selection styling');
         }
     }
 
@@ -1114,12 +1163,10 @@ export class MenuManager {
         setTimeout(() => {
             this.updateWeaponNodeStates();
             
-            // Initialize navigation for mobile
-            if (this.isMobileDevice) {
-                this.updateWeaponNodesArray();
-                this.selectedNodeIndex = 0;
-                this.applyWeaponNodeSelection();
-            }
+            // Initialize navigation for all devices
+            this.updateWeaponNodesArray();
+            this.selectedNodeIndex = 0;
+            this.applyWeaponNodeSelection();
         }, 50);
     }
 
@@ -1323,29 +1370,21 @@ export class MenuManager {
             console.log(`- Background: ${isPurchased ? 'rgba(0, 255, 0, 0.6)' : canPurchase ? 'rgba(255, 215, 0, 0.15)' : 'rgba(60, 60, 60, 0.5)'}`);
         }
         
-        // Mobile-specific styling (no yellow borders)
+        // Remove yellow borders entirely - use neutral styling for all devices
         let borderColor, backgroundColor, boxShadow;
         
-        console.log('Creating weapon node - isMobile:', this.isMobileDevice, 'canPurchase:', canPurchase, 'isPurchased:', isPurchased);
+        console.log('Creating weapon node - canPurchase:', canPurchase, 'isPurchased:', isPurchased);
         
         if (isPurchased) {
             borderColor = '#0f0';
             backgroundColor = 'rgba(0, 150, 0, 0.4)';
             boxShadow = '0 0 15px rgba(0, 255, 0, 0.5)';
         } else if (canPurchase) {
-            if (this.isMobileDevice) {
-                // Mobile: no yellow border, use neutral styling
-                borderColor = '#999999';
-                backgroundColor = 'rgba(160, 160, 160, 0.15)';
-                boxShadow = 'none';
-                console.log('Applied mobile styling for purchasable weapon');
-            } else {
-                // Desktop: keep yellow border
-                borderColor = '#FFD700';
-                backgroundColor = 'rgba(255, 215, 0, 0.15)';
-                boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
-                console.log('Applied desktop styling for purchasable weapon');
-            }
+            // No yellow borders for anyone - use neutral white/gray styling
+            borderColor = '#CCCCCC';
+            backgroundColor = 'rgba(200, 200, 200, 0.15)';
+            boxShadow = '0 0 10px rgba(200, 200, 200, 0.3)';
+            console.log('Applied neutral styling for purchasable weapon');
         } else {
             borderColor = '#666666';
             backgroundColor = 'rgba(60, 60, 60, 0.5)';
@@ -1443,25 +1482,14 @@ export class MenuManager {
             const handleHover = () => {
                 nodeDiv.style.background = 'rgba(255, 255, 255, 0.25)';
                 nodeDiv.style.transform = 'scale(1.1)';
-                
-                if (this.isMobileDevice) {
-                    // Mobile: white glow instead of yellow
-                    nodeDiv.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
-                } else {
-                    // Desktop: yellow glow
-                    nodeDiv.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.6)';
-                }
+                // White glow for all devices instead of yellow
+                nodeDiv.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
             };
 
             const handleUnhover = () => {
-                // Reset to original styling based on device type
-                if (this.isMobileDevice) {
-                    nodeDiv.style.background = 'rgba(160, 160, 160, 0.15)';
-                    nodeDiv.style.boxShadow = 'none';
-                } else {
-                    nodeDiv.style.background = 'rgba(255, 215, 0, 0.15)';
-                    nodeDiv.style.boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
-                }
+                // Reset to neutral styling for all devices
+                nodeDiv.style.background = 'rgba(200, 200, 200, 0.15)';
+                nodeDiv.style.boxShadow = '0 0 10px rgba(200, 200, 200, 0.3)';
                 nodeDiv.style.transform = 'scale(1)';
             };
 
@@ -1719,10 +1747,8 @@ export class MenuManager {
         this.hideElement('weaponTreeMenu');
         this.isWeaponTreeVisible = false;
         
-        // Clear selection when hiding
-        if (this.isMobileDevice) {
-            this.clearWeaponNodeSelection();
-        }
+        // Clear selection when hiding for all devices
+        this.clearWeaponNodeSelection();
         
         this.showMainMenu();
     }
