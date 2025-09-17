@@ -3,10 +3,215 @@ import { PLAYER_SKINS } from './constants.js';
 export class MenuManager {
     constructor(gameState) {
         this.gameState = gameState;
+        this.selectedNodeIndex = 0; // For weapon tree navigation
+        this.weaponNodes = []; // Array to store weapon nodes for navigation
+        this.isWeaponTreeVisible = false;
+        
+        // Initialize mobile detection
+        this.isMobileDevice = this.detectMobileDevice();
+        
+        // Initialize weapon tree navigation if on mobile
+        if (this.isMobileDevice) {
+            this.initWeaponTreeNavigation();
+        }
+        
         this.setupMainMenu();
         this.setupSkinMenu();
         this.setupPauseMenu();
         this.setupSettingsMenu();
+    }
+
+    // Mobile detection utility
+    detectMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+               (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+    }
+
+    // Initialize weapon tree keyboard navigation for mobile devices
+    initWeaponTreeNavigation() {
+        document.addEventListener('keydown', (e) => {
+            if (!this.isWeaponTreeVisible) return;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    this.navigateWeaponTree('up');
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    this.navigateWeaponTree('down');
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    this.navigateWeaponTree('left');
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    this.navigateWeaponTree('right');
+                    e.preventDefault();
+                    break;
+                case 'Enter':
+                case ' ':
+                    this.activateSelectedWeaponNode();
+                    e.preventDefault();
+                    break;
+            }
+        });
+    }
+
+    // Navigate through weapon tree nodes
+    navigateWeaponTree(direction) {
+        if (this.weaponNodes.length === 0) {
+            this.updateWeaponNodesArray();
+        }
+        
+        if (this.weaponNodes.length === 0) return;
+        
+        // Remove current selection
+        this.clearWeaponNodeSelection();
+        
+        // Get current node position
+        const currentNode = this.weaponNodes[this.selectedNodeIndex];
+        if (!currentNode) return;
+        
+        const currentRow = parseInt(currentNode.dataset.row) || 0;
+        const currentCol = parseInt(currentNode.dataset.col) || 0;
+        
+        let newIndex = this.selectedNodeIndex;
+        
+        switch(direction) {
+            case 'up':
+                newIndex = this.findNodeByPosition(currentRow - 1, currentCol, 'up');
+                break;
+            case 'down':
+                newIndex = this.findNodeByPosition(currentRow + 1, currentCol, 'down');
+                break;
+            case 'left':
+                newIndex = this.findNodeByPosition(currentRow, currentCol - 1, 'left');
+                break;
+            case 'right':
+                newIndex = this.findNodeByPosition(currentRow, currentCol + 1, 'right');
+                break;
+        }
+        
+        if (newIndex !== -1) {
+            this.selectedNodeIndex = newIndex;
+        }
+        
+        // Apply selection to new node
+        this.applyWeaponNodeSelection();
+    }
+
+    // Find node by grid position
+    findNodeByPosition(targetRow, targetCol, direction) {
+        for (let i = 0; i < this.weaponNodes.length; i++) {
+            const node = this.weaponNodes[i];
+            const nodeRow = parseInt(node.dataset.row) || 0;
+            const nodeCol = parseInt(node.dataset.col) || 0;
+            
+            if (nodeRow === targetRow && nodeCol === targetCol) {
+                return i;
+            }
+        }
+        
+        // If no exact match, find closest node in that direction
+        return this.findClosestNode(targetRow, targetCol, direction);
+    }
+
+    // Find closest node when exact position doesn't exist
+    findClosestNode(targetRow, targetCol, direction) {
+        let closest = -1;
+        let minDistance = Infinity;
+        
+        for (let i = 0; i < this.weaponNodes.length; i++) {
+            const node = this.weaponNodes[i];
+            const nodeRow = parseInt(node.dataset.row) || 0;
+            const nodeCol = parseInt(node.dataset.col) || 0;
+            
+            let isValidDirection = false;
+            switch(direction) {
+                case 'up':
+                    isValidDirection = nodeRow < targetRow;
+                    break;
+                case 'down':
+                    isValidDirection = nodeRow > targetRow;
+                    break;
+                case 'left':
+                    isValidDirection = nodeCol < targetCol;
+                    break;
+                case 'right':
+                    isValidDirection = nodeCol > targetCol;
+                    break;
+            }
+            
+            if (isValidDirection) {
+                const distance = Math.abs(nodeRow - targetRow) + Math.abs(nodeCol - targetCol);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closest = i;
+                }
+            }
+        }
+        
+        return closest;
+    }
+
+    // Update the array of weapon nodes for navigation
+    updateWeaponNodesArray() {
+        this.weaponNodes = Array.from(document.querySelectorAll('.weapon-node')).filter(node => {
+            return node.style.display !== 'none';
+        });
+        
+        // Add row/col data to nodes based on their position
+        this.weaponNodes.forEach((node, index) => {
+            const weaponId = node.dataset.weaponId;
+            if (weaponId) {
+                const tree = this.gameState.getWeaponTree();
+                const weapon = tree.unified.weapons[weaponId];
+                if (weapon && weapon.position) {
+                    node.dataset.row = weapon.position.row;
+                    node.dataset.col = weapon.position.col;
+                }
+            }
+        });
+    }
+
+    // Clear current selection styling
+    clearWeaponNodeSelection() {
+        const currentNode = this.weaponNodes[this.selectedNodeIndex];
+        if (currentNode && this.isMobileDevice) {
+            // Remove mobile selection border (no yellow border on mobile)
+            currentNode.style.boxShadow = currentNode.dataset.originalBoxShadow || 'none';
+            currentNode.style.transform = 'scale(1)';
+        }
+    }
+
+    // Apply selection styling to current node
+    applyWeaponNodeSelection() {
+        const currentNode = this.weaponNodes[this.selectedNodeIndex];
+        if (currentNode && this.isMobileDevice) {
+            // Store original styling
+            currentNode.dataset.originalBoxShadow = currentNode.style.boxShadow || 'none';
+            
+            // Apply mobile-specific selection (white glow instead of yellow)
+            currentNode.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.8), 0 0 40px rgba(255, 255, 255, 0.6)';
+            currentNode.style.transform = 'scale(1.1)';
+        }
+    }
+
+    // Activate the currently selected weapon node
+    activateSelectedWeaponNode() {
+        const currentNode = this.weaponNodes[this.selectedNodeIndex];
+        if (currentNode && currentNode.style.cursor === 'pointer') {
+            currentNode.click();
+        }
     }
 
     setupMainMenu() {
@@ -762,6 +967,7 @@ export class MenuManager {
         }
         
         this.showElement('weaponTreeMenu');
+        this.isWeaponTreeVisible = true;
         
         // Always refresh the weapon tree display when showing it
         this.updatePointsDisplay();
@@ -769,6 +975,13 @@ export class MenuManager {
         // Use setTimeout to ensure DOM is fully rendered before updating styles
         setTimeout(() => {
             this.updateWeaponNodeStates();
+            
+            // Initialize navigation for mobile
+            if (this.isMobileDevice) {
+                this.updateWeaponNodesArray();
+                this.selectedNodeIndex = 0;
+                this.applyWeaponNodeSelection();
+            }
         }, 50);
     }
 
@@ -972,12 +1185,37 @@ export class MenuManager {
             console.log(`- Background: ${isPurchased ? 'rgba(0, 255, 0, 0.6)' : canPurchase ? 'rgba(255, 215, 0, 0.15)' : 'rgba(60, 60, 60, 0.5)'}`);
         }
         
+        // Mobile-specific styling (no yellow borders)
+        let borderColor, backgroundColor, boxShadow;
+        
+        if (isPurchased) {
+            borderColor = '#0f0';
+            backgroundColor = 'rgba(0, 150, 0, 0.4)';
+            boxShadow = '0 0 15px rgba(0, 255, 0, 0.5)';
+        } else if (canPurchase) {
+            if (this.isMobileDevice) {
+                // Mobile: no yellow border, use neutral styling
+                borderColor = '#999999';
+                backgroundColor = 'rgba(160, 160, 160, 0.15)';
+                boxShadow = 'none';
+            } else {
+                // Desktop: keep yellow border
+                borderColor = '#FFD700';
+                backgroundColor = 'rgba(255, 215, 0, 0.15)';
+                boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
+            }
+        } else {
+            borderColor = '#666666';
+            backgroundColor = 'rgba(60, 60, 60, 0.5)';
+            boxShadow = 'none';
+        }
+        
         nodeDiv.style.cssText = `
             width: 100px;
             height: 100px;
-            border: 3px solid ${isPurchased ? '#0f0' : canPurchase ? '#FFD700' : '#666666'};
+            border: 3px solid ${borderColor};
             border-radius: 15px;
-            background: ${isPurchased ? 'rgba(0, 150, 0, 0.4)' : canPurchase ? 'rgba(255, 215, 0, 0.15)' : 'rgba(60, 60, 60, 0.5)'};
+            background: ${backgroundColor};
             cursor: ${canPurchase ? 'pointer' : 'default'};
             display: flex;
             flex-direction: column;
@@ -985,7 +1223,7 @@ export class MenuManager {
             align-items: center;
             transition: all 0.3s;
             position: relative;
-            box-shadow: ${isPurchased ? '0 0 15px rgba(0, 255, 0, 0.5)' : canPurchase ? '0 0 10px rgba(255, 215, 0, 0.3)' : 'none'};
+            box-shadow: ${boxShadow};
         `;
 
         const title = document.createElement('div');
@@ -1063,13 +1301,26 @@ export class MenuManager {
             const handleHover = () => {
                 nodeDiv.style.background = 'rgba(255, 255, 255, 0.25)';
                 nodeDiv.style.transform = 'scale(1.1)';
-                nodeDiv.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.6)';
+                
+                if (this.isMobileDevice) {
+                    // Mobile: white glow instead of yellow
+                    nodeDiv.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
+                } else {
+                    // Desktop: yellow glow
+                    nodeDiv.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.6)';
+                }
             };
 
             const handleUnhover = () => {
-                nodeDiv.style.background = 'rgba(255, 255, 255, 0.15)';
+                // Reset to original styling based on device type
+                if (this.isMobileDevice) {
+                    nodeDiv.style.background = 'rgba(160, 160, 160, 0.15)';
+                    nodeDiv.style.boxShadow = 'none';
+                } else {
+                    nodeDiv.style.background = 'rgba(255, 215, 0, 0.15)';
+                    nodeDiv.style.boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
+                }
                 nodeDiv.style.transform = 'scale(1)';
-                nodeDiv.style.boxShadow = '0 0 10px rgba(255, 215, 0, 0.3)';
             };
 
             // Mouse events
@@ -1324,6 +1575,13 @@ export class MenuManager {
 
     hideWeaponTree() {
         this.hideElement('weaponTreeMenu');
+        this.isWeaponTreeVisible = false;
+        
+        // Clear selection when hiding
+        if (this.isMobileDevice) {
+            this.clearWeaponNodeSelection();
+        }
+        
         this.showMainMenu();
     }
 
