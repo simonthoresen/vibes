@@ -497,9 +497,9 @@ export class Renderer {
         projectiles.forEach(proj => {
             // Handle beam projectiles (like Ralsei beam)
             if (proj.isBeam) {
-                this.ctx.save();
-                
                 if (this.darkFountainImageLoaded) {
+                    this.ctx.save();
+                    
                     // Calculate beam parameters
                     const beamLength = Math.sqrt(
                         Math.pow(proj.endX - proj.x, 2) + 
@@ -514,14 +514,33 @@ export class Renderer {
                     // Set alpha for beam visibility
                     this.ctx.globalAlpha = 0.9;
                     
-                    // Draw single dark fountain sprite stretched across entire beam length
-                    this.ctx.drawImage(
-                        this.darkFountainImage,
-                        0, 0, this.darkFountainImage.width, this.darkFountainImage.height, // Source: entire sprite
-                        0, -proj.width/2, beamLength, proj.width // Destination: stretch to full beam length and width
-                    );
+                    // Draw the dark fountain sprite stretched along the beam length
+                    // Repeat the sprite pattern along the beam
+                    const spriteWidth = this.darkFountainImage.width;
+                    const spriteHeight = this.darkFountainImage.height;
+                    const numRepetitions = Math.ceil(beamLength / spriteWidth);
+                    
+                    // Scale height to match beam width
+                    const scaleY = proj.width / spriteHeight;
+                    
+                    for (let i = 0; i < numRepetitions; i++) {
+                        const x = i * spriteWidth;
+                        const drawWidth = Math.min(spriteWidth, beamLength - x);
+                        
+                        if (drawWidth > 0) {
+                            this.ctx.drawImage(
+                                this.darkFountainImage,
+                                0, 0, drawWidth, spriteHeight, // Source rectangle
+                                x, -proj.width/2, drawWidth, proj.width // Destination rectangle
+                            );
+                        }
+                    }
+                    
+                    this.ctx.restore();
                 } else {
                     // Fallback to gradient rendering if image not loaded
+                    this.ctx.save();
+                    
                     // Create gradient for beam effect
                     const gradient = this.ctx.createLinearGradient(proj.x, proj.y, proj.endX, proj.endY);
                     gradient.addColorStop(0, proj.color + 'CC'); // Semi-transparent start
@@ -544,9 +563,9 @@ export class Renderer {
                     this.ctx.lineWidth = proj.width * 2;
                     this.ctx.globalAlpha = 0.3;
                     this.ctx.stroke();
+                    
+                    this.ctx.restore();
                 }
-                
-                this.ctx.restore();
                 return;
             }
             
