@@ -90,20 +90,43 @@ export class MenuManager {
         let touchStartTime = 0;
         let isNavigating = false;
         
+        console.log('Setting up touch navigation...');
+        
         const handleTouchStart = (e) => {
-            if (!this.isWeaponTreeVisible) return;
+            const weaponTreeMenu = document.getElementById('weaponTreeMenu');
+            if (!weaponTreeMenu || weaponTreeMenu.style.display === 'none' || !this.isWeaponTreeVisible) {
+                console.log('Touch ignored - weapon tree not visible');
+                return;
+            }
             
+            // Check if touch is actually within the weapon tree area
+            const rect = weaponTreeMenu.getBoundingClientRect();
             const touch = e.touches[0];
+            
+            if (touch.clientX < rect.left || touch.clientX > rect.right ||
+                touch.clientY < rect.top || touch.clientY > rect.bottom) {
+                console.log('Touch outside weapon tree area');
+                return;
+            }
+            
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
             touchStartTime = Date.now();
             isNavigating = false;
             
-            console.log('Touch start:', touchStartX, touchStartY);
+            console.log('Touch start detected in weapon tree:', {
+                x: touchStartX, 
+                y: touchStartY, 
+                weaponTreeVisible: this.isWeaponTreeVisible,
+                rect: rect
+            });
         };
         
         const handleTouchMove = (e) => {
-            if (!this.isWeaponTreeVisible || isNavigating) return;
+            const weaponTreeMenu = document.getElementById('weaponTreeMenu');
+            if (!weaponTreeMenu || weaponTreeMenu.style.display === 'none' || !this.isWeaponTreeVisible || isNavigating) {
+                return;
+            }
             
             const touch = e.touches[0];
             const currentX = touch.clientX;
@@ -112,31 +135,42 @@ export class MenuManager {
             const deltaX = currentX - touchStartX;
             const deltaY = currentY - touchStartY;
             
-            // Early detection for better responsiveness
-            const minDistance = 25; // Reduced for better responsiveness
+            // Very low threshold for immediate detection
+            const minDistance = 5; // Extremely low for maximum sensitivity
             const absX = Math.abs(deltaX);
             const absY = Math.abs(deltaY);
+            
+            console.log('Touch move:', {
+                deltaX: deltaX,
+                deltaY: deltaY,
+                absX: absX,
+                absY: absY,
+                minDistance: minDistance,
+                weaponTreeVisible: this.isWeaponTreeVisible
+            });
             
             if (absX > minDistance || absY > minDistance) {
                 isNavigating = true;
                 
-                // Determine direction with priority to the larger movement
-                if (absX > absY) {
-                    // Horizontal movement
+                console.log('Navigation triggered during move');
+                
+                // Clear direction preference - handle both horizontal and vertical equally
+                if (absX >= absY) {
+                    // Horizontal movement (prioritize left/right)
                     if (deltaX > 0) {
-                        console.log('Swiped right (during move)');
+                        console.log('SWIPED RIGHT (move) - deltaX:', deltaX);
                         this.navigateWeaponTree('right');
                     } else {
-                        console.log('Swiped left (during move)');
+                        console.log('SWIPED LEFT (move) - deltaX:', deltaX);
                         this.navigateWeaponTree('left');
                     }
                 } else {
                     // Vertical movement
                     if (deltaY > 0) {
-                        console.log('Swiped down (during move)');
+                        console.log('SWIPED DOWN (move) - deltaY:', deltaY);
                         this.navigateWeaponTree('down');
                     } else {
-                        console.log('Swiped up (during move)');
+                        console.log('SWIPED UP (move) - deltaY:', deltaY);
                         this.navigateWeaponTree('up');
                     }
                 }
@@ -147,11 +181,14 @@ export class MenuManager {
         };
         
         const handleTouchEnd = (e) => {
-            if (!this.isWeaponTreeVisible) return;
+            const weaponTreeMenu = document.getElementById('weaponTreeMenu');
+            if (!weaponTreeMenu || weaponTreeMenu.style.display === 'none' || !this.isWeaponTreeVisible) {
+                return;
+            }
             
             // If we already handled navigation during touchmove, don't do it again
             if (isNavigating) {
-                console.log('Navigation already handled during touchmove');
+                console.log('Navigation already handled during touchmove - skipping touchend');
                 return;
             }
             
@@ -164,14 +201,19 @@ export class MenuManager {
             const deltaY = touchEndY - touchStartY;
             const deltaTime = touchEndTime - touchStartTime;
             
-            console.log('Touch end - deltaX:', deltaX, 'deltaY:', deltaY, 'time:', deltaTime);
+            console.log('Touch end detected:', {
+                deltaX: deltaX,
+                deltaY: deltaY,
+                deltaTime: deltaTime,
+                wasNavigating: isNavigating
+            });
             
-            // Only register swipes that are fast enough and long enough
-            const minSwipeDistance = 20; // Reduced for easier swiping
-            const maxSwipeTime = 800; // Increased time allowance
+            // Fallback detection for quick swipes that didn't trigger during move
+            const minSwipeDistance = 3; // Extremely low threshold for maximum sensitivity
+            const maxSwipeTime = 2000; // Very generous time allowance
             
             if (deltaTime > maxSwipeTime) {
-                console.log('Swipe too slow');
+                console.log('Touch too slow:', deltaTime);
                 return;
             }
             
@@ -179,23 +221,25 @@ export class MenuManager {
             const absY = Math.abs(deltaY);
             
             if (absX > minSwipeDistance || absY > minSwipeDistance) {
+                console.log('Fallback navigation triggered in touchend');
+                
                 // Determine primary direction
-                if (absX > absY) {
+                if (absX >= absY) {
                     // Horizontal swipe - prioritize left/right
                     if (deltaX > 0) {
-                        console.log('Swiped right');
+                        console.log('SWIPED RIGHT (end) - deltaX:', deltaX);
                         this.navigateWeaponTree('right');
                     } else {
-                        console.log('Swiped left');
+                        console.log('SWIPED LEFT (end) - deltaX:', deltaX);
                         this.navigateWeaponTree('left');
                     }
                 } else {
                     // Vertical swipe
                     if (deltaY > 0) {
-                        console.log('Swiped down');
+                        console.log('SWIPED DOWN (end) - deltaY:', deltaY);
                         this.navigateWeaponTree('down');
                     } else {
-                        console.log('Swiped up');
+                        console.log('SWIPED UP (end) - deltaY:', deltaY);
                         this.navigateWeaponTree('up');
                     }
                 }
@@ -205,24 +249,61 @@ export class MenuManager {
             }
         };
         
-        // Add touch event listeners to document with better options
-        document.addEventListener('touchstart', handleTouchStart, { passive: false });
-        document.addEventListener('touchmove', handleTouchMove, { passive: false });
-        document.addEventListener('touchend', handleTouchEnd, { passive: false });
+        // Remove any existing listeners first
+        document.removeEventListener('touchstart', this.handleTouchStartBound);
+        document.removeEventListener('touchmove', this.handleTouchMoveBound);
+        document.removeEventListener('touchend', this.handleTouchEndBound);
         
-        console.log('Enhanced touch navigation initialized for all devices');
+        // Bind functions to this instance so we can remove them later
+        this.handleTouchStartBound = handleTouchStart.bind(this);
+        this.handleTouchMoveBound = handleTouchMove.bind(this);
+        this.handleTouchEndBound = handleTouchEnd.bind(this);
+        
+        // Add touch event listeners with passive: false to allow preventDefault
+        document.addEventListener('touchstart', this.handleTouchStartBound, { 
+            passive: false, 
+            capture: true 
+        });
+        document.addEventListener('touchmove', this.handleTouchMoveBound, { 
+            passive: false, 
+            capture: true 
+        });
+        document.addEventListener('touchend', this.handleTouchEndBound, { 
+            passive: false, 
+            capture: true 
+        });
+        
+        // Also add to the weapon tree menu specifically for extra coverage
+        const weaponTreeMenu = document.getElementById('weaponTreeMenu');
+        if (weaponTreeMenu) {
+            weaponTreeMenu.addEventListener('touchstart', this.handleTouchStartBound, { 
+                passive: false 
+            });
+            weaponTreeMenu.addEventListener('touchmove', this.handleTouchMoveBound, { 
+                passive: false 
+            });
+            weaponTreeMenu.addEventListener('touchend', this.handleTouchEndBound, { 
+                passive: false 
+            });
+            console.log('Touch events also bound directly to weaponTreeMenu');
+        }
+        
+        console.log('Enhanced touch navigation initialized with ultra-sensitive detection');
     }
 
     // Navigate through weapon tree nodes
     navigateWeaponTree(direction) {
-        console.log('Navigating weapon tree:', direction, 'Current index:', this.selectedNodeIndex);
+        console.log('🔥 NAVIGATE WEAPON TREE CALLED:', direction, 'Current index:', this.selectedNodeIndex);
+        console.log('🔥 Weapon tree visible:', this.isWeaponTreeVisible);
+        console.log('🔥 Current weapon nodes count:', this.weaponNodes.length);
         
         if (this.weaponNodes.length === 0) {
+            console.log('🔥 Updating weapon nodes array...');
             this.updateWeaponNodesArray();
         }
         
         if (this.weaponNodes.length === 0) {
-            console.log('No weapon nodes found');
+            console.log('🔥 No weapon nodes found after update');
             return;
         }
         
@@ -236,7 +317,7 @@ export class MenuManager {
         const currentRow = Math.floor(this.selectedNodeIndex / nodesPerRow);
         const currentCol = this.selectedNodeIndex % nodesPerRow;
         
-        console.log('Current position:', currentRow, currentCol);
+        console.log('🔥 Current position:', currentRow, currentCol, 'Direction:', direction);
         
         switch(direction) {
             case 'up':
@@ -257,24 +338,30 @@ export class MenuManager {
                 }
                 break;
             case 'left':
+                console.log('🔥 PROCESSING LEFT NAVIGATION');
                 if (currentCol > 0) {
                     newIndex = currentRow * nodesPerRow + (currentCol - 1);
+                    console.log('🔥 Moving left in same row to index:', newIndex);
                 } else if (currentRow > 0) {
                     // Wrap to end of previous row
                     newIndex = (currentRow - 1) * nodesPerRow + (nodesPerRow - 1);
                     if (newIndex >= this.weaponNodes.length) {
                         newIndex = this.weaponNodes.length - 1;
                     }
+                    console.log('🔥 Wrapping to previous row, index:', newIndex);
                 }
                 break;
             case 'right':
+                console.log('🔥 PROCESSING RIGHT NAVIGATION');
                 if (currentCol < nodesPerRow - 1 && newIndex + 1 < this.weaponNodes.length) {
                     newIndex = currentRow * nodesPerRow + (currentCol + 1);
+                    console.log('🔥 Moving right in same row to index:', newIndex);
                 } else {
                     // Wrap to start of next row
                     const nextRowStart = (currentRow + 1) * nodesPerRow;
                     if (nextRowStart < this.weaponNodes.length) {
                         newIndex = nextRowStart;
+                        console.log('🔥 Wrapping to next row, index:', newIndex);
                     }
                 }
                 break;
@@ -283,11 +370,13 @@ export class MenuManager {
         // Ensure index is within bounds
         newIndex = Math.max(0, Math.min(newIndex, this.weaponNodes.length - 1));
         
-        console.log('New index:', newIndex);
+        console.log('🔥 Final new index:', newIndex, 'Previous index:', this.selectedNodeIndex);
         this.selectedNodeIndex = newIndex;
         
         // Apply selection to new node
         this.applyWeaponNodeSelection();
+        
+        console.log('🔥 Navigation completed successfully');
     }
 
     // Find node by grid position

@@ -337,6 +337,25 @@ export const WEAPONS = {
         sprite: 'umbrella.png',
         dodgeChance: 0.05, // 5% base chance to avoid damage
         dodgeChancePerStack: 0.05 // Additional 5% per umbrella
+    },
+
+    // Cheat-only Weapons
+    RALSEI: {
+        name: 'Ralsei',
+        damage: 0, // Uses instant kill instead
+        range: TILE_SIZE * 12, // Longer range for beam
+        cooldown: 10000, // 10 seconds between beam shots
+        projectileSpeed: 20, // Fast beam speed
+        color: '#FF69B4', // Hot pink like Ralsei's outfit
+        type: 'ranged',
+        sprite: 'Healing_staff.png', // Reuse healing staff sprite for projectiles
+        special: 'ralsei_instant_kill_beam',
+        healAmount: 5, // Heals 5 HP
+        healInterval: 1000, // Every 1 second
+        cheatOnly: true, // Mark as cheat-only weapon
+        piercing: true, // Beam goes through all enemies
+        beamWidth: TILE_SIZE * 2, // Wide beam
+        beamLength: 5000 // Beam extends far beyond screen
     }
 };
 

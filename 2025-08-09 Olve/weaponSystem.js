@@ -13,6 +13,9 @@ export class WeaponSystem {
         // Update traps (check triggers, apply effects, remove expired)
         this.updateTraps(deltaTime);
         
+        // Handle Ralsei healing
+        this.updateRalseiHealing();
+        
         // Continuously attempt to attack enemies
         this.attack();
     }
@@ -121,6 +124,21 @@ export class WeaponSystem {
         // Check weapon cooldown (faster with more weapons)
         let scaledCooldown = weapon.cooldown / count;
         
+        // Special fire rate bonus for Ralsei when you have 5+ weapons
+        if (weapon.special === 'ralsei_instant_kill_beam') {
+            if (count >= 20) {
+                // Insane fire rate: 0.1 second cooldown for 20+ Ralsei
+                scaledCooldown = 100;
+            } else if (count >= 10) {
+                // Ultra fire rate: 1 second cooldown for 10+ Ralsei
+                scaledCooldown = 1000;
+            } else if (count >= 5) {
+                // Fast fire rate: 5 seconds cooldown for 5+ Ralsei
+                scaledCooldown = 5000;
+            }
+            // Otherwise use normal scaling: weapon.cooldown / count
+        }
+        
         // Apply Ice Staff attack speed reduction if enemies are in frost zones
         if (weapon.sprite === 'Ice_staff.png' && this.gameState.iceStaffSlowEndTime && now < this.gameState.iceStaffSlowEndTime) {
             scaledCooldown = scaledCooldown / weapon.attackSpeedReduction; // Increase cooldown (slower attack)
@@ -179,6 +197,67 @@ export class WeaponSystem {
             predictedY + closestEnemy.height / 2 - playerCenterY,
             predictedX + closestEnemy.width / 2 - playerCenterX
         );
+        
+        // Handle special beam weapons (like Ralsei)
+        if (weapon.special === 'ralsei_instant_kill_beam') {
+            // Get all living enemies sorted by distance
+            const allEnemies = this.gameState.enemies
+                .filter(enemy => enemy.isAlive)
+                .map(enemy => ({
+                    enemy: enemy,
+                    distance: Math.sqrt(
+                        Math.pow(enemy.x + enemy.width/2 - playerCenterX, 2) + 
+                        Math.pow(enemy.y + enemy.height/2 - playerCenterY, 2)
+                    )
+                }))
+                .sort((a, b) => a.distance - b.distance);
+
+            // Create all beams simultaneously, each targeting a different enemy when possible
+            const targetsUsed = new Set();
+            const beamTargets = [];
+            
+            // First pass: assign unique enemies to beams
+            for (let i = 0; i < count; i++) {
+                let assignedTarget = null;
+                let assignedAngle = baseAngle;
+                
+                // Find the next available enemy
+                for (const enemyData of allEnemies) {
+                    if (!targetsUsed.has(enemyData.enemy.id || enemyData.enemy)) {
+                        assignedTarget = enemyData.enemy;
+                        targetsUsed.add(enemyData.enemy.id || enemyData.enemy);
+                        
+                        // Calculate precise angle to this enemy with prediction
+                        const predictedX = assignedTarget.x + (assignedTarget.dx || 0) * leadTime;
+                        const predictedY = assignedTarget.y + (assignedTarget.dy || 0) * leadTime;
+                        
+                        assignedAngle = Math.atan2(
+                            predictedY + assignedTarget.height / 2 - playerCenterY,
+                            predictedX + assignedTarget.width / 2 - playerCenterX
+                        );
+                        break;
+                    }
+                }
+                
+                // If no unique enemy available, spread beams around the battlefield
+                if (!assignedTarget && allEnemies.length > 0) {
+                    // Use random enemy with angle spread to cover more area
+                    const randomEnemy = allEnemies[Math.floor(Math.random() * allEnemies.length)].enemy;
+                    const spreadAngle = (Math.PI * 2 / count) * i; // Distribute evenly in circle
+                    assignedAngle = baseAngle + spreadAngle + (Math.random() - 0.5) * 0.2;
+                    assignedTarget = randomEnemy;
+                }
+                
+                beamTargets.push({ enemy: assignedTarget, angle: assignedAngle });
+            }
+            
+            // Second pass: create all beams simultaneously
+            beamTargets.forEach(target => {
+                this.createBeamProjectile(weapon, playerCenterX, playerCenterY, target.angle);
+            });
+            
+            return;
+        }
         
         // Handle multi-shot weapons (like Triple Bow)
         if (weapon.multiShot && weapon.multiShot > 1) {
@@ -436,8 +515,93 @@ export class WeaponSystem {
             color: weapon.color,
             piercing: weapon.piercing,
             hitEnemies: new Set(),
+            type: weapon.type, // Add weapon type
             weapon: weapon // Add weapon reference for sprite rendering
         });
+    }
+
+    createBeamProjectile(weapon, x, y, angle) {
+        // Create a beam that instantly hits all enemies in its path
+        const beamEndX = x + Math.cos(angle) * weapon.beamLength;
+        const beamEndY = y + Math.sin(angle) * weapon.beamLength;
+        
+        this.gameState.projectiles.push({
+            x,
+            y,
+            endX: beamEndX,
+            endY: beamEndY,
+            angle: angle,
+            width: weapon.beamWidth,
+            height: weapon.beamLength,
+            damage: 99999, // Instant kill damage
+            color: weapon.color,
+            piercing: true,
+            hitEnemies: new Set(),
+            type: 'beam',
+            weapon: weapon,
+            isBeam: true,
+            lifetime: 200, // Beam visible for 200ms
+            createdAt: Date.now()
+        });
+
+        // Immediately check for beam collisions with all enemies
+        this.checkBeamCollisions(x, y, beamEndX, beamEndY, angle, weapon);
+    }
+
+    checkBeamCollisions(beamStartX, beamStartY, beamEndX, beamEndY, angle, weapon) {
+        const beamWidth = weapon.beamWidth;
+        
+        this.gameState.enemies.forEach(enemy => {
+            const enemyCenterX = enemy.x + enemy.width / 2;
+            const enemyCenterY = enemy.y + enemy.height / 2;
+            
+            // Check if enemy is within the beam path
+            const distanceToBeam = this.pointToLineDistance(
+                enemyCenterX, enemyCenterY,
+                beamStartX, beamStartY,
+                beamEndX, beamEndY
+            );
+            
+            if (distanceToBeam <= beamWidth / 2) {
+                // Instant kill the enemy
+                enemy.health = 0;
+                enemy.hitTime = Date.now();
+                enemy.markedForDeath = true;
+                
+                // Create special beam hit effect
+                if (this.particleEngine) {
+                    this.particleEngine.createExplosionEffect(
+                        enemyCenterX,
+                        enemyCenterY,
+                        '#FF69B4' // Pink explosion for Ralsei beam
+                    );
+                }
+            }
+        });
+    }
+
+    pointToLineDistance(px, py, x1, y1, x2, y2) {
+        // Calculate distance from point (px, py) to line segment (x1, y1) to (x2, y2)
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        if (lenSq === 0) return Math.sqrt(A * A + B * B);
+        
+        let param = dot / lenSq;
+        param = Math.max(0, Math.min(1, param));
+        
+        const xx = x1 + param * C;
+        const yy = y1 + param * D;
+        
+        const dx = px - xx;
+        const dy = py - yy;
+        
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     damageEnemy(enemy, weapon, hitTime) {
@@ -1565,5 +1729,45 @@ export class WeaponSystem {
         const bowTypes = ['BOW', 'DRAGON_BOW', 'TRIPLE_BOW'];
         const playerWeapons = this.gameState.player.weapons.map(w => w.id);
         return bowTypes.every(type => playerWeapons.includes(type));
+    }
+
+    updateRalseiHealing() {
+        // Check if player has Ralsei weapon
+        const ralseiWeapons = this.gameState.player.weapons.filter(weapon => weapon.id === 'RALSEI');
+        if (ralseiWeapons.length === 0) return;
+
+        const now = Date.now();
+        const weapon = WEAPONS.RALSEI;
+        
+        // Initialize healing tracking if needed
+        if (!this.gameState.player.ralseiHealingState) {
+            this.gameState.player.ralseiHealingState = {
+                lastHealTime: 0
+            };
+        }
+
+        const healingState = this.gameState.player.ralseiHealingState;
+        const weaponCount = ralseiWeapons.length;
+
+        // Heal player (scales with weapon count)
+        if (now - healingState.lastHealTime >= weapon.healInterval) {
+            const totalHealAmount = weapon.healAmount * weaponCount;
+            if (this.gameState.player.health < this.gameState.player.maxHealth) {
+                this.gameState.player.health = Math.min(
+                    this.gameState.player.maxHealth,
+                    this.gameState.player.health + totalHealAmount
+                );
+
+                // Create healing particle effect
+                if (this.particleEngine) {
+                    this.particleEngine.createHealingEffect(
+                        this.gameState.player.x + this.gameState.player.width / 2,
+                        this.gameState.player.y + this.gameState.player.height / 2,
+                        '#FF69B4' // Pink color for Ralsei
+                    );
+                }
+            }
+            healingState.lastHealTime = now;
+        }
     }
 }

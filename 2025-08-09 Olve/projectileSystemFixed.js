@@ -14,7 +14,13 @@ export class ProjectileSystem {
 
     updateProjectiles() {
         this.gameState.projectiles = this.gameState.projectiles.filter(proj => {
-            // Move projectile
+            // Handle beam projectiles (they don't move, just expire after lifetime)
+            if (proj.isBeam) {
+                const now = Date.now();
+                return now - proj.createdAt < proj.lifetime;
+            }
+            
+            // Move regular projectiles
             proj.x += proj.dx;
             proj.y += proj.dy;
 
@@ -104,9 +110,20 @@ export class ProjectileSystem {
     }
 
     hitEnemy(enemy, projectile) {
-        const enemyWillDie = enemy.health - projectile.damage <= 0;
+        let damage = projectile.damage;
         
-        enemy.health -= projectile.damage;
+        // Handle Ralsei's percentage damage (scales with number of Ralsei weapons)
+        if (projectile.weapon && projectile.weapon.special === 'ralsei_percentage_damage') {
+            // Count how many Ralsei weapons the player has
+            const ralseiCount = this.gameState.player.weapons.filter(weapon => weapon.id === 'RALSEI').length;
+            // Each Ralsei adds 5% damage (5% * number of Ralsei weapons)
+            const totalPercentage = projectile.weapon.percentageDamage * ralseiCount;
+            damage = Math.ceil((enemy.maxHealth || enemy.health) * totalPercentage);
+        }
+        
+        const enemyWillDie = enemy.health - damage <= 0;
+        
+        enemy.health -= damage;
         enemy.hitTime = Date.now();
         
         // Handle hit tracking differently for throwing vs regular projectiles
@@ -123,6 +140,11 @@ export class ProjectileSystem {
         
         // Handle staff weapon special effects
         if (projectile.type === 'staff' && projectile.weapon) {
+            this.handleStaffSpecialEffects(enemy, projectile);
+        }
+        
+        // Handle special ranged weapon effects (like Ralsei)
+        if (projectile.weapon && (projectile.weapon.special === 'ralsei_percentage_damage' || projectile.weapon.special === 'ralsei_instant_kill_beam')) {
             this.handleStaffSpecialEffects(enemy, projectile);
         }
         
@@ -272,6 +294,22 @@ export class ProjectileSystem {
                         '#32CD32'
                     );
                 }
+                break;
+                
+            case 'ralsei_percentage_damage':
+                // Create pink healing-style particle effect for Ralsei hits
+                if (this.particleEngine) {
+                    this.particleEngine.createHealingEffect(
+                        hitEnemy.x + hitEnemy.width / 2,
+                        hitEnemy.y + hitEnemy.height / 2,
+                        '#FF69B4' // Pink color for Ralsei
+                    );
+                }
+                break;
+                
+            case 'ralsei_instant_kill_beam':
+                // Beam already handles damage and effects instantly
+                // This case is just for consistency
                 break;
         }
     }

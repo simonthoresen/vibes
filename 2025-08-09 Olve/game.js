@@ -1,4 +1,4 @@
-// Game constants
+// Game constants - Updated with Ralsei weapon - Cache bust v2.0
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const TILE_SIZE = 32;
@@ -84,6 +84,24 @@ const WEAPONS = {
         orbitRadius: TILE_SIZE * 4, // same as Dragon Scythe
         spinSpeed: 1, // half the speed of other scythes
         oscillating: true
+    },
+    RALSEI: {
+        name: 'Ralsei',
+        damage: 0, // Uses percentage damage instead
+        range: TILE_SIZE * 8, // Good range
+        cooldown: 200, // 5 times per second (1000ms / 5 = 200ms)
+        projectileSpeed: 6,
+        color: '#FF69B4', // Hot pink like Ralsei's outfit
+        type: 'ranged',
+        multiShot: 5, // Shoots 5 Ralsei per attack
+        spreadAngle: 0.6, // Spread between the 5 shots
+        sprite: 'Healing_staff.png', // Reuse healing staff sprite for projectiles
+        special: 'ralsei_percentage_damage',
+        percentageDamage: 0.05, // 5% of enemy max HP
+        healAmount: 5, // Heals 5 HP
+        healInterval: 1000, // Every 1 second
+        cheatOnly: true, // Mark as cheat-only weapon
+        piercing: true // Ralsei projectiles go through enemies
     }
 };
 window.WEAPONS = WEAPONS;
@@ -759,7 +777,7 @@ function showCheatMenu() {
         'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
         'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
         'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
-        'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Umbrella'
+        'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Umbrella', 'Ralsei'
     ];
     console.log('Weapons array:', weapons); // Debug log to see the full array
     console.log('Weapons array length:', weapons.length); // Debug log
@@ -784,24 +802,7 @@ function showCheatMenu() {
     amountControl.appendChild(amountLabel);
     amountControl.appendChild(amountInput);
     weaponSection.appendChild(amountControl);
-    // Now add checkboxes for all weapons
-    weapons.forEach(weapon => {
-        const weaponControl = document.createElement('div');
-        weaponControl.style.cssText = 'margin-bottom: 10px; display: flex; align-items: center;';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = weapon.replace(/\s+/g, '') + 'Check';
-        checkbox.checked = gameState.player.weapons.some(w => w.id === weapon.replace(/\s+/g, '_').toUpperCase() || (weapon === 'Piercing Bow' && w.id === 'BOW'));
-        checkbox.style.marginRight = '10px';
-        const label = document.createElement('label');
-        label.htmlFor = checkbox.id;
-        label.textContent = weapon;
-        label.style.color = 'white';
-        weaponControl.appendChild(checkbox);
-        weaponControl.appendChild(label);
-        weaponSection.appendChild(weaponControl);
-    });
-
+    
     // Create confirm button
     const confirmButton = document.createElement('button');
     confirmButton.textContent = 'Confirm Weapons';

@@ -1281,7 +1281,7 @@ class DungeonCrawlerGame {
             'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
             'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
             'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
-            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Triple Bow', 'Umbrella'
+            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Triple Bow', 'Umbrella', 'Ralsei'
         ];
         
         // Add amount selector

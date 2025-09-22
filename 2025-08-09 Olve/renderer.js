@@ -29,6 +29,22 @@ export class Renderer {
             this.fastArrowImageLoaded = true;
         };
         
+        // Load dark fountain sprite for Ralsei beam
+        this.darkFountainImage = new Image();
+        this.darkFountainImage.src = 'images/dark_fountain.png';
+        this.darkFountainImageLoaded = false;
+        this.darkFountainImage.onload = () => {
+            this.darkFountainImageLoaded = true;
+        };
+        
+        // Load Ralsei player sprite
+        this.ralseiPlayerImage = new Image();
+        this.ralseiPlayerImage.src = 'images/ralsei.png';
+        this.ralseiPlayerImageLoaded = false;
+        this.ralseiPlayerImage.onload = () => {
+            this.ralseiPlayerImageLoaded = true;
+        };
+        
         // Load sword sprites
         this.swordImage = new Image();
         this.swordImage.src = 'images/Sword.png';
@@ -285,35 +301,60 @@ export class Renderer {
         // Draw poison aura if player has poison cloud weapon
         this.drawPoisonAura(player, centerX, centerY);
 
-        // Draw player with current skin (color + optional custom accessories)
-        // First, always draw the base colored character
-        this.ctx.fillStyle = player.invulnerable ?
-            (Math.floor(Date.now() / 100) % 2 === 0 ? '#ffffff' : (player.skin === 'custom' ? '#ff6b6b' : player.skin.color)) :
-            (player.skin === 'custom' ? '#ff6b6b' : player.skin.color);
-        this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, player.width / 2, 0, Math.PI * 2);
-        this.ctx.fill();
+        // Check if player has any Ralsei weapons
+        const hasRalseiWeapon = player.weapons && player.weapons.some(weapon => weapon.id === 'RALSEI');
         
-        // Then, draw custom accessories on top if they exist
-        const customAccessories = localStorage.getItem('customAccessories');
-        if (customAccessories && this.customAccessoriesImage) {
-            // Create a circular clipping path for accessories too
+        if (hasRalseiWeapon && this.ralseiPlayerImageLoaded) {
+            // Draw Ralsei sprite when player has Ralsei weapons
             this.ctx.save();
-            this.ctx.beginPath();
-            this.ctx.arc(centerX, centerY, player.width / 2, 0, Math.PI * 2);
-            this.ctx.clip();
             
-            // Draw the custom accessories on top
-            const size = player.width;
+            // Apply invulnerability flashing effect
+            if (player.invulnerable && Math.floor(Date.now() / 100) % 2 === 0) {
+                this.ctx.globalAlpha = 0.5; // Make semi-transparent during invulnerability flash
+            }
+            
+            // Draw the Ralsei sprite centered on the player
+            const size = player.width * 1.2; // Make Ralsei slightly larger than the circle
             this.ctx.drawImage(
-                this.customAccessoriesImage, 
-                centerX - size/2, 
-                centerY - size/2, 
-                size, 
+                this.ralseiPlayerImage,
+                centerX - size/2,
+                centerY - size/2,
+                size,
                 size
             );
             
             this.ctx.restore();
+        } else {
+            // Draw player with current skin (color + optional custom accessories)
+            // First, always draw the base colored character
+            this.ctx.fillStyle = player.invulnerable ?
+                (Math.floor(Date.now() / 100) % 2 === 0 ? '#ffffff' : (player.skin === 'custom' ? '#ff6b6b' : player.skin.color)) :
+                (player.skin === 'custom' ? '#ff6b6b' : player.skin.color);
+            this.ctx.beginPath();
+            this.ctx.arc(centerX, centerY, player.width / 2, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Then, draw custom accessories on top if they exist
+            const customAccessories = localStorage.getItem('customAccessories');
+            if (customAccessories && this.customAccessoriesImage) {
+                // Create a circular clipping path for accessories too
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, player.width / 2, 0, Math.PI * 2);
+                this.ctx.clip();
+                
+                // Draw the custom accessories on top
+                const size = player.width;
+                this.ctx.drawImage(
+                    this.customAccessoriesImage, 
+                    centerX - size/2, 
+                    centerY - size/2, 
+                    size, 
+                    size
+                );
+                
+                this.ctx.restore();
+            }
         }
 
         // Draw player health bar
@@ -454,6 +495,61 @@ export class Renderer {
 
     drawProjectiles(projectiles) {
         projectiles.forEach(proj => {
+            // Handle beam projectiles (like Ralsei beam)
+            if (proj.isBeam) {
+                this.ctx.save();
+                
+                if (this.darkFountainImageLoaded) {
+                    // Calculate beam parameters
+                    const beamLength = Math.sqrt(
+                        Math.pow(proj.endX - proj.x, 2) + 
+                        Math.pow(proj.endY - proj.y, 2)
+                    );
+                    const beamAngle = Math.atan2(proj.endY - proj.y, proj.endX - proj.x);
+                    
+                    // Move to beam start position
+                    this.ctx.translate(proj.x, proj.y);
+                    this.ctx.rotate(beamAngle);
+                    
+                    // Set alpha for beam visibility
+                    this.ctx.globalAlpha = 0.9;
+                    
+                    // Draw single dark fountain sprite stretched across entire beam length
+                    this.ctx.drawImage(
+                        this.darkFountainImage,
+                        0, 0, this.darkFountainImage.width, this.darkFountainImage.height, // Source: entire sprite
+                        0, -proj.width/2, beamLength, proj.width // Destination: stretch to full beam length and width
+                    );
+                } else {
+                    // Fallback to gradient rendering if image not loaded
+                    // Create gradient for beam effect
+                    const gradient = this.ctx.createLinearGradient(proj.x, proj.y, proj.endX, proj.endY);
+                    gradient.addColorStop(0, proj.color + 'CC'); // Semi-transparent start
+                    gradient.addColorStop(0.5, proj.color); // Full color middle
+                    gradient.addColorStop(1, proj.color + '44'); // Very transparent end
+                    
+                    // Draw beam as thick line
+                    this.ctx.strokeStyle = gradient;
+                    this.ctx.lineWidth = proj.width;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.globalAlpha = 0.8;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(proj.x, proj.y);
+                    this.ctx.lineTo(proj.endX, proj.endY);
+                    this.ctx.stroke();
+                    
+                    // Add glow effect
+                    this.ctx.strokeStyle = proj.color + '44';
+                    this.ctx.lineWidth = proj.width * 2;
+                    this.ctx.globalAlpha = 0.3;
+                    this.ctx.stroke();
+                }
+                
+                this.ctx.restore();
+                return;
+            }
+            
             // Check projectile type by color and weapon reference
             const isPiercingBow = proj.color === '#8b4513';
             const isDragonBow = proj.color === '#f77';
