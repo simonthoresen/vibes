@@ -1,4 +1,4 @@
-import { DEFAULT_KEYBINDS, PLAYER_SKINS } from './constants.js';
+import { DEFAULT_KEYBINDS, PLAYER_SKINS, WEAPONS } from './constants.js';
 
 export class GameState {
     constructor() {
@@ -570,18 +570,24 @@ export class GameState {
     // Purchase a weapon unlock
     purchaseWeapon(branch, weaponKey) {
         const tree = this.getWeaponTree();
-        const weapon = tree[branch]?.weapons[weaponKey];
+        // Handle both old branch-based calls and new unified structure
+        const weapon = branch === 'unified' 
+            ? tree.unified?.weapons[weaponKey]
+            : tree.unified?.weapons[weaponKey]; // All weapons are now in unified branch
         
-        if (!weapon) return false;
+        if (!weapon) {
+            console.error(`Weapon not found: branch=${branch}, weaponKey=${weaponKey}`);
+            return false;
+        }
         if (this.player.weaponTreePoints < weapon.cost) return false;
         
         // Check requirements
         if (weapon.requires) {
             const purchased = this.loadWeaponTreeUpgrades();
-            const branchPurchased = purchased[branch] || {};
+            const purchasedWeapons = purchased.unified || {};
             
             for (const req of weapon.requires) {
-                if (!branchPurchased[req]) {
+                if (!purchasedWeapons[req]) {
                     return false; // Requirement not met
                 }
             }
@@ -591,45 +597,94 @@ export class GameState {
         this.player.weaponTreePoints -= weapon.cost;
         this.saveWeaponTreePoints(this.player.weaponTreePoints);
         
-        // Save purchase
+        // Save purchase - always save to unified branch
         const purchased = this.loadWeaponTreeUpgrades();
-        if (!purchased[branch]) purchased[branch] = {};
-        purchased[branch][weaponKey] = true;
+        if (!purchased.unified) purchased.unified = {};
+        purchased.unified[weaponKey] = true;
         this.saveWeaponTreeUpgrades(purchased);
+        
+        // Update in-memory state
+        this.player.weaponTreeUpgrades = purchased;
         
         // Trigger callbacks to notify about points change AFTER everything is saved
         this.triggerPointsChanged();
         
+        console.log(`Weapon ${weaponKey} purchased successfully in unified tree`);
+        
+        // Validate state after purchase
+        this.validateWeaponTreeState();
+        
         return true;
+    }
+
+    // Debug method to validate weapon tree state
+    validateWeaponTreeState() {
+        const purchased = this.loadWeaponTreeUpgrades();
+        const tree = this.getWeaponTree();
+        
+        if (!purchased.unified) {
+            console.warn('No unified purchases found in weapon tree state');
+            return;
+        }
+        
+        const purchasedCount = Object.keys(purchased.unified).length;
+        const totalWeapons = Object.keys(tree.unified.weapons).length;
+        
+        console.log(`Weapon Tree State: ${purchasedCount}/${totalWeapons} weapons unlocked`);
+        
+        // Check for any inconsistencies
+        Object.entries(purchased.unified).forEach(([weaponKey, isPurchased]) => {
+            if (!tree.unified.weapons[weaponKey]) {
+                console.error(`Purchased weapon ${weaponKey} not found in tree definition!`);
+            }
+        });
     }
 
     // Check if a weapon is unlocked
     isWeaponUnlocked(branch, weaponKey) {
         const purchased = this.loadWeaponTreeUpgrades();
-        return !!(purchased[branch] && purchased[branch][weaponKey]);
+        // Handle both old branch-based calls and new unified structure
+        if (branch === 'unified' || !branch) {
+            return !!(purchased.unified && purchased.unified[weaponKey]);
+        }
+        // Legacy support for old branch calls
+        return !!(purchased.unified && purchased.unified[weaponKey]);
     }
 
     // Get all unlocked weapons for weapon selection
     getUnlockedWeapons() {
         const tree = this.getWeaponTree();
+        const purchased = this.loadWeaponTreeUpgrades();
+        const purchasedWeapons = purchased.unified || {};
         const unlocked = [];
         
-        Object.entries(tree).forEach(([branchKey, branch]) => {
-            Object.entries(branch.weapons).forEach(([weaponKey, weapon]) => {
-                if (this.isWeaponUnlocked(branchKey, weaponKey)) {
-                    unlocked.push(weapon.weaponId);
-                }
-            });
+        // Use unified tree structure
+        Object.entries(tree.unified.weapons).forEach(([weaponKey, weapon]) => {
+            if (purchasedWeapons[weaponKey]) {
+                unlocked.push(weapon.weaponId);
+            }
         });
         
         return unlocked;
     }
 
-    // Reset weapon tree progress to just basic weapons
-    resetWeaponTree() {
+    // Reset all game data including weapon tree and shop exclusive items
+    resetAllGameData() {
         try {
-            // Clear all saved upgrades
+            console.log('🗑️ [RESET ALL DATA] Starting complete game data reset...');
+            
+            // Clear all game progress data
             localStorage.removeItem('weaponTreeUpgrades');
+            localStorage.removeItem('weaponTreePoints');
+            localStorage.removeItem('purchasedShopItems');
+            localStorage.removeItem('shopData');
+            localStorage.removeItem('skinsUnlocked');
+            localStorage.removeItem('playerSkin');
+            localStorage.removeItem('selectedSkin');
+            localStorage.removeItem('customAccessories');
+            localStorage.removeItem('customSkin');
+            
+            console.log('🗑️ [RESET ALL DATA] Cleared localStorage items');
             
             // Reset weapon tree points to 0
             this.player.weaponTreePoints = 0;
@@ -637,6 +692,10 @@ export class GameState {
             
             // Reset the player's weapon tree upgrades in memory
             this.player.weaponTreeUpgrades = {};
+            
+            // Reset skin settings
+            this.player.skinsUnlocked = false;
+            this.player.skinName = 'default';
             
             // Auto-unlock basic weapons again
             const basicWeapons = ['sword', 'scythe', 'bow'];
@@ -652,18 +711,356 @@ export class GameState {
             this.saveWeaponTreeUpgrades(upgrades);
             this.player.weaponTreeUpgrades = upgrades;
             
-            console.log('Weapon tree progress reset successfully');
+            // Reset shop exclusive items state
+            this.savePurchasedShopItems({});
+            
+            console.log('🗑️ [RESET ALL DATA] All game data reset successfully - weapon tree, shop items, skins, and cosmetics cleared');
             return true;
         } catch (error) {
-            console.log('Failed to reset weapon tree progress:', error);
+            console.log('🗑️ [RESET ALL DATA] Failed to reset game data:', error);
             return false;
         }
+    }
+    
+    // Legacy method name for backwards compatibility
+    resetWeaponTree() {
+        return this.resetAllGameData();
+    }
+
+    // Shop System
+    getShopExclusiveItems() {
+        return {
+            entropyReactor: {
+                name: '⚔️ Entropy Reactor',
+                type: 'Weapon Core',
+                description: 'Every second you continuously deal damage to the same enemy, your damage against that target increases by +10%, stacking up to +100%. The bonus resets if you stop hitting that enemy for 1 second.',
+                baseCost: 250,
+                isShopExclusive: true
+            },
+            voltageLoop: {
+                name: '⚡ Voltage Loop',
+                type: 'Augment',
+                description: 'Every 5th hit releases a lightning arc that jumps to up to 3 nearby enemies, dealing 30% weapon damage each.',
+                baseCost: 180,
+                isShopExclusive: true
+            },
+            thermalConverter: {
+                name: '🔥 Thermal Converter',
+                type: 'Core Upgrade',
+                description: 'Each second of continuous firing increases your weapon\'s heat by 1. At 10 stacks, your attacks ignite enemies for 2% of their max HP over 3 seconds, then heat resets.',
+                baseCost: 200,
+                isShopExclusive: true
+            },
+            wraithDrive: {
+                name: '💀 Wraith Drive',
+                type: 'Passive Relic',
+                description: 'Killing an enemy grants +1% fire rate for 10 seconds, stacking up to +20%. Refreshes duration on new kills.',
+                baseCost: 160,
+                isShopExclusive: true
+            },
+            nullBarrier: {
+                name: '🩸 Null Barrier',
+                type: 'Defensive Relic',
+                description: 'Taking damage reduces all incoming damage by 50% for the next 1 second (cooldown: 5 seconds).',
+                baseCost: 220,
+                isShopExclusive: true
+            },
+            fractalLens: {
+                name: '🧠 Fractal Lens',
+                type: 'Special Relic',
+                description: 'Every 3 seconds, your next shot fires an additional projectile per enemy nearby (up to +5).',
+                baseCost: 300,
+                isShopExclusive: true
+            }
+        };
+    }
+
+    getWeaponTreeItemsForShop() {
+        const weaponTree = this.getWeaponTree();
+        const purchasedWeapons = this.loadWeaponTreeUpgrades();
+        const unlockedWeapons = purchasedWeapons.unified || {};
+        const shopWeapons = {};
+
+        // Get weapons that have requirements met (regardless of purchase status)
+        Object.entries(weaponTree.unified.weapons).forEach(([weaponKey, weapon]) => {
+            const hasCost = weapon.cost > 0;
+            
+            // Skip free weapons (basic weapons like sword, scythe, bow)
+            if (!hasCost) {
+                return;
+            }
+
+            // Check if requirements are met
+            let requirementsMet = true;
+            if (weapon.requires && weapon.requires.length > 0) {
+                requirementsMet = weapon.requires.every(reqWeapon => !!unlockedWeapons[reqWeapon]);
+            }
+            
+            // Add weapons that have requirements met (whether purchased or not)
+            if (requirementsMet) {
+                // Use the weapon tree key as the shop key, but verify the weapon exists in WEAPONS
+                const weaponExists = weapon.weaponId && WEAPONS[weapon.weaponId];
+                
+                if (weaponExists) {
+                    shopWeapons[weaponKey] = {
+                        name: `⚔️ ${weapon.name}`,
+                        type: 'Weapon Upgrade',
+                        description: `Permanently unlock this weapon upgrade for future runs. Original weapon tree cost: ${weapon.cost} points.`,
+                        baseCost: Math.floor(weapon.cost * 1.5), // Shop cost is 1.5x weapon tree cost
+                        isShopExclusive: false,
+                        weaponTreeKey: weaponKey,
+                        weaponId: weapon.weaponId
+                    };
+                } else {
+                    console.warn(`Weapon tree item ${weaponKey} references non-existent weapon ${weapon.weaponId}`);
+                }
+            }
+        });
+
+        return shopWeapons;
+    }
+
+    getShopItems() {
+        const exclusiveItems = this.getShopExclusiveItems();
+        const weaponItems = this.getWeaponTreeItemsForShop();
+        
+        return {
+            ...exclusiveItems,
+            ...weaponItems
+        };
+    }
+
+    loadShopData() {
+        try {
+            const savedShopData = localStorage.getItem('shopData');
+            if (savedShopData) {
+                const data = JSON.parse(savedShopData);
+                // Check if it's a new hour and refresh is needed
+                const now = new Date();
+                const currentHour = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+                if (data.lastRefresh !== currentHour) {
+                    return this.generateNewShopData();
+                }
+                return data;
+            }
+            return this.generateNewShopData();
+        } catch (error) {
+            console.log('Failed to load shop data:', error);
+            return this.generateNewShopData();
+        }
+    }
+
+    saveShopData(shopData) {
+        try {
+            localStorage.setItem('shopData', JSON.stringify(shopData));
+            console.log('Shop data saved:', shopData);
+        } catch (error) {
+            console.log('Failed to save shop data:', error);
+        }
+    }
+
+    generateNewShopData() {
+        const allItems = this.getShopItems();
+        const exclusiveItems = this.getShopExclusiveItems();
+        const weaponItems = this.getWeaponTreeItemsForShop();
+        
+        const exclusiveKeys = Object.keys(exclusiveItems);
+        const weaponKeys = Object.keys(weaponItems);
+        
+        let finalSelection = [];
+        
+        // Always try to have exactly 3 items
+        const targetItems = 3;
+        
+        // If we have available weapon items, prioritize mixing them with exclusives
+        if (weaponKeys.length > 0) {
+            // Try to get 1-2 weapon items and 1-2 exclusive items
+            const weaponCount = Math.min(2, weaponKeys.length);
+            const exclusiveCount = Math.min(targetItems - weaponCount, exclusiveKeys.length);
+            
+            const selectedWeapons = this.getRandomItems(weaponKeys, weaponCount);
+            const selectedExclusives = this.getRandomItems(exclusiveKeys, exclusiveCount);
+            
+            finalSelection = [...selectedWeapons, ...selectedExclusives];
+        } else {
+            // No available weapons, use only exclusive items
+            finalSelection = this.getRandomItems(exclusiveKeys, Math.min(targetItems, exclusiveKeys.length));
+        }
+        
+        // If we still don't have enough items, pad with more exclusives
+        while (finalSelection.length < targetItems && finalSelection.length < exclusiveKeys.length) {
+            const remaining = exclusiveKeys.filter(key => !finalSelection.includes(key));
+            if (remaining.length > 0) {
+                const additional = this.getRandomItems(remaining, Math.min(targetItems - finalSelection.length, remaining.length));
+                finalSelection.push(...additional);
+            } else {
+                break;
+            }
+        }
+        
+        // Shuffle the final selection
+        finalSelection = this.getRandomItems(finalSelection, finalSelection.length);
+        
+        const discounts = [25, 50, 75];
+        
+        const now = new Date();
+        const currentHour = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+        
+        const shopData = {
+            lastRefresh: currentHour,
+            items: finalSelection.map(itemKey => {
+                const item = allItems[itemKey];
+                // Only apply discounts to non-exclusive items (weapon tree items)
+                const discount = item.isShopExclusive ? 0 : discounts[Math.floor(Math.random() * discounts.length)];
+                
+                return {
+                    key: itemKey,
+                    discount: discount
+                };
+            })
+        };
+        
+        this.saveShopData(shopData);
+        return shopData;
+    }
+
+    getRandomItems(array, count) {
+        const shuffled = [...array].sort(() => 0.5 - Math.random());
+        return shuffled.slice(0, count);
+    }
+
+    forceRefreshShop() {
+        const newShopData = this.generateNewShopData();
+        console.log('Shop forcibly refreshed:', newShopData);
+        return newShopData;
+    }
+
+    loadPurchasedShopItems() {
+        try {
+            const savedItems = localStorage.getItem('purchasedShopItems');
+            return savedItems ? JSON.parse(savedItems) : {};
+        } catch (error) {
+            console.log('Failed to load purchased shop items:', error);
+            return {};
+        }
+    }
+
+    savePurchasedShopItems(items) {
+        try {
+            localStorage.setItem('purchasedShopItems', JSON.stringify(items));
+            console.log('Purchased shop items saved:', items);
+        } catch (error) {
+            console.log('Failed to save purchased shop items:', error);
+        }
+    }
+
+    purchaseShopItem(itemKey) {
+        const shopItems = this.getShopItems();
+        const shopData = this.loadShopData();
+        const purchasedItems = this.loadPurchasedShopItems();
+        
+        // Check if item is already purchased
+        if (purchasedItems[itemKey]) {
+            return { success: false, message: 'Item already purchased!' };
+        }
+        
+        // Find the item in current shop
+        const shopItem = shopData.items.find(item => item.key === itemKey);
+        if (!shopItem) {
+            return { success: false, message: 'Item not available in current shop!' };
+        }
+        
+        const item = shopItems[itemKey];
+        const effectiveDiscount = item.isShopExclusive ? 0 : shopItem.discount;
+        const discountedCost = Math.floor(item.baseCost * (1 - effectiveDiscount / 100));
+        
+        // Check if player has enough points
+        if (this.player.weaponTreePoints < discountedCost) {
+            return { success: false, message: 'Not enough points!' };
+        }
+        
+        // Purchase the item
+        this.player.weaponTreePoints -= discountedCost;
+        this.saveWeaponTreePoints(this.player.weaponTreePoints);
+        
+        // Mark as purchased in shop
+        purchasedItems[itemKey] = true;
+        this.savePurchasedShopItems(purchasedItems);
+        
+        // If this is a weapon tree item, also unlock it in the weapon tree
+        if (!item.isShopExclusive && item.weaponTreeKey) {
+            const weaponTreeUpgrades = this.loadWeaponTreeUpgrades();
+            if (!weaponTreeUpgrades.unified) {
+                weaponTreeUpgrades.unified = {};
+            }
+            weaponTreeUpgrades.unified[item.weaponTreeKey] = true;
+            this.saveWeaponTreeUpgrades(weaponTreeUpgrades);
+            this.player.weaponTreeUpgrades = weaponTreeUpgrades;
+            
+            console.log(`Weapon ${item.weaponTreeKey} unlocked in weapon tree via shop purchase`);
+        }
+        
+        // Trigger points changed callback
+        this.triggerPointsChanged();
+        
+        return { success: true, message: `${item.name} purchased successfully!` };
+    }
+
+    getShopItemsByCurrentRotation() {
+        const shopData = this.loadShopData();
+        const shopItems = this.getShopItems();
+        const purchasedItems = this.loadPurchasedShopItems();
+        const weaponTreeUpgrades = this.loadWeaponTreeUpgrades();
+        const unlockedWeapons = weaponTreeUpgrades.unified || {};
+        
+        // Check if any items are missing and regenerate if needed
+        const missingItems = shopData.items.filter(shopItem => !shopItems[shopItem.key]);
+        if (missingItems.length > 0) {
+            console.warn(`Found ${missingItems.length} missing shop items, regenerating shop data:`, missingItems.map(item => item.key));
+            // Regenerate shop data and try again
+            const newShopData = this.generateNewShopData();
+            this.saveShopData(newShopData);
+            return this.getShopItemsByCurrentRotation(); // Recursive call with new data
+        }
+
+        return shopData.items.map(shopItem => {
+            const item = shopItems[shopItem.key];
+            
+            // This should not happen now due to the check above, but keep as safety
+            if (!item) {
+                console.warn(`Shop item not found: ${shopItem.key}, skipping this item`);
+                return null;
+            }
+            
+            // Apply discount only if item allows discounts (non-exclusive items)
+            const effectiveDiscount = item.isShopExclusive ? 0 : shopItem.discount;
+            const discountedCost = Math.floor(item.baseCost * (1 - effectiveDiscount / 100));
+            
+            // Check if item is purchased from shop OR unlocked in weapon tree (for weapon tree items)
+            let isPurchased = !!purchasedItems[shopItem.key];
+            if (!item.isShopExclusive && item.weaponTreeKey) {
+                // For weapon tree items, also check if they're unlocked in the weapon tree
+                isPurchased = isPurchased || !!unlockedWeapons[item.weaponTreeKey];
+            }
+            
+            return {
+                ...item,
+                key: shopItem.key,
+                discount: effectiveDiscount,
+                originalCost: item.baseCost,
+                cost: discountedCost,
+                isPurchased: isPurchased
+            };
+        }).filter(item => item !== null); // Filter out any null items
     }
 
     reset() {
         this.player = this.createPlayer();
         this.enemies = [];
         this.projectiles = [];
+        this.allies = []; // Clear minions/allies when starting new game
+        this.traps = []; // Clear deployed traps when starting new game
+        this.frostZones = []; // Clear frost zones when starting new game
         this.currentFloor = 0;
         this.floorCleared = true;
         this.enemyHPMultiplier = 1;
@@ -672,5 +1069,18 @@ export class GameState {
         this.gameCompleted = false;
         this.deathSequence = false;
         this.timeScale = 1;
+        
+        // Clear passive items state that might persist
+        this.passiveItems = null;
+        this.entropyReactorState = null;
+        this.voltageLoopState = null;
+        
+        // Clear any other persistent state that might have been added
+        this.thermalConverterState = null;
+        this.wraithDriveState = null;
+        this.nullBarrierState = null;
+        this.fractalLensState = null;
+        
+        console.log('🔄 [GAME RESET] Cleared allies, traps, frost zones, passive items, and all persistent game state');
     }
 }

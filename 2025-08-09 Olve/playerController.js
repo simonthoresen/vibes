@@ -1,4 +1,4 @@
-import { getCanvasWidth, getCanvasHeight } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class PlayerController {
     constructor(gameState, inputManager) {
@@ -74,15 +74,65 @@ export class PlayerController {
     wrapPosition() {
         const player = this.gameState.player;
         
-        if (player.x < 0) player.x = getCanvasWidth();
-        if (player.x > getCanvasWidth()) player.x = 0;
-        if (player.y < 0) player.y = getCanvasHeight();
-        if (player.y > getCanvasHeight()) player.y = 0;
+        if (player.x < 0) player.x = CANVAS_WIDTH;
+        if (player.x > CANVAS_WIDTH) player.x = 0;
+        if (player.y < 0) player.y = CANVAS_HEIGHT;
+        if (player.y > CANVAS_HEIGHT) player.y = 0;
     }
 
     takeDamage(damage) {
         if (this.gameState.player.invulnerable) {
             return false;
+        }
+
+        // Check for Null Barrier effect (shop exclusive item)
+        if (this.gameState.passiveItems && this.gameState.passiveItems.NULL_BARRIER) {
+            const now = Date.now();
+            const nullBarrier = this.gameState.passiveItems.NULL_BARRIER;
+            const stackMultiplier = nullBarrier.stackMultiplier;
+            
+            // Initialize null barrier state if not exists
+            if (!this.gameState.nullBarrierState) {
+                this.gameState.nullBarrierState = {
+                    lastActivation: 0,
+                    cooldown: Math.max(1000, 5000 / stackMultiplier) // Cooldown decreases with stacks (min 1 second)
+                };
+            }
+            
+            const nullBarrierState = this.gameState.nullBarrierState;
+            
+            // Check if we can activate null barrier
+            if (now - nullBarrierState.lastActivation >= nullBarrierState.cooldown) {
+                // Activate null barrier - reduce damage and start damage reduction period
+                const damageReduction = Math.min(0.9, 0.5 * stackMultiplier); // Damage reduction increases with stacks (max 90%)
+                damage = damage * (1 - damageReduction);
+                
+                // Set damage reduction for next 1 second
+                this.gameState.nullBarrierActive = true;
+                this.gameState.nullBarrierEndTime = now + 1000;
+                this.gameState.nullBarrierReduction = damageReduction;
+                
+                nullBarrierState.lastActivation = now;
+                
+                console.log(`🛡️ [NULL BARRIER] Activated! Damage reduced by ${(damageReduction * 100).toFixed(0)}% for 1 second (${nullBarrier.count} items equipped, ${nullBarrier.stackMultiplier}x multiplier)`);
+                
+                // Create visual effect
+                if (this.particleEngine && this.particleEngine.createShieldEffect) {
+                    const centerX = this.gameState.player.x + this.gameState.player.width / 2;
+                    const centerY = this.gameState.player.y + this.gameState.player.height / 2;
+                    this.particleEngine.createShieldEffect(centerX, centerY, '#e63946');
+                }
+            } else if (this.gameState.nullBarrierActive && now < this.gameState.nullBarrierEndTime) {
+                // Apply ongoing damage reduction
+                const originalDamage = damage;
+                damage = damage * (1 - this.gameState.nullBarrierReduction);
+                console.log(`🛡️ [NULL BARRIER] Ongoing protection! Damage ${originalDamage.toFixed(1)} → ${damage.toFixed(1)} (${(this.gameState.nullBarrierReduction * 100).toFixed(0)}% reduction)`);
+            }
+            
+            // Clean up expired barrier
+            if (this.gameState.nullBarrierActive && now >= this.gameState.nullBarrierEndTime) {
+                this.gameState.nullBarrierActive = false;
+            }
         }
 
         // Check for umbrella dodge chance
@@ -142,8 +192,8 @@ export class PlayerController {
 
     reset() {
         this.gameState.player.health = this.gameState.player.maxHealth;
-        this.gameState.player.x = getCanvasWidth() / 2;
-        this.gameState.player.y = getCanvasHeight() / 2;
+        this.gameState.player.x = CANVAS_WIDTH / 2;
+        this.gameState.player.y = CANVAS_HEIGHT / 2;
         this.gameState.player.invulnerable = false;
         this.gameState.player.rotation = 0;
         this.clearWeapons();

@@ -4,6 +4,12 @@ export class WeaponSystem {
     constructor(gameState, particleEngine = null) {
         this.gameState = gameState;
         this.particleEngine = particleEngine;
+        this.projectileSystem = null;
+    }
+    
+    setProjectileSystem(projectileSystem) {
+        this.projectileSystem = projectileSystem;
+        console.log(`🔗 [WEAPON SYSTEM] ProjectileSystem connected for Voltage Loop integration`);
     }
 
     update(deltaTime) {
@@ -67,8 +73,32 @@ export class WeaponSystem {
         // Group weapons by their ID to handle stacking
         const weaponGroups = this.groupWeapons();
 
+        // Process passive shop exclusive items first (they don't attack but need state tracking)
+        this.processPassiveItems(weaponGroups);
+        
+        // Periodic debug check for Voltage Loop state
+        if (!this.lastVoltageDebug || now - this.lastVoltageDebug > 3000) { // Every 3 seconds
+            this.lastVoltageDebug = now;
+            if (this.gameState.passiveItems && this.gameState.passiveItems.VOLTAGE_LOOP) {
+                const voltageLoop = this.gameState.passiveItems.VOLTAGE_LOOP;
+                const voltageState = this.gameState.voltageLoopState;
+                console.log(`🔋 [VOLTAGE LOOP STATUS] Active! ${voltageLoop.count} stacks, hit count: ${voltageState?.hitCount || 0}/5, total arcs: ${voltageState?.totalArcsTriggered || 0}`);
+            } else {
+                console.log(`🔋 [VOLTAGE LOOP STATUS] Not active - no passive items found`);
+            }
+        }
+
         // Process each weapon group
         Object.values(weaponGroups).forEach(weapons => {
+            const weapon = weapons[0];
+            
+            // Skip passive items (they don't attack)
+            if (weapon.type === 'passive') {
+                console.log(`⏭️ [WEAPON SKIP] Skipping passive weapon: ${weapon.name}`);
+                return;
+            }
+            
+            console.log(`⚔️ [WEAPON PROCESS] Processing weapon: ${weapon.name} (${weapon.type}), Count: ${weapons.length}`);
             this.processWeaponGroup(weapons, now, playerCenterX, playerCenterY, closestEnemy);
         });
 
@@ -108,12 +138,50 @@ export class WeaponSystem {
 
     groupWeapons() {
         const weaponGroups = {};
+        
+        console.log(`🔍 [WEAPON GROUPING] Processing ${this.gameState.player.weapons.length} weapons:`, 
+            this.gameState.player.weapons.map(w => `${w.name}(${w.id}, type:${w.type})`));
+            
+        // DEBUG: If we only have passive items and no attacking weapons, add a basic Bow for testing
+        const hasAttackingWeapons = this.gameState.player.weapons.some(w => w.type !== 'passive');
+        const hasVoltageLoop = this.gameState.player.weapons.some(w => w.id === 'VOLTAGE_LOOP');
+        
+        if (!hasAttackingWeapons && hasVoltageLoop) {
+            console.log(`⚠️ [AUTO-FIX] Voltage Loop found but no attacking weapons! Adding Bow for testing...`);
+            // Add a basic bow for testing
+            const bowWeapon = {
+                id: 'BOW',
+                name: 'Bow (Auto-added for Voltage Loop test)',
+                damage: 25,
+                range: 300,
+                cooldown: 1000,
+                color: '#8B4513',
+                type: 'projectile',
+                projectileSpeed: 8
+            };
+            this.gameState.player.weapons.push(bowWeapon);
+            // Regroup weapons after adding the bow
+            return this.groupWeapons();
+        }
+        
         this.gameState.player.weapons.forEach(weapon => {
             if (!weaponGroups[weapon.id]) {
                 weaponGroups[weapon.id] = [];
             }
             weaponGroups[weapon.id].push(weapon);
         });
+        
+        const groupSummary = Object.entries(weaponGroups).map(([id, weapons]) => `${id}:${weapons.length}`).join(', ');
+        console.log(`🔍 [WEAPON GROUPING] Created groups: ${groupSummary}`);
+        
+        // Special focus on passive items
+        const passiveGroups = Object.entries(weaponGroups).filter(([id, weapons]) => weapons[0].type === 'passive');
+        if (passiveGroups.length > 0) {
+            console.log(`🔮 [WEAPON GROUPING] Passive items found:`, passiveGroups.map(([id, weapons]) => `${id}:${weapons.length} (${weapons[0].name})`));
+        } else {
+            console.log(`❌ [WEAPON GROUPING] No passive items found in weapon groups`);
+        }
+        
         return weaponGroups;
     }
 
@@ -123,6 +191,26 @@ export class WeaponSystem {
         
         // Check weapon cooldown (faster with more weapons)
         let scaledCooldown = weapon.cooldown / count;
+        
+        // Apply Wraith Drive fire rate bonus if active
+        if (this.gameState.wraithDriveState && this.gameState.wraithDriveState.endTime > now) {
+            const wraithState = this.gameState.wraithDriveState;
+            const wraithDrive = this.gameState.passiveItems ? this.gameState.passiveItems.WRAITH_DRIVE : null;
+            
+            if (wraithDrive) {
+                const fireRateIncrease = 0.01 * wraithDrive.stackMultiplier; // 1% per stack, doubles with item stacks
+                const fireRateBonus = wraithState.stacks * fireRateIncrease;
+                const originalCooldown = scaledCooldown;
+                scaledCooldown = scaledCooldown / (1 + fireRateBonus); // Reduce cooldown = faster fire rate
+                
+                if (fireRateBonus > 0) {
+                    console.log(`💀 [WRAITH DRIVE] Applying fire rate bonus to ${weapon.name}: +${(fireRateBonus * 100).toFixed(1)}% (${originalCooldown.toFixed(0)}ms → ${scaledCooldown.toFixed(0)}ms cooldown)`);
+                }
+            }
+        } else if (this.gameState.wraithDriveState && this.gameState.wraithDriveState.endTime <= now) {
+            // Clean up expired wraith drive state
+            this.gameState.wraithDriveState.stacks = 0;
+        }
         
         // Special fire rate bonus for Ralsei when you have 5+ weapons
         if (weapon.special === 'ralsei_instant_kill_beam') {
@@ -144,12 +232,50 @@ export class WeaponSystem {
             scaledCooldown = scaledCooldown / weapon.attackSpeedReduction; // Increase cooldown (slower attack)
         }
         
-        if (now - (this.gameState.player.lastAttacks[weapon.id] || 0) < scaledCooldown) {
+        const timeSinceLastAttack = now - (this.gameState.player.lastAttacks[weapon.id] || 0);
+        
+        if (timeSinceLastAttack < scaledCooldown) {
+            if (Math.random() < 0.001) { // 0.1% chance to log cooldown blocks
+                console.log(`⏰ [COOLDOWN BLOCK] ${weapon.name} on cooldown: ${timeSinceLastAttack.toFixed(0)}/${scaledCooldown.toFixed(0)}ms`);
+            }
             return;
         }
         
+        console.log(`🔥 [WEAPON ATTACK] ${weapon.name} attacking! Cooldown: ${scaledCooldown.toFixed(0)}ms, Count: ${count}`);
+        
         // Update last attack time for this weapon
         this.gameState.player.lastAttacks[weapon.id] = now;
+        
+        // Handle Thermal Converter effect (shop exclusive item)
+        if (this.gameState.passiveItems && this.gameState.passiveItems.THERMAL_CONVERTER) {
+            const thermalConverter = this.gameState.passiveItems.THERMAL_CONVERTER;
+            
+            // Initialize thermal converter state if not exists
+            if (!this.gameState.thermalConverterState) {
+                this.gameState.thermalConverterState = {
+                    heat: 0,
+                    lastFiring: 0
+                };
+            }
+            
+            const thermalState = this.gameState.thermalConverterState;
+            
+            // If we haven't fired for 1+ seconds, reset heat
+            if (now - thermalState.lastFiring > 1000) {
+                thermalState.heat = 0;
+            }
+            
+            thermalState.lastFiring = now;
+            thermalState.heat = Math.min(thermalState.heat + 1, 10); // Cap at 10 stacks
+            
+            console.log(`🔥 [THERMAL CONVERTER] Heat buildup: ${thermalState.heat}/10 (${thermalConverter.count} items equipped)`);
+            
+            // At 10 stacks, mark for ignite effect on next hit (don't ignite all enemies immediately)
+            if (thermalState.heat >= 10) {
+                thermalState.igniteReady = true; // Flag that next hit should ignite
+                console.log(`🔥 [THERMAL CONVERTER] 10 heat stacks reached! Next attack will ignite enemies hit.`);
+            }
+        }
 
         switch (weapon.type) {
             case 'ranged':
@@ -179,6 +305,11 @@ export class WeaponSystem {
             case 'umbrella':
                 // Umbrella weapons are passive and don't need active processing
                 // Their effect is handled in the takeDamage method
+                break;
+            case 'passive':
+                // Shop exclusive passive items - their effects are handled elsewhere
+                // Just track them for stacking calculations
+                this.handlePassiveItem(weapon, count);
                 break;
         }
     }
@@ -288,6 +419,50 @@ export class WeaponSystem {
                 const spreadAngle = (i - (count - 1) / 2) * 0.1;
                 const leadAngle = baseAngle + spreadAngle;
                 this.createProjectile(weapon, playerCenterX, playerCenterY, leadAngle);
+            }
+        }
+        
+        // Apply Fractal Lens effect (shop exclusive item)
+        if (this.gameState.passiveItems && this.gameState.passiveItems.FRACTAL_LENS) {
+            const fractalLens = this.gameState.passiveItems.FRACTAL_LENS;
+            const now = Date.now();
+            
+            // Initialize fractal lens state if not exists
+            if (!this.gameState.fractalLensState) {
+                this.gameState.fractalLensState = {
+                    lastTrigger: 0
+                };
+            }
+            
+            const fractalState = this.gameState.fractalLensState;
+            
+            // Check if 3 seconds have passed since last trigger
+            if (now - fractalState.lastTrigger >= 3000) {
+                fractalState.lastTrigger = now;
+                
+                // Count nearby enemies within 300 pixels
+                const detectionRange = 300;
+                const nearbyEnemies = this.gameState.enemies.filter(enemy => {
+                    const dx = enemy.x + enemy.width/2 - playerCenterX;
+                    const dy = enemy.y + enemy.height/2 - playerCenterY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    return distance <= detectionRange && enemy.health > 0;
+                }).length;
+                
+                const baseMaxProjectiles = 5;
+                const maxAdditionalProjectiles = Math.min(nearbyEnemies, baseMaxProjectiles * fractalLens.stackMultiplier); // Max projectiles double per stack
+                
+                // Fire additional projectiles
+                for (let i = 0; i < maxAdditionalProjectiles; i++) {
+                    const additionalAngle = baseAngle + (Math.random() - 0.5) * Math.PI/2; // Random spread around base angle
+                    this.createProjectile(weapon, playerCenterX, playerCenterY, additionalAngle);
+                }
+                
+                if (maxAdditionalProjectiles > 0) {
+                    console.log(`🧠 [FRACTAL LENS] 3-second trigger! +${maxAdditionalProjectiles} projectiles based on ${nearbyEnemies} nearby enemies (${fractalLens.count} items equipped, max ${baseMaxProjectiles * fractalLens.stackMultiplier})`);
+                } else if (nearbyEnemies === 0) {
+                    console.log(`🧠 [FRACTAL LENS] 3-second trigger, but no nearby enemies found (${fractalLens.count} items equipped)`);
+                }
             }
         }
     }
@@ -504,6 +679,8 @@ export class WeaponSystem {
     }
 
     createProjectile(weapon, x, y, angle) {
+        console.log(`🏹 [PROJECTILE CREATED] ${weapon.name} projectile created at (${x.toFixed(1)}, ${y.toFixed(1)}) with damage ${weapon.damage}`);
+        
         this.gameState.projectiles.push({
             x,
             y,
@@ -616,6 +793,17 @@ export class WeaponSystem {
         enemy.health -= damage;
         enemy.hitTime = hitTime;
         
+        console.log(`🎯 [WEAPON SYSTEM HIT] Enemy hit by weapon! Name: ${weapon.name}, Type: ${weapon.type}, Damage: ${damage}`);
+        
+        // DEBUG: Add version check to verify cache invalidation
+        if (!this.weaponVersionLogged) {
+            this.weaponVersionLogged = true;
+            console.log(`🔧 [VERSION CHECK] WeaponSystem loaded - Voltage Loop duplicate logic REMOVED (should only be in projectileSystem.js)`);
+        }
+        
+        // NOTE: Voltage Loop logic removed from weapon system - it should ONLY trigger on projectile hits in projectileSystem.js
+        // This prevents duplicate/conflicting hit counting between weapon and projectile systems
+        
         // Create particle effect for hit (if enemy doesn't die, death effect will be handled elsewhere)
         if (this.particleEngine && !enemyWillDie) {
             const centerX = enemy.x + enemy.width / 2;
@@ -685,8 +873,7 @@ export class WeaponSystem {
             // Auto-unlock basic weapons for first time players
             const basicWeapons = ['sword', 'scythe', 'bow'];
             basicWeapons.forEach(weaponKey => {
-                const branch = weaponKey === 'sword' ? 'melee' : weaponKey === 'scythe' ? 'spinning' : 'ranged';
-                this.gameState.purchaseWeapon(branch, weaponKey);
+                this.gameState.purchaseWeapon('unified', weaponKey);
             });
             unlockedWeaponIds = this.gameState.getUnlockedWeapons();
         }
@@ -696,15 +883,41 @@ export class WeaponSystem {
             unlockedWeaponIds.includes(id)
         );
         
-        // For starting selection, show all unlocked weapons
-        if (!isBossReward) {
-            // Starting selection: show unlocked weapons
-        } else {
-            // For additional weapons during run, show unlocked weapons
+        // Add shop exclusive items to the loot pool (for boss rewards only)
+        if (isBossReward) {
+            console.log(`🎁 [BOSS REWARD] Adding shop exclusive items to loot pool. Regular weapons available: ${weaponsList.length}`);
+            
+            // Add shop exclusive weapons from constants (can be obtained multiple times for stacking)
+            const shopExclusiveWeaponIds = [
+                'ENTROPY_REACTOR',
+                'VOLTAGE_LOOP', 
+                'THERMAL_CONVERTER',
+                'WRAITH_DRIVE',
+                'NULL_BARRIER',
+                'FRACTAL_LENS'
+            ];
+            
+            let shopExclusiveAdded = 0;
+            shopExclusiveWeaponIds.forEach(weaponId => {
+                if (WEAPONS[weaponId]) {
+                    weaponsList.push([weaponId, WEAPONS[weaponId]]);
+                    shopExclusiveAdded++;
+                    console.log(`🎁 [BOSS REWARD] Added ${WEAPONS[weaponId].name} to loot pool`);
+                } else {
+                    console.log(`❌ [BOSS REWARD] ${weaponId} not found in WEAPONS constant`);
+                }
+            });
+            
+            console.log(`🎁 [BOSS REWARD] Total weapons in pool: ${weaponsList.length} (${shopExclusiveAdded} shop exclusive items added)`);
         }
+        
         // Shuffle and take up to 3 weapons to choose from
         this.shuffleArray(weaponsList);
         const weaponsToShow = weaponsList.slice(0, Math.min(3, weaponsList.length));
+        
+        if (isBossReward) {
+            console.log(`🎁 [BOSS REWARD] Showing weapons:`, weaponsToShow.map(([id, weapon]) => `${weapon.name} (${id}, isShopExclusive: ${weapon.isShopExclusive})`));
+        }
         
         weaponsToShow.forEach(([id, weapon]) => {
             const option = this.createWeaponOption(id, weapon, isBossReward);
@@ -717,29 +930,41 @@ export class WeaponSystem {
         option.className = 'weapon-choice';
         option.style.border = `2px solid ${weapon.color}`;
         
-        const description = this.getWeaponDescription(weapon);
-        
-        option.innerHTML = `
-            <h3 style="color: ${weapon.color}; margin: 0 0 10px 0;">${weapon.name}</h3>
-            <div style="color: #aaa; margin: 10px 0; font-size: 14px;">${description}</div>
-            <div style="margin: 15px 0;">
-                <div style="display: flex; justify-content: space-between; margin: 5px 0;">
-                    <span>Damage:</span>
-                    <span style="color: ${weapon.color}">${weapon.damage}</span>
+        // Handle shop exclusive items differently
+        if (weapon.isShopExclusive) {
+            option.innerHTML = `
+                <h3 style="color: ${weapon.color}; margin: 0 0 10px 0;">${weapon.name}</h3>
+                <div style="color: #aaa; margin: 10px 0; font-size: 14px;">${weapon.description}</div>
+                <div style="padding: 10px; background-color: ${weapon.color}; color: black; border-radius: 5px; margin-top: 10px; font-weight: bold;">
+                    SPECIAL RELIC
                 </div>
-                <div style="display: flex; justify-content: space-between; margin: 5px 0;">
-                    <span>Speed:</span>
-                    <span style="color: ${weapon.color}">${(1000/weapon.cooldown).toFixed(1)} /s</span>
+            `;
+        } else {
+            // Regular weapon display
+            const description = this.getWeaponDescription(weapon);
+            
+            option.innerHTML = `
+                <h3 style="color: ${weapon.color}; margin: 0 0 10px 0;">${weapon.name}</h3>
+                <div style="color: #aaa; margin: 10px 0; font-size: 14px;">${description}</div>
+                <div style="margin: 15px 0;">
+                    <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                        <span>Damage:</span>
+                        <span style="color: ${weapon.color}">${weapon.damage}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                        <span>Speed:</span>
+                        <span style="color: ${weapon.color}">${(1000/weapon.cooldown).toFixed(1)} /s</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                        <span>Range:</span>
+                        <span style="color: ${weapon.color}">${(weapon.range/32).toFixed(1)}x</span>
+                    </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin: 5px 0;">
-                    <span>Range:</span>
-                    <span style="color: ${weapon.color}">${(weapon.range/32).toFixed(1)}x</span>
+                <div style="padding: 10px; background-color: ${weapon.color}; color: black; border-radius: 5px; margin-top: 10px; font-weight: bold;">
+                    ${weapon.type.toUpperCase()}
                 </div>
-            </div>
-            <div style="padding: 10px; background-color: ${weapon.color}; color: black; border-radius: 5px; margin-top: 10px; font-weight: bold;">
-                ${weapon.type.toUpperCase()}
-            </div>
-        `;
+            `;
+        }
         
         option.onclick = () => this.selectWeapon(id, weapon, isBossReward);
         
@@ -778,13 +1003,38 @@ export class WeaponSystem {
     }
 
     selectWeapon(id, weapon, isBossReward) {
+        // Create new weapon object
         const newWeapon = { ...weapon, id };
         
-        if (isBossReward) {
-            this.gameState.player.weapons.push(newWeapon);
-            this.gameState.floorCleared = true;
+        // Handle shop exclusive items
+        if (weapon.isShopExclusive && weapon.shopItemKey) {
+            // Add shop exclusive item to weapons for stacking
+            if (isBossReward) {
+                this.gameState.player.weapons.push(newWeapon);
+                this.gameState.floorCleared = true;
+            } else {
+                this.gameState.player.weapons = [newWeapon];
+            }
+            
+            // Also mark the shop item as purchased (for shop display purposes)
+            const purchasedItems = this.gameState.loadPurchasedShopItems();
+            purchasedItems[weapon.shopItemKey] = true;
+            this.gameState.savePurchasedShopItems(purchasedItems);
+            
+            console.log(`Shop exclusive item ${weapon.name} obtained and added to weapons for stacking!`);
+            
+            // Show a special message
+            setTimeout(() => {
+                alert(`🎉 You found a rare ${weapon.name}!\n\nThis special relic has been added to your arsenal and can stack with additional copies for enhanced effects!`);
+            }, 100);
         } else {
-            this.gameState.player.weapons = [newWeapon];
+            // Regular weapon selection
+            if (isBossReward) {
+                this.gameState.player.weapons.push(newWeapon);
+                this.gameState.floorCleared = true;
+            } else {
+                this.gameState.player.weapons = [newWeapon];
+            }
         }
 
         // Hide weapon selection
@@ -1768,6 +2018,55 @@ export class WeaponSystem {
                 }
             }
             healingState.lastHealTime = now;
+        }
+    }
+
+    handlePassiveItem(weapon, count) {
+        // Store passive item info for use by other systems
+        // The stacking effects are handled where the actual mechanics are processed
+        if (!this.gameState.passiveItems) {
+            this.gameState.passiveItems = {};
+        }
+        
+        // Store the count for each passive item type for stacking calculations
+        this.gameState.passiveItems[weapon.id] = {
+            count: count,
+            stackMultiplier: Math.pow(2, count - 1) // Effects double per stack
+        };
+        
+        console.log(`🔮 [SHOP EXCLUSIVE DEBUG] ${weapon.name}: ${count} stacks detected, ${this.gameState.passiveItems[weapon.id].stackMultiplier}x effect multiplier active`);
+    }
+
+    processPassiveItems(weaponGroups) {
+        // Process all passive shop exclusive items to update their state
+        const passiveWeaponIds = [
+            'ENTROPY_REACTOR',
+            'VOLTAGE_LOOP', 
+            'THERMAL_CONVERTER',
+            'WRAITH_DRIVE',
+            'NULL_BARRIER',
+            'FRACTAL_LENS'
+        ];
+
+        console.log(`🔄 [PASSIVE PROCESSING] Checking for passive items in weapon groups:`, Object.keys(weaponGroups));
+
+        let foundPassiveItems = 0;
+        passiveWeaponIds.forEach(weaponId => {
+            if (weaponGroups[weaponId]) {
+                const weapons = weaponGroups[weaponId];
+                const weapon = weapons[0];
+                const count = weapons.length;
+                
+                console.log(`🔮 [PASSIVE PROCESSING] Found ${weaponId}: ${count} stacks, processing...`);
+                
+                // Call handlePassiveItem to update the passive items state
+                this.handlePassiveItem(weapon, count);
+                foundPassiveItems++;
+            }
+        });
+        
+        if (foundPassiveItems === 0) {
+            console.log(`⚠️ [PASSIVE PROCESSING] No passive shop exclusive items found in current weapons`);
         }
     }
 }

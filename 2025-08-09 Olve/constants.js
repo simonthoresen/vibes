@@ -419,6 +419,73 @@ export const COMPANION_TYPES = {
         sprite: 'Skull_minion.png',
         permanent: true,
         lightningColor: '#00BFFF' // Deep sky blue
+    },
+    // Shop Exclusive Items (stackable passive effects)
+    ENTROPY_REACTOR: {
+        name: 'Entropy Reactor',
+        damage: 0,
+        type: 'passive',
+        cooldown: 0,
+        color: '#ff6b35',
+        isShopExclusive: true,
+        shopItemKey: 'entropyReactor',
+        special: 'entropy_reactor',
+        description: 'Every second you continuously deal damage to the same enemy, your damage against that target increases by +10%, stacking up to +100%. The bonus resets if you stop hitting that enemy for 1 second. (Effect doubles per stack)'
+    },
+    VOLTAGE_LOOP: {
+        name: 'Voltage Loop',
+        damage: 0,
+        type: 'passive',
+        cooldown: 0,
+        color: '#00d4ff',
+        isShopExclusive: true,
+        shopItemKey: 'voltageLoop',
+        special: 'voltage_loop',
+        description: 'Every 5th hit releases a lightning arc that jumps to up to 3 nearby enemies, dealing 10% of enemy max HP each. Required hits reduced by 1 per stack (minimum 1 hit). (Jump count, damage, and chain range all double per stack)'
+    },
+    THERMAL_CONVERTER: {
+        name: 'Thermal Converter',
+        damage: 0,
+        type: 'passive',
+        cooldown: 0,
+        color: '#ff4500',
+        isShopExclusive: true,
+        shopItemKey: 'thermalConverter',
+        special: 'thermal_converter',
+        description: 'Each second of continuous firing increases your weapon\'s heat by 1. At 10 stacks, your attacks ignite enemies for 2% of their max HP over 3 seconds, then heat resets. (Ignite damage doubles per stack)'
+    },
+    WRAITH_DRIVE: {
+        name: 'Wraith Drive',
+        damage: 0,
+        type: 'passive',
+        cooldown: 0,
+        color: '#9d4edd',
+        isShopExclusive: true,
+        shopItemKey: 'wraithDrive',
+        special: 'wraith_drive',
+        description: 'Killing an enemy grants +1% fire rate for 10 seconds, stacking up to +20%. Refreshes duration on new kills. (Fire rate bonus doubles per stack)'
+    },
+    NULL_BARRIER: {
+        name: 'Null Barrier',
+        damage: 0,
+        type: 'passive',
+        cooldown: 0,
+        color: '#e63946',
+        isShopExclusive: true,
+        shopItemKey: 'nullBarrier',
+        special: 'null_barrier',
+        description: 'Taking damage reduces all incoming damage by 50% for the next 1 second (cooldown: 5 seconds). (Damage reduction increases and cooldown decreases per stack)'
+    },
+    FRACTAL_LENS: {
+        name: 'Fractal Lens',
+        damage: 0,
+        type: 'passive',
+        cooldown: 0,
+        color: '#7209b7',
+        isShopExclusive: true,
+        shopItemKey: 'fractalLens',
+        special: 'fractal_lens',
+        description: 'Every 3 seconds, your next shot fires an additional projectile per enemy nearby (up to +5). (Max additional projectiles double per stack)'
     }
 };
 

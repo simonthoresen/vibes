@@ -4,14 +4,14 @@ import { GameState } from './gameState.js';
 import { InputManager } from './inputManager.js';
 import { Renderer } from './renderer.js?v=2';
 import { MenuManager } from './menuManager.js?v=2';
-import { WeaponSystem } from './weaponSystem.js?v=2';
-import { EnemySystem } from './enemySystemFixed.js?v=2';
-import { ProjectileSystem } from './projectileSystemFixed.js?v=2';
-import { PlayerController } from './playerControllerFixed.js?v=2';
+import { WeaponSystem } from './weaponSystem.js?v=3';
+import { EnemySystem } from './enemySystemFixed.js?v=3';
+import { ProjectileSystem } from './projectileSystemFixed.js?v=3';
+import { PlayerController } from './playerControllerFixed.js?v=3';
 import { GameLoop } from './gameLoop.js?v=2';
 import { ParticleEngine } from './particleEngine.js?v=2';
 import { AllySystem } from './allySystemFixed.js?v=2';
-import { KONAMI_CODE, WEAPONS } from './constants.js?v=2';
+import { KONAMI_CODE, WEAPONS } from './constants.js?v=20251010';
 
 class DungeonCrawlerGame {
     constructor() {
@@ -53,8 +53,9 @@ class DungeonCrawlerGame {
         this.playerController = new PlayerController(this.gameState, this.inputManager);
         this.allySystem = new AllySystem(this.gameState, this.particleEngine);
 
-        // Connect particle engine to systems that need it
+        // Connect systems that need cross-references
         this.enemySystem.setParticleEngine(this.particleEngine);
+        this.weaponSystem.setProjectileSystem(this.projectileSystem);
         
         // Set up points change callback to refresh weapon tree
         this.gameState.onPointsChanged(() => {
@@ -62,9 +63,8 @@ class DungeonCrawlerGame {
                 // Only refresh weapon tree if it's currently visible
                 const weaponTreeMenu = document.getElementById('weaponTreeMenu');
                 if (weaponTreeMenu && weaponTreeMenu.style.display !== 'none') {
+                    // Use the new lightweight refresh method that updates states immediately
                     this.menuManager.refreshWeaponTree();
-                    // Also update connection line colors
-                    this.menuManager.updateConnectionLineColors();
                 }
             }
         });
@@ -461,6 +461,47 @@ class DungeonCrawlerGame {
         window.toggleSettings = () => this.toggleSettings();
         window.returnToMainMenu = () => this.quitToMenuImmediate();
         window.closeSettings = () => this.closeSettings();
+        
+        // Override any legacy main menu functions to prevent conflicts
+        window.setupMainMenu = () => {
+            console.log('Legacy setupMainMenu blocked - using MenuManager instead');
+            if (this.menuManager) {
+                this.menuManager.setupMainMenu();
+            }
+        };
+        
+        // Also override the legacy returnToMainMenu function completely
+        window.returnToMainMenu = () => {
+            console.log('Legacy returnToMainMenu blocked - using quitToMenuImmediate instead');
+            this.quitToMenuImmediate();
+        };
+        
+        // Prevent direct DOM manipulation of main menu by monitoring changes
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && 
+                    mutation.target.id === 'mainMenu' && 
+                    mutation.attributeName === 'style') {
+                    const mainMenu = mutation.target;
+                    if (mainMenu.style.display === 'flex' || mainMenu.style.display === 'block') {
+                        console.log('Unauthorized main menu display detected - fixing with MenuManager');
+                        setTimeout(() => {
+                            if (this.menuManager) {
+                                this.menuManager.showMainMenu();
+                            }
+                        }, 0);
+                    }
+                }
+            });
+        });
+        
+        // Start monitoring for main menu changes
+        setTimeout(() => {
+            const mainMenu = document.getElementById('mainMenu');
+            if (mainMenu) {
+                observer.observe(mainMenu, { attributes: true, attributeFilter: ['style'] });
+            }
+        }, 100);
 
         // Setup pause menu buttons (legacy approach using IDs)
         const resumeBtn = document.getElementById('resumeGame');
@@ -693,6 +734,9 @@ class DungeonCrawlerGame {
         this.gameState.gameStarted = false;
         this.gameState.gameCompleted = false;
         
+        // Clear cheat menu selections when quitting to menu
+        this.clearCheatMenuSelections();
+        
         // Trigger points changed to update any UI that might be showing
         this.gameState.triggerPointsChanged();
     }
@@ -877,6 +921,29 @@ class DungeonCrawlerGame {
         this.playerController.reset();
         this.projectileSystem.clear();
         this.particleEngine.clear();
+        
+        // Clear cheat menu selections to prevent shop exclusive items from persisting
+        this.clearCheatMenuSelections();
+    }
+    
+    clearCheatMenuSelections() {
+        // Clear all weapon checkboxes in cheat menu to prevent items from persisting across games
+        const weapons = [
+            'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
+            'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
+            'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
+            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Triple Bow', 'Umbrella', 'Ralsei',
+            'Entropy Reactor', 'Voltage Loop', 'Thermal Converter', 'Wraith Drive', 'Null Barrier', 'Fractal Lens'
+        ];
+        
+        weapons.forEach(weapon => {
+            const checkbox = document.getElementById(weapon.replace(/\s+/g, '') + 'Check');
+            if (checkbox) {
+                checkbox.checked = false;
+            }
+        });
+        
+        console.log('🗑️ [CHEAT MENU] Cleared all weapon selections for new game');
     }
 
     showCompletionScreen() {
@@ -918,15 +985,26 @@ class DungeonCrawlerGame {
     }
 
     showMainMenu() { 
-        this.showElement('mainMenu'); 
-        this.startBackgroundAudio();
-        // Trigger points animation when returning to main menu
+        // Clear cheat menu selections when returning to main menu (safety check)
+        this.clearCheatMenuSelections();
+        
+        // Use MenuManager to properly show main menu with all buttons
         if (this.menuManager) {
-            this.menuManager.updatePointsDisplay();
+            this.menuManager.showMainMenu();
+        } else {
+            // Fallback to element show if MenuManager not available
+            this.showElement('mainMenu');
         }
+        this.startBackgroundAudio();
     }
     hideMainMenu() { 
-        this.hideElement('mainMenu'); 
+        // Use MenuManager to properly hide main menu
+        if (this.menuManager) {
+            this.menuManager.hideMainMenu();
+        } else {
+            // Fallback to element hide if MenuManager not available
+            this.hideElement('mainMenu');
+        }
         this.stopBackgroundAudio();
     }
     showGameContainer() { 
@@ -1253,6 +1331,9 @@ class DungeonCrawlerGame {
         // One-hit kill button
         const oneHitKillButton = this.createOneHitKillButton(buttonStyle);
 
+        // Force refresh shop button
+        const forceRefreshShopButton = this.createForceRefreshShopButton(buttonStyle);
+
         // Close button
         const closeButton = this.createCloseButton(buttonStyle, cheatMenu);
 
@@ -1263,6 +1344,7 @@ class DungeonCrawlerGame {
         content.appendChild(unlockSkinsButton);
         content.appendChild(relockSkinsButton);
         content.appendChild(oneHitKillButton);
+        content.appendChild(forceRefreshShopButton);
         content.appendChild(closeButton);
         cheatMenu.appendChild(content);
         document.body.appendChild(cheatMenu);
@@ -1281,7 +1363,8 @@ class DungeonCrawlerGame {
             'Sword', 'Scythe', 'Dragon Bow', 'Dragon Sword', 'Dragon Scythe', 'Nature Scythe', 'Crystal Scythe',
             'Piercing Bow', 'Fire Staff', 'Ice Staff', 'Lightning Staff', 'Healing Staff',
             'Chakram', 'Boomerang', 'Spirit Blade', 'Throwing Axe', 'Cursed Orb', 'Flaming Skull',
-            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Triple Bow', 'Umbrella', 'Ralsei'
+            'Spike Trap', 'Web Launcher', 'Explosive Mine', 'Poison Cloud', 'Triple Bow', 'Umbrella', 'Ralsei',
+            'Entropy Reactor', 'Voltage Loop', 'Thermal Converter', 'Wraith Drive', 'Null Barrier', 'Fractal Lens'
         ];
         
         // Add amount selector
@@ -1317,8 +1400,19 @@ class DungeonCrawlerGame {
             
             const label = document.createElement('label');
             label.htmlFor = weapon.replace(/\s+/g, '') + 'Check';
-            label.textContent = weapon;
-            label.style.color = 'white';
+            
+            // Check if this is a shop exclusive item
+            const shopExclusiveItems = ['Entropy Reactor', 'Voltage Loop', 'Thermal Converter', 'Wraith Drive', 'Null Barrier', 'Fractal Lens'];
+            const isShopExclusive = shopExclusiveItems.includes(weapon);
+            
+            if (isShopExclusive) {
+                label.textContent = `${weapon} ⭐`;
+                label.style.color = '#FFD700'; // Gold color for shop exclusive items
+                label.title = 'Shop Exclusive Item - Stackable passive effect';
+            } else {
+                label.textContent = weapon;
+                label.style.color = 'white';
+            }
             
             weaponControl.appendChild(checkbox);
             weaponControl.appendChild(label);
@@ -1334,6 +1428,80 @@ class DungeonCrawlerGame {
         
         confirmButton.onclick = () => {
             this.gameState.player.cheatsEnabled = true;
+            
+            // Debug: Check what's in WEAPONS constant
+            console.log(`🔍 [DEBUG] WEAPONS constant keys:`, Object.keys(WEAPONS));
+            console.log(`🔍 [DEBUG] Looking for shop exclusive items:`, ['ENTROPY_REACTOR', 'VOLTAGE_LOOP', 'THERMAL_CONVERTER', 'WRAITH_DRIVE', 'NULL_BARRIER', 'FRACTAL_LENS'].map(id => ({id, found: !!WEAPONS[id]})));
+            
+            // Fallback shop exclusive items if not found in WEAPONS constant
+            const shopExclusiveWeapons = {
+                ENTROPY_REACTOR: {
+                    name: 'Entropy Reactor',
+                    damage: 0,
+                    type: 'passive',
+                    cooldown: 0,
+                    color: '#ff6b35',
+                    isShopExclusive: true,
+                    shopItemKey: 'entropyReactor',
+                    special: 'entropy_reactor',
+                    description: 'Every second you continuously deal damage to the same enemy, your damage against that target increases by +10%, stacking up to +100%. The bonus resets if you stop hitting that enemy for 1 second. (Effect doubles per stack)'
+                },
+                VOLTAGE_LOOP: {
+                    name: 'Voltage Loop',
+                    damage: 0,
+                    type: 'passive',
+                    cooldown: 0,
+                    color: '#00d4ff',
+                    isShopExclusive: true,
+                    shopItemKey: 'voltageLoop',
+                    special: 'voltage_loop',
+                    description: 'Every 5th hit releases a lightning arc that jumps to up to 3 nearby enemies, dealing 30% weapon damage each. (Jump count and damage double per stack)'
+                },
+                THERMAL_CONVERTER: {
+                    name: 'Thermal Converter',
+                    damage: 0,
+                    type: 'passive',
+                    cooldown: 0,
+                    color: '#ff4500',
+                    isShopExclusive: true,
+                    shopItemKey: 'thermalConverter',
+                    special: 'thermal_converter',
+                    description: 'Each second of continuous firing increases your weapon\'s heat by 1. At 10 stacks, your attacks ignite enemies for 2% of their max HP over 3 seconds, then heat resets. (Ignite damage doubles per stack)'
+                },
+                WRAITH_DRIVE: {
+                    name: 'Wraith Drive',
+                    damage: 0,
+                    type: 'passive',
+                    cooldown: 0,
+                    color: '#9d4edd',
+                    isShopExclusive: true,
+                    shopItemKey: 'wraithDrive',
+                    special: 'wraith_drive',
+                    description: 'Killing an enemy grants +1% fire rate for 10 seconds, stacking up to +20%. Refreshes duration on new kills. (Fire rate bonus doubles per stack)'
+                },
+                NULL_BARRIER: {
+                    name: 'Null Barrier',
+                    damage: 0,
+                    type: 'passive',
+                    cooldown: 0,
+                    color: '#e63946',
+                    isShopExclusive: true,
+                    shopItemKey: 'nullBarrier',
+                    special: 'null_barrier',
+                    description: 'Taking damage reduces all incoming damage by 50% for the next 1 second (cooldown: 5 seconds). (Damage reduction increases and cooldown decreases per stack)'
+                },
+                FRACTAL_LENS: {
+                    name: 'Fractal Lens',
+                    damage: 0,
+                    type: 'passive',
+                    cooldown: 0,
+                    color: '#7209b7',
+                    isShopExclusive: true,
+                    shopItemKey: 'fractalLens',
+                    special: 'fractal_lens',
+                    description: 'Every 3 seconds, your next shot fires an additional projectile per enemy nearby (up to +5). (Max additional projectiles double per stack)'
+                }
+            };
             
             // Get list of weapon types that are in the cheat menu
             const cheatMenuWeaponTypes = weapons.map(weapon => weapon.replace(/\s+/g, '_').toUpperCase());
@@ -1351,15 +1519,42 @@ class DungeonCrawlerGame {
                 const checkbox = document.getElementById(weapon.replace(/\s+/g, '') + 'Check');
                 if (checkbox.checked) {
                     const amount = parseInt(amountInput.value);
+                    console.log(`📋 [CHEAT MENU] Adding ${amount} stacks of ${weapon}`);
+                    
                     for (let i = 0; i < amount; i++) {
                         const weaponKey = weapon.replace(/\s+/g, '_').toUpperCase();
-                        // Use the WEAPONS constant directly instead of async import
-                        const weaponData = {...WEAPONS[weaponKey]};
+                        
+                        // Try WEAPONS constant first, then fallback to local shop exclusive weapons
+                        let weaponData = {...WEAPONS[weaponKey]};
+                        
+                        if (!weaponData.name && shopExclusiveWeapons[weaponKey]) {
+                            weaponData = {...shopExclusiveWeapons[weaponKey]};
+                            console.log(`🔄 [CHEAT MENU] Using fallback definition for ${weaponKey}`);
+                        }
+                        
+                        if (!weaponData.name) {
+                            console.error(`❌ [CHEAT MENU] Weapon ${weaponKey} not found in WEAPONS constant or fallback!`);
+                            return;
+                        }
+                        
                         weaponData.id = weaponKey;
                         this.gameState.player.weapons.push(weaponData);
+                        
+                        console.log(`✅ [CHEAT MENU] Added ${weaponData.name} (${weaponData.type}, isShopExclusive: ${weaponData.isShopExclusive})`);
                     }
                 }
             });
+            
+            // Debug: Show all weapons after update
+            console.log(`📋 [CHEAT MENU] Final weapons array:`, this.gameState.player.weapons.map(w => `${w.name} (${w.id}, type: ${w.type})`));
+            const passiveItems = this.gameState.player.weapons.filter(w => w.type === 'passive');
+            const attackingItems = this.gameState.player.weapons.filter(w => w.type !== 'passive');
+            console.log(`🔮 [CHEAT MENU] Passive items found:`, passiveItems.map(w => `${w.name} (${w.id})`));
+            console.log(`⚔️ [CHEAT MENU] Attacking weapons found:`, attackingItems.map(w => `${w.name} (${w.id}, type: ${w.type})`));
+            
+            if (passiveItems.length > 0 && attackingItems.length === 0) {
+                console.log(`⚠️ [CHEAT MENU WARNING] You have passive items but no attacking weapons! Passive items like Voltage Loop need other weapons to trigger them.`);
+            }
             
             // Visual feedback
             confirmButton.style.backgroundColor = '#2a5';
@@ -1516,6 +1711,45 @@ class DungeonCrawlerGame {
 
         return oneHitKillButton;
     }
+
+    createForceRefreshShopButton(buttonStyle) {
+        const forceRefreshShopButton = document.createElement('button');
+        forceRefreshShopButton.textContent = 'Force Shop Refresh';
+        forceRefreshShopButton.style.cssText = buttonStyle;
+        
+        this.addButtonHoverEffect(forceRefreshShopButton);
+        
+        forceRefreshShopButton.onclick = () => {
+            this.gameState.player.cheatsEnabled = true;
+            
+            // Force refresh the shop
+            this.gameState.forceRefreshShop();
+            
+            // Visual feedback
+            forceRefreshShopButton.style.backgroundColor = '#2a5';
+            forceRefreshShopButton.textContent = 'Shop Refreshed!';
+            
+            // If shop is currently open, refresh its display
+            if (this.menuManager) {
+                const shopMenu = document.getElementById('shopMenu');
+                if (shopMenu && shopMenu.style.display !== 'none') {
+                    this.menuManager.refreshShopContent();
+                }
+            }
+            
+            // Visual feedback timeout
+            setTimeout(() => {
+                if (!forceRefreshShopButton.matches(':hover')) {
+                    forceRefreshShopButton.style.backgroundColor = '#333';
+                }
+                forceRefreshShopButton.textContent = 'Force Shop Refresh';
+            }, 1000);
+        };
+
+        return forceRefreshShopButton;
+    }
+
+
 
     createCloseButton(buttonStyle, cheatMenu) {
         const closeButton = document.createElement('button');

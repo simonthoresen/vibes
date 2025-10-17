@@ -64,12 +64,21 @@
             max-width: 1000px;
             width: 90%;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            /* Add scrolling support */
+            max-height: 80vh;
+            overflow: hidden;
+            position: relative;
         }
         .weapons-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 25px;
             margin-top: 30px;
+            /* Enable scrolling on mobile/tablet */
+            overflow: auto;
+            max-height: calc(80vh - 120px);
+            padding-right: 10px;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
         .weapon-choice {
             background-color: rgba(30, 30, 30, 0.9);
@@ -102,6 +111,126 @@
             font-size: 1.5em;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
+        
+        /* Mobile/Tablet specific scrolling improvements */
+        @media (pointer: coarse) {
+            .weapon-container {
+                max-height: 85vh;
+                padding: 20px;
+            }
+            
+            .weapons-grid {
+                overflow-x: auto;
+                overflow-y: auto;
+                max-height: calc(85vh - 100px);
+                /* Ensure horizontal scrolling works */
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                /* Add momentum scrolling for iOS */
+                -webkit-overflow-scrolling: touch;
+                /* Prevent bounce on iOS when scrolling */
+                overscroll-behavior: contain;
+                /* Better touch handling */
+                touch-action: pan-x pan-y;
+            }
+            
+            /* Make weapon choices more touch-friendly */
+            .weapon-choice {
+                padding: 20px;
+                min-height: 120px;
+                /* Prevent text selection during scrolling */
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+                /* Better touch response */
+                touch-action: manipulation;
+            }
+        }
+        
+        /* Tablet specific (iPad, Android tablets) */
+        @media (min-width: 768px) and (max-width: 1024px) and (pointer: coarse) {
+            .weapons-grid {
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 20px;
+                padding: 10px;
+                /* Larger scrollable area for tablets */
+                max-height: calc(80vh - 100px);
+            }
+            
+            .weapon-container {
+                max-width: 95%;
+                max-height: 80vh;
+            }
+        }
+        
+        /* Phone specific */
+        @media (max-width: 767px) and (pointer: coarse) {
+            .weapon-container {
+                width: 95%;
+                padding: 15px;
+                max-height: 90vh;
+            }
+            
+            .weapons-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                max-height: calc(90vh - 80px);
+                padding: 5px;
+            }
+            
+            .weapon-choice {
+                min-height: 100px;
+                padding: 15px;
+            }
+        }
+        
+        /* Custom scrollbar for weapon grid */
+        .weapons-grid::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .weapons-grid::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        .weapons-grid::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+        }
+        
+        .weapons-grid::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.6);
+        }
+        
+        /* For Firefox */
+        .weapons-grid {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.4) rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Ensure weapon tree content is scrollable in all directions */
+        @supports (-webkit-touch-callout: none) {
+            /* iOS specific improvements */
+            .weapons-grid {
+                -webkit-overflow-scrolling: touch;
+                overflow: scroll;
+                /* Prevent rubber band effect */
+                overscroll-behavior-y: contain;
+                overscroll-behavior-x: contain;
+            }
+        }
+        
+        /* Android specific improvements */
+        @media screen and (-webkit-min-device-pixel-ratio: 1) and (pointer: coarse) {
+            .weapons-grid {
+                /* Better Android scrolling */
+                overflow: auto;
+                scroll-behavior: smooth;
+            }
+        }
+        
         #gameStats {
             position: absolute;
             left: 10px;
@@ -631,6 +760,6 @@
                 </div>
             </div>
         </div>
-        <script type="module" src="game-refactored.js?v=2025-09-10-force-refresh"></script>
+        <script type="module" src="game-refactored.js?v=2025-10-11-debug-boss-rewards"></script>
     </body>
 </html>

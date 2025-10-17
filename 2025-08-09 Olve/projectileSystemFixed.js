@@ -13,6 +13,23 @@ export class ProjectileSystem {
     }
 
     updateProjectiles() {
+        // Periodic debug logging
+        if (!this.lastProjectileDebug || Date.now() - this.lastProjectileDebug > 3000) { // Every 3 seconds
+            this.lastProjectileDebug = Date.now();
+            console.log(`🏹 [PROJECTILE STATUS] ${this.gameState.projectiles.length} projectiles active, ${this.gameState.enemies.length} enemies on screen`);
+            
+            // Show detailed info if we have projectiles but no hits
+            if (this.gameState.projectiles.length > 0) {
+                const projectile = this.gameState.projectiles[0];
+                console.log(`🎯 [PROJECTILE DEBUG] First projectile: weapon=${projectile.weapon?.name}, pos=(${projectile.x?.toFixed(1)}, ${projectile.y?.toFixed(1)}), damage=${projectile.damage}`);
+            }
+            
+            if (this.gameState.enemies.length > 0) {
+                const enemy = this.gameState.enemies[0];
+                console.log(`👾 [ENEMY DEBUG] First enemy: pos=(${enemy.x?.toFixed(1)}, ${enemy.y?.toFixed(1)}), health=${enemy.health}, size=${enemy.width}x${enemy.height}`);
+            }
+        }
+        
         this.gameState.projectiles = this.gameState.projectiles.filter(proj => {
             // Handle beam projectiles (they don't move, just expire after lifetime)
             if (proj.isBeam) {
@@ -70,6 +87,35 @@ export class ProjectileSystem {
     }
 
     checkEnemyCollisions(projectile) {
+        // DEBUG: Add version check to verify cache invalidation
+        if (!this.versionLogged) {
+            this.versionLogged = true;
+            console.log(`🔧 [VERSION CHECK] ProjectileSystemFixed loaded - Voltage Loop duplicate logic removed from weaponSystem.js`);
+            
+            // Add test to force trigger Voltage Loop if needed (for debugging)
+            window.testVoltageLoop = () => {
+                console.log(`🧪 [TEST] Force triggering Voltage Loop for testing...`);
+                if (this.gameState.enemies && this.gameState.enemies.length > 0) {
+                    const testEnemy = this.gameState.enemies[0];
+                    // Use new 10% max HP damage calculation
+                    const testDamage = Math.floor((testEnemy.maxHealth || testEnemy.health) * 0.1);
+                    console.log(`🧪 [TEST] Using 10% of enemy max HP as damage: ${testDamage} (enemy HP: ${testEnemy.maxHealth || testEnemy.health})`);
+                    this.createLightningArc(testEnemy, testDamage, 3, null);
+                } else {
+                    console.log(`🧪 [TEST] No enemies to test Voltage Loop with`);
+                }
+            };
+            console.log(`🧪 [TEST] Added testVoltageLoop() function to window - call it in console to test lightning`);
+        }
+        
+        // Always log collision checks to debug the Voltage Loop issue
+        console.log(`🔍 [COLLISION CHECK] Checking projectile (${projectile.weapon?.name || 'unknown'}) vs ${this.gameState.enemies.length} enemies`);
+        
+        if (this.gameState.enemies.length === 0) {
+            console.log(`❌ [COLLISION DEBUG] No enemies on screen to hit!`);
+            return;
+        }
+        
         this.gameState.enemies.forEach(enemy => {
             // For throwing weapons, allow hitting the same enemy multiple times
             // by adding a cooldown instead of permanent tracking
@@ -98,6 +144,7 @@ export class ProjectileSystem {
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance <= enemy.width / 2 + projectile.width / 2) {
+                    console.log(`💥 [COLLISION DETECTED] Projectile hit enemy! Distance: ${distance.toFixed(1)}, Threshold: ${(enemy.width / 2 + projectile.width / 2).toFixed(1)}`);
                     this.hitEnemy(enemy, projectile);
                     
                     if (!projectile.piercing) {
@@ -122,9 +169,124 @@ export class ProjectileSystem {
         }
         
         const enemyWillDie = enemy.health - damage <= 0;
+        let finalDamage = damage;
         
-        enemy.health -= damage;
+        // Apply Entropy Reactor damage bonus (shop exclusive item)
+        if (this.gameState.passiveItems && this.gameState.passiveItems.ENTROPY_REACTOR) {
+            const entropyReactor = this.gameState.passiveItems.ENTROPY_REACTOR;
+            const now = Date.now();
+            
+            // Initialize entropy reactor state if not exists
+            if (!this.gameState.entropyReactorState) {
+                this.gameState.entropyReactorState = {
+                    targetEnemy: null,
+                    stacks: 0,
+                    lastHitTime: 0
+                };
+            }
+            
+            const entropyState = this.gameState.entropyReactorState;
+            
+            // Check if we're hitting the same enemy as before
+            if (entropyState.targetEnemy === enemy && now - entropyState.lastHitTime <= 1000) {
+                // Continuous damage - increase stacks
+                const maxStacks = Math.floor(10 * entropyReactor.stackMultiplier); // Max stacks double per item stack
+                const damageBonus = 0.1 * entropyReactor.stackMultiplier; // Base 10% per stack, doubles per item
+                
+                entropyState.stacks = Math.min(entropyState.stacks + 1, maxStacks);
+                
+                const totalDamageBonus = entropyState.stacks * damageBonus;
+                finalDamage = Math.floor(damage * (1 + totalDamageBonus));
+                
+                console.log(`⚔️ [ENTROPY REACTOR] Same target hit! Damage bonus: +${(totalDamageBonus * 100).toFixed(0)}% (${entropyState.stacks}/${maxStacks} stacks, ${entropyReactor.count} items equipped, ${damage} → ${finalDamage} damage)`);
+            } else {
+                // New target or gap in damage - reset stacks
+                if (entropyState.stacks > 0) {
+                    console.log(`⚔️ [ENTROPY REACTOR] Target changed/timeout! Resetting stacks from ${entropyState.stacks} to 0`);
+                }
+                entropyState.stacks = 0;
+                entropyState.targetEnemy = enemy;
+            }
+            
+            entropyState.lastHitTime = now;
+        }
+        
+        enemy.health -= finalDamage;
         enemy.hitTime = Date.now();
+        
+        console.log(`🎯 [HIT DETECTION - PROJECTILE] Enemy hit by projectile! Weapon: ${projectile.weapon?.name || 'unknown'}, Type: ${projectile.type || 'unknown'}, Damage: ${finalDamage}`);
+        
+        // Trigger Voltage Loop effect (shop exclusive item)
+        if (this.gameState.passiveItems && this.gameState.passiveItems.VOLTAGE_LOOP) {
+            const voltageLoop = this.gameState.passiveItems.VOLTAGE_LOOP;
+            
+            // Initialize voltage loop state if not exists
+            if (!this.gameState.voltageLoopState) {
+                this.gameState.voltageLoopState = {
+                    hitCount: 0,
+                    totalArcsTriggered: 0
+                };
+                console.log(`⚡⚡⚡ [VOLTAGE LOOP INIT] Initialized state with hit count 0`);
+            }
+            
+            const voltageState = this.gameState.voltageLoopState;
+            voltageState.hitCount++;
+            
+            // Calculate required hits: starts at 5, reduced by 1 for each stack, minimum 1
+            const requiredHits = Math.max(1, 5 - (voltageLoop.count - 1));
+            
+            // Enhanced debug logging with visual indicators
+            console.log(`⚡ [VOLTAGE LOOP HIT ${voltageState.hitCount}/${requiredHits}] Progress: ${'█'.repeat(Math.min(voltageState.hitCount, requiredHits))}${'░'.repeat(Math.max(0, requiredHits - voltageState.hitCount))} (${voltageLoop.count} items equipped, ${requiredHits} hits required)`);
+            
+            // Trigger lightning arc when required hits reached
+            if (voltageState.hitCount >= requiredHits) {
+                voltageState.hitCount = 0;
+                voltageState.totalArcsTriggered++;
+                
+                // Calculate arc damage as 10% of enemy max HP (doubled per stack via stackMultiplier)
+                const baseArcDamage = Math.floor((enemy.maxHealth || enemy.health) * 0.1);
+                const arcDamage = Math.floor(baseArcDamage * voltageLoop.stackMultiplier); // Effect doubles per stack
+                const maxJumps = Math.floor(3 * voltageLoop.stackMultiplier); // Max jumps double per stack
+                
+                console.log(`🌩️🌩️🌩️ [VOLTAGE LOOP ARC TRIGGERED #${voltageState.totalArcsTriggered}] ${requiredHits} hits reached! Creating purple lightning arc: ${arcDamage} damage (10% of ${enemy.maxHealth || enemy.health} HP × ${voltageLoop.stackMultiplier}x) to max ${maxJumps} targets`);
+                this.createLightningArc(enemy, arcDamage, maxJumps, projectile);
+                
+                console.log(`✅ [VOLTAGE LOOP ARC #${voltageState.totalArcsTriggered}] Lightning arc creation completed! Counter reset to 0/${requiredHits}`);
+            }
+        } else if (this.gameState.passiveItems) {
+            // Debug: Check if the VOLTAGE_LOOP item is missing from passiveItems
+            const availableItems = Object.keys(this.gameState.passiveItems);
+            if (availableItems.length > 0) {
+                console.log(`❌ [VOLTAGE LOOP DEBUG] Voltage Loop not found in passive items. Available items:`, availableItems);
+            }
+        } else {
+            console.log(`❌ [VOLTAGE LOOP DEBUG] No passive items found at all`);
+        }
+
+        // Apply Thermal Converter ignite effect ONLY if this hit will ignite the enemy
+        if (this.gameState.passiveItems && this.gameState.passiveItems.THERMAL_CONVERTER) {
+            const thermalConverter = this.gameState.passiveItems.THERMAL_CONVERTER;
+            const igniteDamagePercent = 0.02 * thermalConverter.stackMultiplier; // Base 2% per second, doubles per stack
+            const igniteDamage = Math.ceil((enemy.maxHealth || enemy.health) * igniteDamagePercent);
+            
+            // Apply fire effect to this hit enemy using Fire Staff system
+            console.log(`🔥 [THERMAL CONVERTER] Igniting enemy with ${(igniteDamagePercent * 100).toFixed(1)}% DPS for 5 seconds (${thermalConverter.count} items equipped, ${igniteDamage} damage/second)`);
+            
+            if (!enemy.fireEffect) {
+                enemy.fireEffect = {
+                    damage: igniteDamage,
+                    duration: 5000, // 5 seconds
+                    interval: 1000, // Every 1 second
+                    lastTick: Date.now()
+                };
+                console.log(`🔥 [THERMAL CONVERTER] Applied fire DOT: ${igniteDamage} damage every 1s for 5s`);
+            } else {
+                // Refresh existing fire effect
+                enemy.fireEffect.duration = 5000;
+                enemy.fireEffect.damage = Math.max(enemy.fireEffect.damage, igniteDamage);
+                console.log(`🔥 [THERMAL CONVERTER] Refreshed existing fire DOT with higher damage: ${enemy.fireEffect.damage}`);
+            }
+        }
         
         // Handle hit tracking differently for throwing vs regular projectiles
         if (projectile.type === 'throwing') {
@@ -1012,6 +1174,152 @@ export class ProjectileSystem {
     clear() {
         this.gameState.projectiles = [];
         this.gameState.frostZones = [];
+    }
+    
+    createLightningArc(startEnemy, damage, maxJumps, sourceProjectile) {
+        console.log(`⚡ [VOLTAGE LOOP ARC] Method called! Enemies: ${this.gameState.enemies ? this.gameState.enemies.length : 'none'}, maxJumps: ${maxJumps}, damage: ${damage}`);
+        
+        if (!this.gameState.enemies || maxJumps <= 0) {
+            console.log(`⚡ [VOLTAGE LOOP ARC] Early return: enemies=${!!this.gameState.enemies}, maxJumps=${maxJumps}`);
+            return;
+        }
+        
+        // Get voltage loop stack multiplier for range calculation
+        const voltageLoop = this.gameState.passiveItems.VOLTAGE_LOOP;
+        // Base range is double Lightning Staff's range (300 instead of 150), then doubles per stack
+        const jumpRange = 300 * (voltageLoop ? voltageLoop.stackMultiplier : 1); 
+        let currentEnemy = startEnemy;
+        const hitEnemies = new Set([startEnemy]);
+        
+        console.log(`⚡ [VOLTAGE LOOP ARC] Starting lightning arc with ${maxJumps} max jumps and ${jumpRange} range, ${this.gameState.enemies.length} total enemies`);
+        
+        // Create dramatic purple lightning explosion on the starting enemy (the one that triggered the arc)
+        if (this.particleEngine) {
+            const startX = startEnemy.x + startEnemy.width/2;
+            const startY = startEnemy.y + startEnemy.height/2;
+            
+            console.log(`🌩️ [VOLTAGE LOOP VISUAL] Creating MASSIVE lightning explosion at starting enemy (${startX.toFixed(1)}, ${startY.toFixed(1)})`);
+            
+            // Create massive explosion particles first (most visible)
+            if (this.particleEngine.createExplosion) {
+                this.particleEngine.createExplosion(startX, startY, {
+                    particleCount: 20,
+                    speed: 8,
+                    size: 6,
+                    colors: ['#8A2BE2', '#9370DB', '#DDA0DD', '#FFFFFF'], // Purple lightning colors
+                    life: 1200
+                });
+                console.log(`🌩️ [VOLTAGE LOOP VISUAL] Created MASSIVE explosion with 20 particles`);
+            }
+            
+            // Create multiple lightning effects for dramatic impact
+            for (let i = 0; i < 10; i++) {
+                const angle = (i / 10) * Math.PI * 2;
+                const distance = 40 + Math.random() * 30;
+                const endX = startX + Math.cos(angle) * distance;
+                const endY = startY + Math.sin(angle) * distance;
+                
+                this.particleEngine.createLightningEffect(startX, startY, endX, endY, '#8A2BE2');
+            }
+            console.log(`🌩️ [VOLTAGE LOOP VISUAL] Created 10 dramatic lightning bolts radiating outward`);
+            
+            console.log(`🌩️ [VOLTAGE LOOP VISUAL] Created dramatic purple lightning explosion on starting enemy at (${startX.toFixed(1)}, ${startY.toFixed(1)})`);
+        } else {
+            console.log(`❌ [VOLTAGE LOOP VISUAL] Cannot create starting explosion - particleEngine not available`);
+        }
+        
+        for (let jump = 0; jump < maxJumps; jump++) {
+            // Find nearest enemy within jump range that hasn't been hit
+            let nextEnemy = null;
+            let minDistance = jumpRange;
+            
+            this.gameState.enemies.forEach(enemy => {
+                if (hitEnemies.has(enemy) || enemy.health <= 0) return;
+                
+                const dx = enemy.x + enemy.width/2 - (currentEnemy.x + currentEnemy.width/2);
+                const dy = enemy.y + enemy.height/2 - (currentEnemy.y + currentEnemy.height/2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nextEnemy = enemy;
+                }
+            });
+            
+            if (!nextEnemy) {
+                console.log(`⚡ [VOLTAGE LOOP ARC] No more targets found for jump ${jump + 1}. Checked ${this.gameState.enemies.filter(e => e.health > 0).length} living enemies within ${jumpRange} range.`);
+                break; // No more valid targets
+            }
+            
+            // Deal damage to next enemy
+            nextEnemy.health -= damage;
+            nextEnemy.hitTime = Date.now();
+            hitEnemies.add(nextEnemy);
+            
+            console.log(`⚡ [VOLTAGE LOOP ARC] Jump ${jump + 1}: Hit enemy at distance ${minDistance.toFixed(1)}, dealt ${damage} damage`);
+            
+            // Create dramatic purple lightning explosion on the target enemy
+            if (this.particleEngine) {
+                const targetX = nextEnemy.x + nextEnemy.width/2;
+                const targetY = nextEnemy.y + nextEnemy.height/2;
+                
+                console.log(`⚡ [VOLTAGE LOOP VISUAL] Creating lightning explosion at (${targetX.toFixed(1)}, ${targetY.toFixed(1)})`);
+                
+                // Create explosion particles first (more visible)
+                if (this.particleEngine.createExplosion) {
+                    this.particleEngine.createExplosion(targetX, targetY, {
+                        particleCount: 15,
+                        speed: 6,
+                        size: 5,
+                        colors: ['#8A2BE2', '#9370DB', '#DDA0DD', '#FFFFFF'], // Purple lightning colors
+                        life: 1000
+                    });
+                    console.log(`⚡ [VOLTAGE LOOP VISUAL] Created explosion particles`);
+                } else {
+                    console.log(`❌ [VOLTAGE LOOP VISUAL] particleEngine.createExplosion not available`);
+                }
+                
+                // Create radial lightning bolts for impact
+                if (this.particleEngine.createLightningEffect) {
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2;
+                        const distance = 30 + Math.random() * 20;
+                        const endX = targetX + Math.cos(angle) * distance;
+                        const endY = targetY + Math.sin(angle) * distance;
+                        
+                        this.particleEngine.createLightningEffect(targetX, targetY, endX, endY, '#8A2BE2');
+                    }
+                    console.log(`⚡ [VOLTAGE LOOP VISUAL] Created 6 lightning bolts`);
+                } else {
+                    console.log(`❌ [VOLTAGE LOOP VISUAL] particleEngine.createLightningEffect not available`);
+                }
+                
+                console.log(`⚡ [VOLTAGE LOOP CHAIN] Created purple lightning explosion on chain target ${jump + 1} at (${targetX.toFixed(1)}, ${targetY.toFixed(1)})`);
+            } else {
+                console.log(`❌ [VOLTAGE LOOP VISUAL] particleEngine not available`);
+            }
+            
+            // Create main visual lightning connection between enemies (thick purple bolt like in the image)
+            if (this.particleEngine && this.particleEngine.createLightningEffect) {
+                const startX = currentEnemy.x + currentEnemy.width/2;
+                const startY = currentEnemy.y + currentEnemy.height/2;
+                const endX = nextEnemy.x + nextEnemy.width/2;
+                const endY = nextEnemy.y + nextEnemy.height/2;
+                
+                console.log(`🔗 [VOLTAGE LOOP CHAIN] Creating lightning connection from (${startX.toFixed(1)}, ${startY.toFixed(1)}) to (${endX.toFixed(1)}, ${endY.toFixed(1)})`);
+                
+                // Create multiple lightning bolts for thicker effect
+                for (let bolt = 0; bolt < 5; bolt++) {
+                    this.particleEngine.createLightningEffect(startX, startY, endX, endY, '#8A2BE2');
+                }
+                
+                console.log(`🔗 [VOLTAGE LOOP CHAIN] Created 5 purple lightning connections from enemy to chain target ${jump + 1} (distance: ${minDistance.toFixed(1)}px)`);
+            } else {
+                console.log(`❌ [VOLTAGE LOOP CHAIN] Cannot create lightning connection - particleEngine.createLightningEffect not available`);
+            }
+            
+            currentEnemy = nextEnemy;
+        }
     }
 }
 
