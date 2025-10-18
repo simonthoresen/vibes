@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiDAR Explorer - First Person Scanner Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        #ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 100;
+            font-weight: bold;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        #crosshair::before {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair::after {
+            height: 2px;
+            width: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        #instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            text-align: center;
+            text-shadow: 0 0 20px #fff;
+            font-size: 18px;
+            pointer-events: none;
+            z-index: 99;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+
+        #instructions.hidden {
+            opacity: 0;
+        }
+
+        #battery {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #interactionPrompt {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 16px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        #diceGame {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 30px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            font-family: 'Courier New', monospace;
+            z-index: 200;
+            display: none;
+            min-width: 300px;
+            text-align: center;
+        }
+
+        #diceGame h3 {
+            margin: 10px 0;
+        }
+
+        #diceGame p {
+            margin: 5px 0;
+            font-size: 18px;
+        }
+
+        #deathScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            font-family: 'Courier New', monospace;
+        }
+
+        #deathScreen h1 {
+            color: #f00;
+            text-shadow: 0 0 20px #f00;
+            font-size: 72px;
+            margin-bottom: 30px;
+        }
+
+        #deathScreen p {
+            color: #fff;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div>SCANNER: ACTIVE</div>
+        <div id="scanStatus">READY</div>
+    </div>
+
+    <div id="battery">Battery: 10/10</div>
+
+    <div id="crosshair"></div>
+
+    <div id="interactionPrompt">
+        Press E to interact with table
+    </div>
+
+    <div id="diceGame">
+        <div id="diceResult"></div>
+    </div>
+
+    <div id="deathScreen">
+        <h1>GAME OVER</h1>
+        <p id="deathReason">You died!</p>
+        <p style="margin-top: 30px; opacity: 0.7;">Refresh to restart</p>
+    </div>
+
+    <div id="instructions">
+        <h2>LiDAR</h2>
+        <p style="margin-top: 20px;">LEFT CLICK - Scan (2s cooldown)</p>
+        <p style="margin-top: 10px;">F - Flashlight (-1 Battery)</p>
+        <p style="margin-top: 10px;">E - Interact with Table</p>
+        <p style="margin-top: 15px; font-size: 12px; opacity: 0.7;">Red dots = Enemies | Win dice = +2 Battery | Lose dice = -2 Battery</p>
+        <p style="margin-top: 20px; opacity: 0.7;">Click to begin...</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="lidar-game.js"></script>
+</body>
+</html>

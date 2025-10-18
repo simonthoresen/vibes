@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lidar Scanner Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+
+        #gameCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #0f0;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        #startScreen h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #0f0;
+        }
+
+        #startScreen p {
+            font-size: 1.5em;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #0f0;
+            font-size: 14px;
+            text-shadow: 0 0 5px #0f0;
+            z-index: 5;
+            display: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>LIDAR SCANNER</h1>
+        <p>Right-click to scan</p>
+    </div>
+
+    <div id="hud">
+        <div>Scans: <span id="scanCount">0</span></div>
+        <div>Objects Found: <span id="objectCount">0</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const hud = document.getElementById('hud');
+        const scanCountEl = document.getElementById('scanCount');
+        const objectCountEl = document.getElementById('objectCount');
+
+        // Set canvas size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game state
+        let gameStarted = false;
+        let scanCount = 0;
+        let discoveredObjects = new Set();
+        let scans = [];
+        let particles = [];
+
+        // Generate random environment objects
+        const objects = [];
+        const numObjects = 20;
+
+        for (let i = 0; i < numObjects; i++) {
+            objects.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 30 + 10,
+                type: Math.random() > 0.5 ? 'circle' : 'rect',
+                discovered: false,
+                id: i
+            });
+        }
+
+        // Lidar scan class
+        class LidarScan {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 0;
+                this.maxRadius = 400;
+                this.speed = 8;
+                this.rays = [];
+                this.numRays = 64;
+                this.active = true;
+                
+                // Generate rays
+                for (let i = 0; i < this.numRays; i++) {
+                    const angle = (Math.PI * 2 * i) / this.numRays;
+                    this.rays.push({
+                        angle: angle,
+                        length: 0,
+                        hit: null
+                    });
+                }
+            }
+
+            update() {
+                if (this.radius < this.maxRadius) {
+                    this.radius += this.speed;
+                    
+                    // Check ray collisions with objects
+                    this.rays.forEach(ray => {
+                        if (!ray.hit) {
+                            const dx = Math.cos(ray.angle) * this.radius;
+                            const dy = Math.sin(ray.angle) * this.radius;
+                            const rayX = this.x + dx;
+                            const rayY = this.y + dy;
+
+                            objects.forEach(obj => {
+                                const dist = Math.sqrt((obj.x - rayX) ** 2 + (obj.y - rayY) ** 2);
+                                if (dist < obj.size / 2) {
+                                    ray.hit = { x: rayX, y: rayY, obj: obj };
+                                    ray.length = this.radius;
+                                    
+                                    if (!obj.discovered) {
+                                        obj.discovered = true;
+                                        discoveredObjects.add(obj.id);
+                                        objectCountEl.textContent = discoveredObjects.size;
+                                        
+                                        // Create particles
+                                        for (let i = 0; i < 10; i++) {
+                                            particles.push(new Particle(rayX, rayY));
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                // Draw scan circle
+                ctx.strokeStyle = `rgba(0, 255, 0, ${1 - this.radius / this.maxRadius})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Draw rays
+                this.rays.forEach((ray, index) => {
+                    if (index % 2 === 0) { // Draw every other ray for performance
+                        const length = ray.hit ? ray.length : this.radius;
+                        const dx = Math.cos(ray.angle) * length;
+                        const dy = Math.sin(ray.angle) * length;
+                        
+                        ctx.strokeStyle = `rgba(0, 255, 0, ${0.3 - (length / this.maxRadius) * 0.3})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y);
+                        ctx.lineTo(this.x + dx, this.y + dy);
+                        ctx.stroke();
+
+                        // Draw hit point
+                        if (ray.hit) {
+                            ctx.fillStyle = '#0ff';
+                            ctx.beginPath();
+                            ctx.arc(ray.hit.x, ray.hit.y, 2, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                });
+            }
+        }
+
+        // Particle class for visual effects
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.life = 1;
+                this.decay = 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+
+            draw() {
+                ctx.fillStyle = `rgba(0, 255, 255, ${this.life})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Event listeners
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            
+            if (!gameStarted) {
+                gameStarted = true;
+                startScreen.classList.add('hidden');
+                hud.style.display = 'block';
+            }
+
+            scanCount++;
+            scanCountEl.textContent = scanCount;
+            scans.push(new LidarScan(e.clientX, e.clientY));
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Game loop
+        function gameLoop() {
+            // Clear canvas with fade effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw scans
+            scans = scans.filter(scan => {
+                scan.update();
+                scan.draw();
+                return scan.active;
+            });
+
+            // Update and draw particles
+            particles = particles.filter(particle => {
+                particle.update();
+                particle.draw();
+                return particle.life > 0;
+            });
+
+            // Draw discovered objects
+            objects.forEach(obj => {
+                if (obj.discovered) {
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    if (obj.type === 'circle') {
+                        ctx.arc(obj.x, obj.y, obj.size / 2, 0, Math.PI * 2);
+                    } else {
+                        ctx.rect(obj.x - obj.size / 2, obj.y - obj.size / 2, obj.size, obj.size);
+                    }
+                    
+                    ctx.stroke();
+                }
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
