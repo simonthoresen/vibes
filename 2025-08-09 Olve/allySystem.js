@@ -1,4 +1,4 @@
-import { COMPANION_TYPES, getCanvasWidth, getCanvasHeight } from './constants.js';
+import { COMPANION_TYPES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class AllySystem {
     constructor(gameState, particleEngine = null) {
@@ -461,8 +461,8 @@ export class AllySystem {
     constrainToScreen(ally) {
         // Keep allies within screen bounds with some margin
         const margin = 10;
-        ally.x = Math.max(margin, Math.min(getCanvasWidth() - ally.width - margin, ally.x));
-        ally.y = Math.max(margin, Math.min(getCanvasHeight() - ally.height - margin, ally.y));
+        ally.x = Math.max(margin, Math.min(CANVAS_WIDTH - ally.width - margin, ally.x));
+        ally.y = Math.max(margin, Math.min(CANVAS_HEIGHT - ally.height - margin, ally.y));
     }
 
     // Handle allies taking damage (from enemy attacks)

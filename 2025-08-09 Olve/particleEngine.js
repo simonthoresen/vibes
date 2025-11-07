@@ -103,31 +103,48 @@ export class ParticleEngine {
             this.lightningBolts.forEach(bolt => {
                 ctx.save();
                 ctx.globalAlpha = bolt.alpha;
-                ctx.strokeStyle = bolt.color;
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
                 
-                // Add glow effect
-                ctx.shadowColor = bolt.color;
-                ctx.shadowBlur = 8;
-                
-                // Draw the main lightning bolt
-                ctx.beginPath();
-                bolt.segments.forEach((segment, index) => {
-                    if (index === 0) {
-                        ctx.moveTo(segment.x, segment.y);
-                    } else {
-                        ctx.lineTo(segment.x, segment.y);
-                    }
-                });
-                ctx.stroke();
-                
-                // Draw a thinner inner bolt for more realism
-                ctx.shadowBlur = 4;
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.stroke();
+                // Use simplified rendering for low particle settings
+                if (bolt.isSimplified) {
+                    // Draw simple translucent purple line
+                    ctx.strokeStyle = bolt.color;
+                    ctx.globalAlpha = bolt.alpha * 0.6; // Make it translucent
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    
+                    // Draw straight line from start to end
+                    ctx.beginPath();
+                    ctx.moveTo(bolt.startX, bolt.startY);
+                    ctx.lineTo(bolt.endX, bolt.endY);
+                    ctx.stroke();
+                } else {
+                    // Full lightning effect with glow
+                    ctx.strokeStyle = bolt.color;
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    
+                    // Add glow effect
+                    ctx.shadowColor = bolt.color;
+                    ctx.shadowBlur = 8;
+                    
+                    // Draw the main lightning bolt
+                    ctx.beginPath();
+                    bolt.segments.forEach((segment, index) => {
+                        if (index === 0) {
+                            ctx.moveTo(segment.x, segment.y);
+                        } else {
+                            ctx.lineTo(segment.x, segment.y);
+                        }
+                    });
+                    ctx.stroke();
+                    
+                    // Draw a thinner inner bolt for more realism
+                    ctx.shadowBlur = 4;
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.stroke();
+                }
                 
                 ctx.restore();
             });
@@ -361,13 +378,19 @@ export class ParticleEngine {
     }
 
     createLightningEffect(startX, startY, endX, endY, color) {
+        // Get particle multiplier from settings
+        const particleMultiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        
         // Create a natural-looking lightning bolt with jagged segments
         const lightning = {
             startX, startY, endX, endY, color,
-            segments: this.generateLightningPath(startX, startY, endX, endY),
+            segments: particleMultiplier === 0 
+                ? [{ x: startX, y: startY }, { x: endX, y: endY }] // Simple straight line when particles disabled
+                : this.generateLightningPath(startX, startY, endX, endY), // Complex jagged path otherwise
             life: 300, // Lightning flash duration
             createdAt: Date.now(),
-            alpha: 1.0
+            alpha: 1.0,
+            isSimplified: particleMultiplier === 0 // Flag to indicate simplified rendering
         };
         
         // Store lightning bolts for rendering
@@ -376,21 +399,23 @@ export class ParticleEngine {
         }
         this.lightningBolts.push(lightning);
         
-        // Also create some particle sparks at key points
-        lightning.segments.forEach((segment, index) => {
-            if (index % 3 === 0) { // Every 3rd segment
-                this.createExplosion(segment.x, segment.y, {
-                    particleCount: 2,
-                    colors: [color, '#FFFFFF', '#E6E6FA'],
-                    minSize: 1,
-                    maxSize: 2,
-                    minSpeed: 3,
-                    maxSpeed: 8,
-                    minLife: 150,
-                    maxLife: 400
-                });
-            }
-        });
+        // Only create particle sparks if particles are enabled
+        if (particleMultiplier > 0) {
+            lightning.segments.forEach((segment, index) => {
+                if (index % 3 === 0) { // Every 3rd segment
+                    this.createExplosion(segment.x, segment.y, {
+                        particleCount: 2,
+                        colors: [color, '#FFFFFF', '#E6E6FA'],
+                        minSize: 1,
+                        maxSize: 2,
+                        minSpeed: 3,
+                        maxSpeed: 8,
+                        minLife: 150,
+                        maxLife: 400
+                    });
+                }
+            });
+        }
     }
 
     generateLightningPath(startX, startY, endX, endY) {

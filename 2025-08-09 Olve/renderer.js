@@ -1862,8 +1862,23 @@ export class Renderer {
             const radius = trap.width / 2;
             const time = Date.now() / 1000;
             
-            // Create much denser cloud of poison particles
-            const particleCount = 120; // Double the particles for thicker cloud
+            // Get particle multiplier from settings
+            const particleMultiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+            
+            // If particle multiplier is 0, just show a green transparent circle
+            if (particleMultiplier === 0) {
+                this.ctx.globalAlpha = 0.25;
+                this.ctx.fillStyle = '#32CD32';
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+                return;
+            }
+            
+            // Create much denser cloud of poison particles (scaled by multiplier)
+            const baseParticleCount = 120; // Base particles for thicker cloud
+            const particleCount = Math.round(baseParticleCount * particleMultiplier);
             
             for (let i = 0; i < particleCount; i++) {
                 // Use particle index for consistent positioning (no random jumping)
@@ -1892,9 +1907,12 @@ export class Renderer {
                 this.ctx.fill();
             }
             
-            // Add more larger floating particles for extra thickness
-            for (let i = 0; i < 25; i++) { // More floating particles
-                const angle = (i * Math.PI * 2) / 25 + time * 0.02; // Much slower orbit
+            // Add more larger floating particles for extra thickness (scaled by multiplier)
+            const baseFloatingCount = 25;
+            const floatingCount = Math.round(baseFloatingCount * particleMultiplier);
+            
+            for (let i = 0; i < floatingCount; i++) { // More floating particles
+                const angle = (i * Math.PI * 2) / baseFloatingCount + time * 0.02; // Much slower orbit
                 const distance = radius * 0.7 + Math.sin(time * 0.2 + i) * (radius * 0.1); // Gentler variation
                 const particleX = centerX + Math.cos(angle) * distance;
                 const particleY = centerY + Math.sin(angle) * distance;
@@ -1919,13 +1937,29 @@ export class Renderer {
 
         // Get aura config from constants
         const auraRadius = 64; // TILE_SIZE * 2
-        const particleCount = 60;
+        const baseParticleCount = 60;
         
         this.ctx.save();
         
         const time = Date.now() * 0.001; // Convert to seconds
         
-        // Draw poison aura particles around player
+        // Get particle multiplier from settings
+        const particleMultiplier = this.gameState?.settings?.particleMultiplier ?? 1.0;
+        
+        // If particle multiplier is 0, just show a green transparent circle
+        if (particleMultiplier === 0) {
+            this.ctx.globalAlpha = 0.2;
+            this.ctx.fillStyle = '#90EE90';
+            this.ctx.beginPath();
+            this.ctx.arc(centerX, centerY, auraRadius, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+            return;
+        }
+        
+        // Draw poison aura particles around player (scaled by multiplier)
+        const particleCount = Math.round(baseParticleCount * particleMultiplier);
+        
         for (let i = 0; i < particleCount; i++) {
             // Use golden angle for even distribution
             const angle = (i * 137.5) * (Math.PI / 180);

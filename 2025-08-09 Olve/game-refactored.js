@@ -43,6 +43,9 @@ class DungeonCrawlerGame {
         
         // Add renderer to gameState so other systems can access it
         this.gameState.renderer = this.renderer;
+        
+        // Add gameState to renderer so it can access settings
+        this.renderer.gameState = this.gameState;
 
         // Initialize game systems
         this.menuManager = new MenuManager(this.gameState);
