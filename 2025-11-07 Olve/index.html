@@ -937,6 +937,8 @@
         <button class="tower-btn" id="heavyTower" data-cost="100">Rocketeer (100g)</button>
         <button class="tower-btn" id="sniperTower" data-cost="150">Sniper (150g)</button>
         <button class="tower-btn" id="medicTower" data-cost="200">Medic (200g)</button>
+        <button class="tower-btn" id="freezerTower" data-cost="125">Freezer (125g)</button>
+        <button class="tower-btn" id="powerPlantTower" data-cost="200">Power Plant (200g)</button>
         <div style="margin-top: 10px; font-size: 12px; color: #ccc;">
             Click a tower, then click on the map to place it
         </div>
@@ -989,6 +991,7 @@
             gold: CONFIG.startGold,
             wave: 1,
             gems: 0,
+            harambeUsed: false, // Track if HARAMBE cheat was used
             enemies: [],
             towers: [],
             projectiles: [],
@@ -1003,6 +1006,7 @@
                 hidden: false,
                 flock: false
             },
+            lastBossType: -1, // Track last boss to prevent repeats
             waveTimer: 0,
             maxWaveTime: 20 * 60, // 20 seconds at 60fps
             waveCleared: false,
@@ -1020,6 +1024,31 @@
             currentMapDepth: CONFIG.mapDepth
         };
         
+        // LocalStorage functions for persistent data
+        function saveGameData() {
+            const saveData = {
+                gems: game.gems,
+                upgrades: game.upgrades
+            };
+            localStorage.setItem('towerDefenseSave', JSON.stringify(saveData));
+        }
+        
+        function loadGameData() {
+            try {
+                const saved = localStorage.getItem('towerDefenseSave');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    game.gems = data.gems || 0;
+                    game.upgrades = data.upgrades || { shield: false, freeze: false };
+                }
+            } catch (e) {
+                console.log('Failed to load save data');
+            }
+        }
+        
+        // Load saved data on page load
+        loadGameData();
+        
         // Tower selection system
         const allTowers = [
             { type: 'basic', name: 'Rifleman', cost: 50, desc: 'Balanced damage and fire rate' },
@@ -1027,7 +1056,11 @@
             { type: 'heavy', name: 'Rocketeer', cost: 100, desc: 'Explosive splash damage' },
             { type: 'sniper', name: 'Sniper', cost: 150, desc: 'Long range, high damage' },
             { type: 'heavygunner', name: 'Heavy Gunner', cost: 750, desc: 'Devastating firepower with ammo' },
-            { type: 'medic', name: 'Medic', cost: 200, desc: 'Heals and shields nearby towers' }
+            { type: 'medic', name: 'Medic', cost: 200, desc: 'Heals and shields nearby towers' },
+            { type: 'pyro', name: 'Pyrotechnician', cost: 125, desc: 'Flame beam that ignites enemies' },
+            { type: 'freezer', name: 'Freezer', cost: 125, desc: 'Slows and freezes enemies' },
+            { type: 'mortar', name: 'Mortar', cost: 250, desc: 'Infinite range artillery with cluster bombs' },
+            { type: 'powerplant', name: 'Power Plant', cost: 200, desc: 'Generates passive income' }
         ];
         
         let selectedTowerDeck = [];
@@ -1075,6 +1108,19 @@
             } else if (type === 'medic') {
                 towerColor = 0x00ffff; // Cyan
                 accentColor = 0x4dd0e1;
+            } else if (type === 'pyro') {
+                towerColor = 0xff4400; // Orange-red
+                accentColor = 0xff6600;
+            } else if (type === 'freezer') {
+                towerColor = 0x0088ff; // Ice blue
+                accentColor = 0x00ccff;
+            } else if (type === 'mortar') {
+                towerColor = 0x4a4a4a; // Dark gray
+                accentColor = 0x666666;
+                maxLevel = 10;
+            } else if (type === 'powerplant') {
+                towerColor = 0xffcc00; // Gold/yellow for power
+                accentColor = 0xffdd44;
             }
             
             // Base platform with detail
@@ -1318,8 +1364,8 @@
                     previewScene.add(leg);
                 }
             } else if (type === 'heavygunner') {
-                // Heavy cannon base mount
-                const cannonBaseGeometry = new THREE.CylinderGeometry(0.3, 0.35, 0.25, 16);
+                // Heavy cannon base mount (optimized)
+                const cannonBaseGeometry = new THREE.CylinderGeometry(0.3, 0.35, 0.25, 12);
                 const cannonBaseMaterial = new THREE.MeshStandardMaterial({ 
                     color: 0x2c3e50,
                     metalness: 0.7,
@@ -1330,7 +1376,7 @@
                 previewScene.add(cannonBase);
                 
                 // Main cannon barrel (positioned between the middle energy rings)
-                const mainBarrelGeometry = new THREE.CylinderGeometry(0.15, 0.17, 0.9, 16);
+                const mainBarrelGeometry = new THREE.CylinderGeometry(0.15, 0.17, 0.9, 12);
                 const mainBarrelMaterial = new THREE.MeshStandardMaterial({ 
                     color: 0x1a1a1a,
                     metalness: 0.9,
@@ -1342,7 +1388,7 @@
                 previewScene.add(mainBarrel);
                 
                 // Cannon muzzle brake
-                const muzzleBrakeGeometry = new THREE.CylinderGeometry(0.19, 0.15, 0.12, 16);
+                const muzzleBrakeGeometry = new THREE.CylinderGeometry(0.19, 0.15, 0.12, 12);
                 const muzzleBrakeMaterial = new THREE.MeshStandardMaterial({ 
                     color: 0x333333,
                     metalness: 0.8,
@@ -1353,16 +1399,16 @@
                 muzzleBrake.position.set(0.95, 0.45 * levelScale + 0.15, 0);
                 previewScene.add(muzzleBrake);
                 
-                // Recoil compensator rings on barrel
-                for (let i = 0; i < 4; i++) {
-                    const ringGeometry = new THREE.TorusGeometry(0.16, 0.025, 8, 16);
+                // Recoil compensator rings on barrel (reduced from 4 to 2)
+                for (let i = 0; i < 2; i++) {
+                    const ringGeometry = new THREE.TorusGeometry(0.16, 0.025, 6, 12);
                     const ringMaterial = new THREE.MeshStandardMaterial({ 
                         color: 0x444444,
                         metalness: 0.8,
                         roughness: 0.2
                     });
                     const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-                    ring.position.set(0.2 + i * 0.15, 0.45 * levelScale + 0.15, 0);
+                    ring.position.set(0.3 + i * 0.3, 0.45 * levelScale + 0.15, 0);
                     ring.rotation.y = Math.PI / 2;
                     previewScene.add(ring);
                 }
@@ -1395,7 +1441,7 @@
                 // Energy rings (level 10 upgrade effect) - positioned around the cannon
                 const ringPositions = [0.25, 0.55, 0.85];
                 for (let i = 0; i < 3; i++) {
-                    const ringGeometry = new THREE.TorusGeometry(0.44, 0.05, 10, 24);
+                    const ringGeometry = new THREE.TorusGeometry(0.44, 0.05, 8, 16);
                     const ringMaterial = new THREE.MeshStandardMaterial({ 
                         color: 0xe74c3c,
                         metalness: 0.4,
@@ -1458,6 +1504,324 @@
                 const glow = new THREE.Mesh(glowGeometry, glowMaterial);
                 glow.position.y = 0.5 * levelScale + 0.15;
                 previewScene.add(glow);
+            } else if (type === 'pyro') {
+                // Flamethrower nozzle
+                const nozzleGeometry = new THREE.CylinderGeometry(0.08, 0.12, 0.5, 12);
+                const nozzleMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x333333,
+                    metalness: 0.9,
+                    roughness: 0.2
+                });
+                const nozzle = new THREE.Mesh(nozzleGeometry, nozzleMaterial);
+                nozzle.rotation.z = Math.PI / 2;
+                nozzle.position.set(0.25, 0.75 * levelScale + 0.15, 0);
+                previewScene.add(nozzle);
+                
+                // Flame effect (cone with gradient)
+                const flameGeometry = new THREE.ConeGeometry(0.2, 0.6, 8);
+                const flameMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xff4400,
+                    metalness: 0,
+                    roughness: 0.8,
+                    emissive: 0xff4400,
+                    emissiveIntensity: 0.8,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+                flame.rotation.z = -Math.PI / 2;
+                flame.position.set(0.7, 0.75 * levelScale + 0.15, 0);
+                previewScene.add(flame);
+                
+                // Inner bright flame
+                const innerFlameGeometry = new THREE.ConeGeometry(0.12, 0.4, 8);
+                const innerFlameMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xffaa00,
+                    metalness: 0,
+                    roughness: 0.5,
+                    emissive: 0xffaa00,
+                    emissiveIntensity: 1.0,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                const innerFlame = new THREE.Mesh(innerFlameGeometry, innerFlameMaterial);
+                innerFlame.rotation.z = -Math.PI / 2;
+                innerFlame.position.set(0.65, 0.75 * levelScale + 0.15, 0);
+                previewScene.add(innerFlame);
+                
+                // Fuel tanks (2 cylinders on sides)
+                for (let side = -1; side <= 1; side += 2) {
+                    const tankGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12);
+                    const tankMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0xff6600,
+                        metalness: 0.6,
+                        roughness: 0.3
+                    });
+                    const tank = new THREE.Mesh(tankGeometry, tankMaterial);
+                    tank.position.set(-0.1, 0.6 * levelScale + 0.15, side * 0.2);
+                    previewScene.add(tank);
+                }
+            } else if (type === 'freezer') {
+                // Ice crystal/freezer unit
+                const coreGeometry = new THREE.OctahedronGeometry(0.25, 0);
+                const coreMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x00ccff,
+                    metalness: 0.3,
+                    roughness: 0.1,
+                    emissive: 0x0088ff,
+                    emissiveIntensity: 0.5,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const core = new THREE.Mesh(coreGeometry, coreMaterial);
+                core.position.y = 0.75 * levelScale + 0.15;
+                previewScene.add(core);
+                
+                // Outer ice shell (wireframe)
+                const shellGeometry = new THREE.IcosahedronGeometry(0.35, 0);
+                const shellMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x88ddff,
+                    metalness: 0.2,
+                    roughness: 0.3,
+                    emissive: 0x0088ff,
+                    emissiveIntensity: 0.3,
+                    transparent: true,
+                    opacity: 0.4,
+                    wireframe: true
+                });
+                const shell = new THREE.Mesh(shellGeometry, shellMaterial);
+                shell.position.y = 0.75 * levelScale + 0.15;
+                previewScene.add(shell);
+                
+                // Cooling vents (4 small boxes around base)
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2;
+                    const ventGeometry = new THREE.BoxGeometry(0.1, 0.15, 0.08);
+                    const ventMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x4488cc,
+                        metalness: 0.7,
+                        roughness: 0.2
+                    });
+                    const vent = new THREE.Mesh(ventGeometry, ventMaterial);
+                    vent.position.set(
+                        Math.cos(angle) * 0.3,
+                        0.5 * levelScale + 0.15,
+                        Math.sin(angle) * 0.3
+                    );
+                    previewScene.add(vent);
+                }
+            } else if (type === 'mortar') {
+                // Mortar tube (large cylinder angled upward)
+                const tubeGeometry = new THREE.CylinderGeometry(0.2, 0.22, 1.2, 12);
+                const tubeMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x2a2a2a,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+                tube.rotation.z = -Math.PI / 6; // Angled 30 degrees
+                tube.position.set(0.3, 0.7 * levelScale + 0.15, 0);
+                previewScene.add(tube);
+                
+                // Mortar base/mount
+                const baseGeometry = new THREE.CylinderGeometry(0.35, 0.4, 0.3, 12);
+                const baseMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x4a4a4a,
+                    metalness: 0.6,
+                    roughness: 0.4
+                });
+                const mortarBase = new THREE.Mesh(baseGeometry, baseMaterial);
+                mortarBase.position.y = 0.5 * levelScale + 0.15;
+                previewScene.add(mortarBase);
+                
+                // Barrel rings (3 reinforcement bands)
+                for (let i = 0; i < 3; i++) {
+                    const ringGeometry = new THREE.TorusGeometry(0.21, 0.03, 6, 12);
+                    const ringMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x666666,
+                        metalness: 0.7,
+                        roughness: 0.3
+                    });
+                    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                    ring.position.set(0.3 - Math.sin(Math.PI / 6) * (0.3 + i * 0.25), 
+                                     0.7 * levelScale + 0.15 + Math.cos(Math.PI / 6) * (0.3 + i * 0.25), 
+                                     0);
+                    ring.rotation.z = -Math.PI / 6;
+                    ring.rotation.y = Math.PI / 2;
+                    previewScene.add(ring);
+                }
+                
+                // Ammo shells (stacked near base)
+                for (let i = 0; i < 3; i++) {
+                    const shellGeometry = new THREE.CylinderGeometry(0.08, 0.1, 0.25, 8);
+                    const shellMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x7a5c3d,
+                        metalness: 0.3,
+                        roughness: 0.6
+                    });
+                    const shell = new THREE.Mesh(shellGeometry, shellMaterial);
+                    const angle = (i / 3) * Math.PI * 2;
+                    shell.position.set(
+                        Math.cos(angle) * 0.3,
+                        0.3 * levelScale + 0.15,
+                        Math.sin(angle) * 0.3
+                    );
+                    previewScene.add(shell);
+                }
+                
+                // Support struts
+                for (let side = -1; side <= 1; side += 2) {
+                    const strutGeometry = new THREE.BoxGeometry(0.06, 0.4, 0.06);
+                    const strutMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x3a3a3a,
+                        metalness: 0.7,
+                        roughness: 0.3
+                    });
+                    const strut = new THREE.Mesh(strutGeometry, strutMaterial);
+                    strut.position.set(0.15, 0.5 * levelScale + 0.15, side * 0.2);
+                    strut.rotation.z = side * Math.PI / 8;
+                    previewScene.add(strut);
+                }
+                
+                // Targeting scope on top
+                const scopeGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.15, 8);
+                const scopeMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x1a1a1a,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const scope = new THREE.Mesh(scopeGeometry, scopeMaterial);
+                scope.position.set(-0.2, 0.9 * levelScale + 0.15, 0);
+                previewScene.add(scope);
+                
+                // Elevation gear (detailed ring at base of tube)
+                const gearGeometry = new THREE.TorusGeometry(0.18, 0.04, 8, 16);
+                const gearMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x555555,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const gear = new THREE.Mesh(gearGeometry, gearMaterial);
+                gear.position.set(0.05, 0.65 * levelScale + 0.15, 0);
+                gear.rotation.z = -Math.PI / 6;
+                gear.rotation.y = Math.PI / 2;
+                previewScene.add(gear);
+            } else if (type === 'powerplant') {
+                // Nuclear power plant with cooling tower and detailed structure (optimized geometry)
+                
+                // Main cooling tower (hyperbolic shape with fewer segments)
+                const towerGeometry = new THREE.CylinderGeometry(0.35, 0.42, 0.9, 16);
+                const towerMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xd0d0d0,
+                    metalness: 0.4,
+                    roughness: 0.6
+                });
+                const tower = new THREE.Mesh(towerGeometry, towerMaterial);
+                tower.position.y = 0.6 * levelScale + 0.15;
+                previewScene.add(tower);
+                
+                // Horizontal bands on cooling tower (reduced from 4 to 2)
+                for (let i = 0; i < 2; i++) {
+                    const bandGeometry = new THREE.TorusGeometry(0.36 + i * 0.02, 0.02, 6, 16);
+                    const bandMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x888888,
+                        metalness: 0.6,
+                        roughness: 0.3
+                    });
+                    const band = new THREE.Mesh(bandGeometry, bandMaterial);
+                    band.position.y = 0.4 + i * 0.4 * levelScale + 0.15;
+                    band.rotation.x = Math.PI / 2;
+                    previewScene.add(band);
+                }
+                
+                // Reactor core building (smaller cylinder at base)
+                const reactorGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.5, 12);
+                const reactorMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xa0a0a0,
+                    metalness: 0.5,
+                    roughness: 0.5
+                });
+                const reactor = new THREE.Mesh(reactorGeometry, reactorMaterial);
+                reactor.position.set(0.45, 0.4 * levelScale + 0.15, 0);
+                previewScene.add(reactor);
+                
+                // Glowing reactor core window
+                const coreWindowGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.52, 12);
+                const coreWindowMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x00ff88,
+                    metalness: 0.2,
+                    roughness: 0.1,
+                    emissive: 0x00ff88,
+                    emissiveIntensity: 1.0,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                const coreWindow = new THREE.Mesh(coreWindowGeometry, coreWindowMaterial);
+                coreWindow.position.set(0.45, 0.4 * levelScale + 0.15, 0);
+                previewScene.add(coreWindow);
+                
+                // Turbine building (box)
+                const turbineGeometry = new THREE.BoxGeometry(0.35, 0.35, 0.5);
+                const turbineMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xb0b0b0,
+                    metalness: 0.5,
+                    roughness: 0.6
+                });
+                const turbine = new THREE.Mesh(turbineGeometry, turbineMaterial);
+                turbine.position.set(-0.45, 0.325 * levelScale + 0.15, 0);
+                previewScene.add(turbine);
+                
+                // Spinning turbine fan (visible through opening)
+                const fanGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 3);
+                const fanMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x666666,
+                    metalness: 0.7,
+                    roughness: 0.3
+                });
+                const fan = new THREE.Mesh(fanGeometry, fanMaterial);
+                fan.position.set(-0.45, 0.325 * levelScale + 0.15, 0.26);
+                fan.rotation.x = Math.PI / 2;
+                previewScene.add(fan);
+                
+                // Connecting pipes between buildings (reduced from 2 to 1)
+                const pipeGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.7, 8);
+                const pipeMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x777777,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const pipe = new THREE.Mesh(pipeGeometry, pipeMaterial);
+                pipe.position.set(0, 0.5 * levelScale + 0.15, 0);
+                pipe.rotation.z = Math.PI / 2;
+                previewScene.add(pipe);
+                
+                // Cooling tower top (cone)
+                const topGeometry = new THREE.ConeGeometry(0.32, 0.35, 16);
+                const topMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xaaaaaa,
+                    metalness: 0.3,
+                    roughness: 0.7
+                });
+                const top = new THREE.Mesh(topGeometry, topMaterial);
+                top.position.y = 1.25 * levelScale + 0.15;
+                previewScene.add(top);
+                
+                // Steam/smoke particles (reduced from 5 to 3)
+                for (let i = 0; i < 3; i++) {
+                    const smokeGeometry = new THREE.SphereGeometry(0.08 + i * 0.015, 6, 6);
+                    const smokeMaterial = new THREE.MeshBasicMaterial({ 
+                        color: 0xe0e0e0,
+                        transparent: true,
+                        opacity: 0.7 - i * 0.12
+                    });
+                    const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
+                    smoke.position.set(
+                        (Math.random() - 0.5) * 0.15,
+                        1.4 * levelScale + 0.15 + i * 0.12,
+                        (Math.random() - 0.5) * 0.15
+                    );
+                    previewScene.add(smoke);
+                }
             }
             
             return { scene: previewScene, camera: previewCamera };
@@ -1665,6 +2029,104 @@
         // Position the entire base group
         baseGroup.position.set(game.basePosition.x, 0, game.basePosition.z);
         scene.add(baseGroup);
+        
+        // Base shield visual (for regenerative shield upgrade)
+        let baseShield = null;
+        
+        function updateBaseShield() {
+            if (game.upgrades.shield) {
+                // Create shield if it doesn't exist
+                if (!baseShield) {
+                    // Create hexagonal shield pattern
+                    baseShield = new THREE.Group();
+                    
+                    // Use circular ring distribution for symmetrical layers
+                    const radius = 2.2;
+                    const rings = 14; // Number of horizontal rings (increased for complete top coverage)
+                    
+                    for (let ring = 0; ring < rings; ring++) {
+                        // Calculate Y position and radius for this ring
+                        const t = ring / (rings - 1); // 0 to 1
+                        const phi = Math.acos(1 - 2 * t); // angle from north pole
+                        const y = Math.cos(phi); // -1 to 1
+                        const ringRadius = Math.sin(phi);
+                        
+                        // Calculate number of hexagons in this ring based on circumference
+                        const circumference = 2 * Math.PI * ringRadius * radius;
+                        const hexagonsInRing = Math.max(3, Math.floor(circumference / 0.6));
+                        
+                        for (let i = 0; i < hexagonsInRing; i++) {
+                            // Create hexagon shape
+                            const hexShape = new THREE.Shape();
+                            const hexSize = 0.25;
+                            for (let j = 0; j < 6; j++) {
+                                const angle = (Math.PI / 3) * j;
+                                const x = hexSize * Math.cos(angle);
+                                const yLocal = hexSize * Math.sin(angle);
+                                if (j === 0) {
+                                    hexShape.moveTo(x, yLocal);
+                                } else {
+                                    hexShape.lineTo(x, yLocal);
+                                }
+                            }
+                            hexShape.lineTo(hexSize, 0);
+                            
+                            const hexGeometry = new THREE.ShapeGeometry(hexShape);
+                            const hexMaterial = new THREE.MeshBasicMaterial({
+                                color: 0x00ffff,
+                                transparent: true,
+                                opacity: 0.5,
+                                side: THREE.DoubleSide
+                            });
+                            const hexMesh = new THREE.Mesh(hexGeometry, hexMaterial);
+                            
+                            // Position on ring
+                            const theta = (i / hexagonsInRing) * Math.PI * 2;
+                            hexMesh.position.x = radius * ringRadius * Math.cos(theta);
+                            hexMesh.position.y = radius * y;
+                            hexMesh.position.z = radius * ringRadius * Math.sin(theta);
+                            
+                            // Make hexagon face outward
+                            hexMesh.lookAt(
+                                hexMesh.position.x * 2,
+                                hexMesh.position.y * 2,
+                                hexMesh.position.z * 2
+                            );
+                            
+                            // Store index for visibility control based on health
+                            hexMesh.userData.index = baseShield.children.length;
+                            
+                            baseShield.add(hexMesh);
+                        }
+                    }
+                    
+                    baseShield.position.set(0, 1.5, 0);
+                    baseShield.userData.totalHexagons = baseShield.children.length;
+                    baseGroup.add(baseShield);
+                }
+                
+                // Update visibility based on shield health - hide hexagons as health decreases
+                const healthPercent = game.shieldHealth / game.maxShieldHealth;
+                const visibleCount = Math.ceil(baseShield.userData.totalHexagons * healthPercent);
+                
+                baseShield.children.forEach((hex, index) => {
+                    // Show first N hexagons based on health percentage
+                    hex.visible = index < visibleCount;
+                    if (hex.visible) {
+                        hex.material.opacity = 0.5 + (healthPercent * 0.2);
+                    }
+                });
+                
+                baseShield.visible = game.shieldHealth > 0;
+                
+                // Rotate shield slowly
+                baseShield.rotation.y += 0.01;
+            } else if (baseShield) {
+                // Remove shield if upgrade no longer active
+                baseGroup.remove(baseShield);
+                baseShield = null;
+            }
+        }
         
         // Steam particle system for chimney
         const steamParticles = [];
@@ -1983,6 +2445,12 @@
                 this.frozenTime = 0;
                 this.freezeEffect = null;
                 
+                // Slow/freeze system (for Freezer tower)
+                this.slowStacks = 0; // Accumulated slow amount (0 to 1.0)
+                this.slowDuration = 0; // Frames remaining with slow
+                this.isFrozen = false; // When slowStacks reaches 1.0
+                this.frozenDuration = 0; // Frames remaining frozen (6 frames = 0.1 seconds)
+                
                 // Create mesh - 3D red cube (1 tile size)
                 const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
                 const material = new THREE.MeshLambertMaterial({ 
@@ -2039,7 +2507,7 @@
             }
             
             update() {
-                // Handle frozen state
+                // Handle frozen state (from old freeze upgrade)
                 if (this.frozen) {
                     this.frozenTime--;
                     if (this.frozenTime <= 0) {
@@ -2047,6 +2515,93 @@
                     }
                     // Don't do anything else while frozen
                     return null;
+                }
+                
+                // Handle new freeze system (from Freezer tower)
+                if (this.isFrozen) {
+                    this.frozenDuration--;
+                    if (this.frozenDuration <= 0) {
+                        // Unfreeze and reset slow stacks
+                        this.isFrozen = false;
+                        this.slowStacks = 0;
+                        this.slowDuration = 0;
+                        
+                        // Remove freeze visual effect
+                        if (this.freezeEffect) {
+                            scene.remove(this.freezeEffect);
+                            this.freezeEffect = null;
+                        }
+                    }
+                    // Don't move while frozen
+                    return null;
+                }
+                
+                // Handle slow decay
+                if (this.slowDuration > 0) {
+                    this.slowDuration--;
+                    if (this.slowDuration <= 0) {
+                        this.slowStacks = 0;
+                        // Update or remove freeze effect based on slow amount
+                        if (this.freezeEffect && this.slowStacks === 0) {
+                            scene.remove(this.freezeEffect);
+                            this.freezeEffect = null;
+                        }
+                    }
+                }
+                
+                // Calculate effective speed (reduced by slow stacks)
+                const effectiveSpeed = this.speed * (1 - this.slowStacks);
+                
+                // Handle burning DOT
+                if (this.burnDuration > 0) {
+                    this.burnTick++;
+                    
+                    // Apply burn damage every 60 frames (1 second)
+                    if (this.burnTick >= 60) {
+                        this.burnTick = 0;
+                        const died = this.takeDamage(this.burnDamage);
+                        
+                        // Create small fire effect
+                        createHitEffect({ x: this.position.x, y: 0.4, z: this.position.z }, false, 0xff4400);
+                        
+                        if (died) {
+                            const idx = game.enemies.indexOf(this);
+                            if (idx !== -1) {
+                                game.gold += this.value;
+                                if (this.isBoss && this.bossType) {
+                                    game.defeatedBosses[this.bossType] = true;
+                                }
+                                if (this.die && typeof this.die === 'function') {
+                                    this.die();
+                                } else {
+                                    this.destroy();
+                                }
+                                game.enemies.splice(idx, 1);
+                            }
+                            return null;
+                        }
+                    }
+                    
+                    // Decrease burn duration
+                    this.burnDuration--;
+                    
+                    // Update fire effect position
+                    if (this.fireEffect) {
+                        this.fireEffect.position.set(this.position.x, 0.5, this.position.z);
+                        // Pulse fire effect
+                        const scale = 1 + Math.sin(this.burnTick * 0.2) * 0.2;
+                        this.fireEffect.scale.set(scale, scale, scale);
+                    }
+                    
+                    // Remove fire effect when burn ends
+                    if (this.burnDuration <= 0) {
+                        if (this.fireEffect) {
+                            scene.remove(this.fireEffect);
+                            this.fireEffect = null;
+                        }
+                        this.burnDamage = 0;
+                        this.burnTick = 0;
+                    }
                 }
                 
                 if (!this.path) {
@@ -2126,8 +2681,8 @@
                         this.mesh.rotation.y = angle;
                     } else {
                         // Move towards the tower
-                        this.position.x += (dx / dist) * this.speed;
-                        this.position.z += (dz / dist) * this.speed;
+                        this.position.x += (dx / dist) * effectiveSpeed;
+                        this.position.z += (dz / dist) * effectiveSpeed;
                         
                         // Rotate to face movement direction
                         const angle = Math.atan2(dx, dz);
@@ -2153,8 +2708,8 @@
                             const dist = Math.sqrt(dx * dx + dz * dz);
                             
                             if (dist > 0.1) {
-                                this.position.x += (dx / dist) * this.speed;
-                                this.position.z += (dz / dist) * this.speed;
+                                this.position.x += (dx / dist) * effectiveSpeed;
+                                this.position.z += (dz / dist) * effectiveSpeed;
                                 
                                 // Rotate to face movement direction
                                 const angle = Math.atan2(dx, dz);
@@ -2172,8 +2727,8 @@
                             if (dist < 0.1) {
                                 this.pathIndex++;
                             } else {
-                                this.position.x += (dx / dist) * this.speed;
-                                this.position.z += (dz / dist) * this.speed;
+                                this.position.x += (dx / dist) * effectiveSpeed;
+                                this.position.z += (dz / dist) * effectiveSpeed;
                                 
                                 // Rotate to face movement direction
                                 const angle = Math.atan2(dx, dz);
@@ -2187,8 +2742,8 @@
                         const dist = Math.sqrt(dx * dx + dz * dz);
                         
                         if (dist > 0.1) {
-                            this.position.x += (dx / dist) * this.speed;
-                            this.position.z += (dz / dist) * this.speed;
+                            this.position.x += (dx / dist) * effectiveSpeed;
+                            this.position.z += (dz / dist) * effectiveSpeed;
                             
                             // Rotate to face movement direction
                             const angle = Math.atan2(dx, dz);
@@ -2198,6 +2753,13 @@
                 }
                 
                 this.mesh.position.set(this.position.x, 0.4, this.position.z);
+                
+                // Update freeze effect position to follow enemy (for Freezer tower slow/freeze)
+                if (this.freezeEffect && (this.isFrozen || this.slowStacks > 0)) {
+                    this.freezeEffect.position.set(this.position.x, 0.4, this.position.z);
+                    // Rotate freeze effect for visual interest
+                    this.freezeEffect.rotation.y += 0.05;
+                }
                 
                 // Update health bar position to follow enemy
                 this.healthBar.position.set(this.position.x, 3.0, this.position.z);
@@ -2227,15 +2789,16 @@
                 
                 // Create freeze visual effect - cyan translucent box
                 if (!this.freezeEffect) {
-                    const geometry = new THREE.BoxGeometry(1.0, 1.2, 1.0);
+                    const geometry = new THREE.BoxGeometry(1.8, 2.0, 1.8);
                     const material = new THREE.MeshBasicMaterial({
                         color: 0x00ffff,
                         transparent: true,
-                        opacity: 0.4,
-                        side: THREE.DoubleSide
+                        opacity: 0.3,
+                        side: THREE.DoubleSide,
+                        wireframe: true
                     });
                     this.freezeEffect = new THREE.Mesh(geometry, material);
-                    this.freezeEffect.position.set(this.position.x, 0.6, this.position.z);
+                    this.freezeEffect.position.set(this.position.x, 0.8, this.position.z);
                     scene.add(this.freezeEffect);
                 }
             }
@@ -2255,6 +2818,12 @@
                 // Remove freeze effect if it exists
                 if (this.freezeEffect) {
                     scene.remove(this.freezeEffect);
+                }
+                
+                // Remove fire effect if it exists
+                if (this.fireEffect) {
+                    scene.remove(this.fireEffect);
+                    this.fireEffect = null;
                 }
                 
                 // Create explosion effect with falling apart pieces
@@ -2382,8 +2951,16 @@
                         const dist = Math.sqrt(dx * dx + dz * dz);
                         
                         if (dist > 0) {
-                            this.position.x += (dx / dist) * this.speed;
-                            this.position.z += (dz / dist) * this.speed;
+                            // Calculate new position
+                            let newX = this.position.x + (dx / dist) * this.speed;
+                            let newZ = this.position.z + (dz / dist) * this.speed;
+                            
+                            // Clamp to map boundaries (stay on green tiles)
+                            newX = Math.max(0.5, Math.min(game.currentMapWidth - 0.5, newX));
+                            newZ = Math.max(0.5, Math.min(game.currentMapDepth - 0.5, newZ));
+                            
+                            this.position.x = newX;
+                            this.position.z = newZ;
                             this.mesh.position.x = this.position.x;
                             this.mesh.position.z = this.position.z;
                             
@@ -2585,8 +3162,16 @@
                         const dist = Math.sqrt(dx * dx + dz * dz);
                         
                         if (dist > 0) {
-                            this.position.x += (dx / dist) * this.speed;
-                            this.position.z += (dz / dist) * this.speed;
+                            // Calculate new position
+                            let newX = this.position.x + (dx / dist) * this.speed;
+                            let newZ = this.position.z + (dz / dist) * this.speed;
+                            
+                            // Clamp to map boundaries (stay on green tiles)
+                            newX = Math.max(0.5, Math.min(game.currentMapWidth - 0.5, newX));
+                            newZ = Math.max(0.5, Math.min(game.currentMapDepth - 0.5, newZ));
+                            
+                            this.position.x = newX;
+                            this.position.z = newZ;
                             this.mesh.position.x = this.position.x;
                             this.mesh.position.z = this.position.z;
                             
@@ -2833,6 +3418,8 @@
                     this.isReloading = false;
                     this.reloadCooldown = 0;
                     this.maxLevel = 10; // Can upgrade to level 10
+                    this.gridSize = 1; // 1x1 initially, becomes 2x2 at level 10
+                    this.occupiedTiles = [[Math.floor(x), Math.floor(z)]]; // Track all occupied tiles
                 } else if (type === 'heavy') {
                     this.baseDamage = 50;
                     this.baseRange = 4;
@@ -2870,9 +3457,77 @@
                     this.healAmount = 2; // Level 1: 2 HP per heal
                     this.healSpeed = 30; // Level 1: heal every 30 frames (0.5s)
                     this.maxLevel = 5; // Can upgrade to level 5
+                } else if (type === 'pyro') {
+                    this.baseDamage = 0; // No direct damage, only burning DOT
+                    this.baseRange = 5;
+                    this.baseFireRate = 1; // Apply burning effect every frame
+                    this.color = 0xff4400; // Orange-red flame color
+                    this.baseUpgradeCost = 150;
+                    this.rangeIncrement = 1;
+                    this.maxRange = 10;
+                    this.maxFireRate = null;
+                    this.isPyro = true;
+                    this.pierceCount = Infinity; // Infinite pierce
+                    this.baseBurnDamage = 10; // 10 dmg/s at level 1
+                    this.burnDuration = 300; // 5 seconds (5 * 60 frames)
+                    this.flameBeam = null; // Will store the constant flame beam
+                    this.flameParticles = []; // Flame particles for visual effect
+                    this.maxFlameParticles = 30; // More particles
+                } else if (type === 'freezer') {
+                    this.baseDamage = 5; // Low damage
+                    this.baseRange = 4;
+                    this.baseFireRate = 30; // 2 shots per second
+                    this.color = 0x0088ff; // Ice blue
+                    this.baseUpgradeCost = 150;
+                    this.rangeIncrement = 1;
+                    this.maxRange = 7;
+                    this.maxFireRate = 20; // Can improve to 3 shots per second
+                    this.isFreezer = true;
+                    this.baseSlowAmount = 0.25; // 25% slow at level 1
+                    this.slowDuration = 120; // 2 seconds (2 * 60 frames)
+                    this.freezeCooldown = 0; // Cooldown until can freeze again
+                    this.freezeCooldownTime = 60; // 1 second cooldown after freezing
+                } else if (type === 'mortar') {
+                    this.baseDamage = 150;
+                    this.baseRange = 10; // Always 10 until level 10 (infinite)
+                    this.baseFireRate = 240; // 0.25/s (60 frames * 4 = 240)
+                    this.color = 0x4a4a4a; // Dark gray
+                    this.baseUpgradeCost = 300;
+                    this.rangeIncrement = 0; // No range increment
+                    this.maxRange = 10;
+                    this.maxFireRate = 60; // 1/s max (60 frames)
+                    this.isMortar = true;
+                    this.baseSplashRadius = 2.0; // Explosive projectiles
+                    this.hasInfiniteRange = false; // Unlocked at level 10
+                    this.maxLevel = 10; // Can upgrade to level 10
+                    this.gridSize = 1; // 1x1 initially, becomes 2x2 at level 10
+                    this.occupiedTiles = [[Math.floor(x), Math.floor(z)]]; // Track all occupied tiles
+                    this.clusterBombs = false; // Unlocked at level 10
+                } else if (type === 'powerplant') {
+                    this.baseDamage = 0; // No damage
+                    this.baseRange = 0; // No range needed
+                    this.baseFireRate = 60; // Generate income every second (60 frames)
+                    this.color = 0xffcc00; // Gold/yellow
+                    this.baseUpgradeCost = 200;
+                    this.rangeIncrement = 0;
+                    this.maxRange = 0;
+                    this.maxFireRate = null;
+                    this.isPowerPlant = true;
+                    this.incomePerSecond = 5; // Level 1: 5 gold per second
+                    this.maxLevel = 5;
+                    this.waterFloor = null; // Blue floor for water turbine (levels 1-2)
+                    this.smokeParticles = []; // Smoke particles for nuclear (level 5)
                 }
                 
                 this.updateStats();
+                
+                // Initialize occupied tiles array for all towers (default 1x1)
+                if (!this.occupiedTiles) {
+                    this.occupiedTiles = [[Math.floor(x), Math.floor(z)]];
+                }
+                if (!this.gridSize) {
+                    this.gridSize = 1;
+                }
                 
                 // Create mesh
                 const baseGeometry = new THREE.CylinderGeometry(0.4, 0.5, 0.5, 8);
@@ -2883,19 +3538,50 @@
                 this.mesh.userData.tower = this; // Reference for raycasting
                 scene.add(this.mesh);
                 
-                // Heavy Gunner gets rounded cannon, others get box
-                let turretGeometry;
-                if (type === 'heavygunner') {
-                    turretGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 16);
-                    turretGeometry.rotateX(Math.PI / 2); // Rotate to point forward
+                // Array to store decorations - MUST initialize before createPowerPlantStructure()
+                this.decorations = [];
+                
+                // Power Plant doesn't need a turret - create custom structure instead
+                if (type === 'powerplant') {
+                    this.createPowerPlantStructure();
+                } else if (type === 'mortar') {
+                    // Mortar: Create base mount and cannon barrel (no rotation)
+                    // Base mount (stays stationary)
+                    const mountGeometry = new THREE.CylinderGeometry(0.3, 0.35, 0.3, 12);
+                    const mountMaterial = new THREE.MeshLambertMaterial({ color: this.color });
+                    const mount = new THREE.Mesh(mountGeometry, mountMaterial);
+                    mount.position.set(0, 0.4, 0);
+                    this.mesh.add(mount);
+                    
+                    // Cannon barrel (black cylinder, can recoil)
+                    const barrelGeometry = new THREE.CylinderGeometry(0.15, 0.18, 0.8, 12);
+                    const barrelMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+                    this.mortarBarrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+                    this.mortarBarrel.position.set(0, 0.8, 0); // Positioned above mount
+                    this.mortarBarrel.castShadow = true;
+                    this.mesh.add(this.mortarBarrel);
+                    
+                    // Store base position for recoil animation
+                    this.mortarBarrel.userData.baseY = 0.8;
+                    this.mortarBarrel.userData.recoilAmount = 0;
+                    
+                    // No turret rotation for mortar
+                    this.turret = null;
                 } else {
-                    turretGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.6);
+                    // Heavy Gunner gets rounded cannon, others get box
+                    let turretGeometry;
+                    if (type === 'heavygunner') {
+                        turretGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 16);
+                        turretGeometry.rotateX(Math.PI / 2); // Rotate to point forward
+                    } else {
+                        turretGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.6);
+                    }
+                    const turretMaterial = new THREE.MeshLambertMaterial({ color: this.color });
+                    this.turret = new THREE.Mesh(turretGeometry, turretMaterial);
+                    this.turret.castShadow = true;
+                    this.turret.position.set(0, 0.4, 0);
+                    this.mesh.add(this.turret);
                 }
-                const turretMaterial = new THREE.MeshLambertMaterial({ color: this.color });
-                this.turret = new THREE.Mesh(turretGeometry, turretMaterial);
-                this.turret.castShadow = true;
-                this.turret.position.set(0, 0.4, 0);
-                this.mesh.add(this.turret);
                 
                 // Health bar - position below tower
                 const hpGeometry = new THREE.PlaneGeometry(0.8, 0.1);
@@ -2904,9 +3590,6 @@
                 this.healthBar.position.set(x, 2.5, z);
                 this.healthBar.rotation.x = -Math.PI / 4;
                 scene.add(this.healthBar);
-                
-                // Array to store decorations
-                this.decorations = [];
                 
                 // Healing shield (for towers being healed by medic)
                 this.healShield = null;
@@ -2922,14 +3605,102 @@
                     // Max targets increases each level: 1, 2, 3, 4, 5
                     this.maxHealTargets = this.level;
                     
-                    // Heal amount increases: 2, 4, 6, 8, 10 HP per heal
-                    this.healAmount = 2 * this.level;
+                    // Heal amount increases more gradually: 2, 3, 4, 5, 6 HP per heal (was 2, 4, 6, 8, 10)
+                    this.healAmount = 1 + this.level;
                     
-                    // Heal speed increases (lower frames = faster): 30, 25, 20, 15, 10 frames
-                    this.healSpeed = Math.max(30 - (this.level - 1) * 5, 10);
+                    // Heal speed slower at higher levels: 30, 30, 25, 20, 15 frames (was 30, 25, 20, 15, 10)
+                    // This prevents level 5 from being too powerful
+                    if (this.level <= 2) {
+                        this.healSpeed = 30;
+                    } else {
+                        this.healSpeed = Math.max(30 - (this.level - 2) * 5, 15);
+                    }
                     
                     // Trim heal targets if we leveled down (shouldn't happen) or remove dead towers
                     this.healTargets = this.healTargets.filter(t => game.towers.includes(t)).slice(0, this.maxHealTargets);
+                } else if (this.type === 'pyro') {
+                    this.damage = this.baseDamage; // 1 direct damage (doesn't scale)
+                    
+                    // Range increases by 1 per level: 5, 6, 7, 8, 9, 10
+                    const calculatedRange = this.baseRange + (this.level - 1) * this.rangeIncrement;
+                    this.range = Math.min(calculatedRange, this.maxRange);
+                    
+                    // Fire rate stays constant at 2.0/s
+                    this.fireRate = this.baseFireRate;
+                    
+                    // Burning damage scales: 10, 20, 30, 40, 50 dmg/s
+                    this.burnDamage = this.baseBurnDamage * this.level;
+                    
+                    // Pierce count stays infinite
+                    this.pierceCount = Infinity;
+                } else if (this.type === 'freezer') {
+                    this.damage = this.baseDamage * this.level; // Low damage scaling
+                    
+                    // Range increases by 1 per level: 4, 5, 6, 7 (caps at 7)
+                    const calculatedRange = this.baseRange + (this.level - 1) * this.rangeIncrement;
+                    this.range = Math.min(calculatedRange, this.maxRange);
+                    
+                    // Fire rate improves: 30, 27, 24, 21, 20 frames
+                    const calculatedFireRate = this.baseFireRate - (this.level - 1) * 3;
+                    this.fireRate = Math.max(calculatedFireRate, this.maxFireRate);
+                    
+                    // Slow amount: Level 1=25%, Level 2=25%, Level 3=50%, Level 4=75%, Level 5=100%
+                    if (this.level === 1 || this.level === 2) {
+                        this.slowAmount = 0.25;
+                    } else if (this.level === 3) {
+                        this.slowAmount = 0.50;
+                    } else if (this.level === 4) {
+                        this.slowAmount = 0.75;
+                    } else {
+                        this.slowAmount = 1.0; // 100% slow = frozen
+                    }
+                } else if (this.type === 'mortar') {
+                    // Damage: 150 + 50 per level, but 700 at level 10
+                    if (this.level === 10) {
+                        this.damage = 700;
+                    } else {
+                        this.damage = this.baseDamage + (this.level - 1) * 50;
+                    }
+                    
+                    // Range: Always 10, then infinite at level 10
+                    if (this.level === 10) {
+                        this.range = 999; // Infinite range
+                        this.hasInfiniteRange = true;
+                        this.clusterBombs = true; // Enable cluster bombs at level 10
+                    } else {
+                        this.range = 10; // Fixed at 10 for all levels before 10
+                        this.hasInfiniteRange = false;
+                        this.clusterBombs = false;
+                    }
+                    
+                    // Fire rate: 0.25/s at level 1, 0.5/s at level 3, 1/s at level 5+
+                    if (this.level === 1 || this.level === 2) {
+                        this.fireRate = 240; // 0.25/s (60 * 4)
+                    } else if (this.level === 3 || this.level === 4) {
+                        this.fireRate = 120; // 0.5/s (60 * 2)
+                    } else {
+                        this.fireRate = 60; // 1/s
+                    }
+                    
+                    // Splash radius increases by 0.5 with each level
+                    this.splashRadius = this.baseSplashRadius + (this.level - 1) * 0.5;
+                } else if (this.type === 'powerplant') {
+                    this.damage = 0; // Never deals damage
+                    this.range = 0;
+                    this.fireRate = 60; // Generate income every 60 frames (1 second)
+                    
+                    // Income scaling: 5, 10, 25, 50, 100 gold per second
+                    if (this.level === 1) {
+                        this.incomePerSecond = 5;
+                    } else if (this.level === 2) {
+                        this.incomePerSecond = 10;
+                    } else if (this.level === 3) {
+                        this.incomePerSecond = 25;
+                    } else if (this.level === 4) {
+                        this.incomePerSecond = 50;
+                    } else {
+                        this.incomePerSecond = 100;
+                    }
                 } else if (this.type === 'sniper') {
                     this.damage = this.baseDamage * Math.pow(2, this.level - 1);
                     
@@ -2957,6 +3728,11 @@
                     // Calculate range with cap
                     const calculatedRange = this.baseRange + (this.level - 1) * this.rangeIncrement;
                     this.range = Math.min(calculatedRange, this.maxRange);
+                    
+                    // Special: Heavy Gunner gets +2 range at level 10
+                    if (this.type === 'heavygunner' && this.level === 10) {
+                        this.range = 10;
+                    }
                     
                     // Calculate fire rate with cap (lower is faster)
                     let calculatedFireRate;
@@ -3044,6 +3820,150 @@
                     this.hasHiddenDetection = true;
                 } else if (this.type === 'heavy' && this.level >= 5) {
                     this.hasHiddenDetection = true;
+                } else if (this.type === 'pyro' && this.level >= 3) {
+                    this.hasHiddenDetection = true;
+                }
+            }
+            
+            createPowerPlantStructure() {
+                // Clear existing decorations
+                this.decorations.forEach(decoration => {
+                    this.mesh.remove(decoration);
+                    scene.remove(decoration);
+                });
+                this.decorations = [];
+                
+                // Remove smoke particles if they exist
+                if (this.smokeParticles) {
+                    this.smokeParticles.forEach(particle => scene.remove(particle));
+                }
+                this.smokeParticles = [];
+                
+                if (this.level <= 2) {
+                    // Level 1-2: Water Turbine
+                    const turbineGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
+                    const turbineMaterial = new THREE.MeshLambertMaterial({ color: 0x4488cc });
+                    const turbine = new THREE.Mesh(turbineGeometry, turbineMaterial);
+                    turbine.userData.tower = this; // Add tower reference for click detection
+                    turbine.position.set(0, 0.4, 0);
+                    turbine.rotation.x = Math.PI / 2;
+                    this.mesh.add(turbine);
+                    this.decorations.push(turbine);
+                    this.turret = turbine; // Use as turret for rotation
+                    
+                    // Add blades
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (Math.PI / 2) * i;
+                        const bladeGeometry = new THREE.BoxGeometry(0.5, 0.08, 0.05);
+                        const bladeMaterial = new THREE.MeshLambertMaterial({ color: 0x2266aa });
+                        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+                        blade.userData.tower = this; // Add tower reference for click detection
+                        blade.position.set(Math.cos(angle) * 0.25, 0, Math.sin(angle) * 0.25);
+                        turbine.add(blade);
+                    }
+                    
+                    // Blue water floor
+                    if (!this.waterFloor) {
+                        const floorGeometry = new THREE.PlaneGeometry(1, 1);
+                        const floorMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0x0088ff,
+                            transparent: true,
+                            opacity: 0.6
+                        });
+                        this.waterFloor = new THREE.Mesh(floorGeometry, floorMaterial);
+                        this.waterFloor.userData.tower = this; // Add tower reference for click detection
+                        this.waterFloor.rotation.x = -Math.PI / 2;
+                        this.waterFloor.position.set(this.position.x, 0.02, this.position.z);
+                        scene.add(this.waterFloor);
+                    }
+                } else if (this.level <= 4) {
+                    // Level 3-4: Wind Turbine
+                    // Remove water floor
+                    if (this.waterFloor) {
+                        scene.remove(this.waterFloor);
+                        this.waterFloor = null;
+                    }
+                    
+                    const poleGeometry = new THREE.CylinderGeometry(0.05, 0.08, 1.2, 8);
+                    const poleMaterial = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+                    const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+                    pole.userData.tower = this; // Add tower reference for click detection
+                    pole.position.set(0, 0.6, 0);
+                    this.mesh.add(pole);
+                    this.decorations.push(pole);
+                    
+                    // Nacelle (housing)
+                    const nacelleGeometry = new THREE.BoxGeometry(0.15, 0.15, 0.25);
+                    const nacelleMaterial = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+                    const nacelle = new THREE.Mesh(nacelleGeometry, nacelleMaterial);
+                    nacelle.userData.tower = this; // Add tower reference for click detection
+                    nacelle.position.set(0, 1.2, 0);
+                    this.mesh.add(nacelle);
+                    this.decorations.push(nacelle);
+                    
+                    // Rotor hub
+                    const hubGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.1, 12);
+                    const hubMaterial = new THREE.MeshLambertMaterial({ color: 0x888888 });
+                    const hub = new THREE.Mesh(hubGeometry, hubMaterial);
+                    hub.userData.tower = this; // Add tower reference for click detection
+                    hub.rotation.z = Math.PI / 2;
+                    hub.position.set(0, 1.2, 0.15);
+                    this.mesh.add(hub);
+                    this.decorations.push(hub);
+                    this.turret = hub; // Use as turret for rotation
+                    
+                    // Three blades
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (Math.PI * 2 / 3) * i;
+                        const bladeGeometry = new THREE.BoxGeometry(0.02, 0.5, 0.08);
+                        const bladeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+                        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+                        blade.userData.tower = this; // Add tower reference for click detection
+                        blade.position.set(0, Math.cos(angle) * 0.25, Math.sin(angle) * 0.25);
+                        hub.add(blade);
+                    }
+                } else {
+                    // Level 5: Nuclear Power Plant
+                    // Remove water floor if still present
+                    if (this.waterFloor) {
+                        scene.remove(this.waterFloor);
+                        this.waterFloor = null;
+                    }
+                    
+                    // Cooling tower
+                    const towerGeometry = new THREE.CylinderGeometry(0.35, 0.4, 0.8, 16);
+                    const towerMaterial = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+                    const tower = new THREE.Mesh(towerGeometry, towerMaterial);
+                    tower.userData.tower = this; // Add tower reference for click detection
+                    tower.position.set(0, 0.6, 0);
+                    this.mesh.add(tower);
+                    this.decorations.push(tower);
+                    
+                    // Reactor core (glowing)
+                    const coreGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 16);
+                    const coreMaterial = new THREE.MeshLambertMaterial({ 
+                        color: 0x00ff88,
+                        emissive: 0x00ff88
+                    });
+                    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+                    core.userData.tower = this; // Add tower reference for click detection
+                    core.position.set(0, 0.6, 0);
+                    this.mesh.add(core);
+                    this.decorations.push(core);
+                    
+                    // Cooling tower top (black for smoke exit)
+                    const topGeometry = new THREE.ConeGeometry(0.3, 0.3, 16);
+                    const topMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
+                    const top = new THREE.Mesh(topGeometry, topMaterial);
+                    top.userData.tower = this; // Add tower reference for click detection
+                    top.position.set(0, 1.15, 0);
+                    this.mesh.add(top);
+                    this.decorations.push(top);
+                    
+                    this.turret = null; // No rotation for nuclear plant
+                    
+                    // Initialize smoke particles array for nuclear plant
+                    this.smokeParticles = [];
                 }
             }
             
@@ -3052,8 +3972,47 @@
                 const maxLevel = this.maxLevel || 5;
                 if (this.level >= maxLevel) return;
                 
+                // Special handling for heavygunner and mortar level 10: check if we have space for 2x2
+                if ((this.type === 'heavygunner' || this.type === 'mortar') && this.level === 9) {
+                    // Check if adjacent tiles are available for 2x2 expansion
+                    const baseX = Math.floor(this.position.x);
+                    const baseZ = Math.floor(this.position.z);
+                    const tilesToCheck = [
+                        [baseX + 1, baseZ],
+                        [baseX, baseZ + 1],
+                        [baseX + 1, baseZ + 1]
+                    ];
+                    
+                    // Check if all tiles are walkable
+                    const canExpand = tilesToCheck.every(([x, z]) => 
+                        x < game.currentMapWidth && z < game.currentMapDepth &&
+                        game.grid[x] && game.grid[x][z] && game.grid[x][z].walkable
+                    );
+                    
+                    if (!canExpand) {
+                        // Can't upgrade to level 10 without space
+                        return;
+                    }
+                    
+                    // Mark additional tiles as occupied
+                    tilesToCheck.forEach(([x, z]) => {
+                        game.grid[x][z].walkable = false;
+                        this.occupiedTiles.push([x, z]);
+                    });
+                    
+                    this.gridSize = 2; // Now 2x2
+                    
+                    // Recalculate paths for enemies
+                    game.enemies.forEach(enemy => enemy.calculatePath());
+                }
+                
                 this.level++;
                 this.updateStats();
+                
+                // Power Plant needs to rebuild structure on upgrade
+                if (this.type === 'powerplant') {
+                    this.createPowerPlantStructure();
+                }
                 
                 // Restore to full health on upgrade
                 this.health = this.maxHealth;
@@ -3061,16 +4020,25 @@
                 // Visual upgrade - make tower base slightly taller (all levels)
                 this.mesh.scale.y = 1 + (this.level - 1) * 0.2;
                 
-                // Medic: Scale turret every level up to 3, then add decorations
-                if (this.type === 'medic') {
+                // Skip turret scaling for Power Plant (uses custom structure)
+                if (this.type === 'powerplant') {
+                    // Power Plant handled by createPowerPlantStructure()
+                } else if (this.type === 'medic') {
                     if (this.level <= 3) {
                         this.turret.scale.set(1 + (this.level - 1) * 0.2, 1 + (this.level - 1) * 0.2, 1 + (this.level - 1) * 0.2);
                     }
+                } else if (this.type === 'mortar') {
+                    // Mortar doesn't have a turret, skip scaling
                 } else {
                     // Other towers: Scale turret only up to level 3
-                    if (this.level <= 3) {
+                    if (this.level <= 3 && this.turret) {
                         this.turret.scale.set(1 + (this.level - 1) * 0.15, 1 + (this.level - 1) * 0.15, 1 + (this.level - 1) * 0.15);
                     }
+                }
+                
+                // Heavy Gunner and Mortar level 10: scale up massively
+                if ((this.type === 'heavygunner' || this.type === 'mortar') && this.level === 10) {
+                    this.mesh.scale.set(2, 2, 2);
                 }
                 
                 // Add decorations for levels 4+
@@ -3283,19 +4251,143 @@
                             this.decorations.push(ring);
                         }
                     } else if (level === 10) {
-                        // Ultimate upgrade - glowing crystal core
-                        const coreGeometry = new THREE.OctahedronGeometry(0.2, 0);
-                        const coreMaterial = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.9 });
+                        // ULTIMATE LEVEL 10 - Massive detailed military turret
+                        
+                        // Base platform - larger armored base
+                        const platformGeometry = new THREE.CylinderGeometry(0.8, 0.9, 0.3, 8);
+                        const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50, emissive: 0x1a252f });
+                        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+                        platform.position.y = 0.1;
+                        this.mesh.add(platform);
+                        this.decorations.push(platform);
+                        
+                        // Four corner support pillars
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 4) + (Math.PI / 2) * i;
+                            const pillarGeometry = new THREE.BoxGeometry(0.15, 0.6, 0.15);
+                            const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e, emissive: 0x1c2833 });
+                            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+                            pillar.position.set(Math.cos(angle) * 0.65, 0.5, Math.sin(angle) * 0.65);
+                            this.mesh.add(pillar);
+                            this.decorations.push(pillar);
+                        }
+                        
+                        // Create turret group that will rotate
+                        const turretGroup = new THREE.Group();
+                        turretGroup.position.y = 0.8;
+                        this.mesh.add(turretGroup);
+                        this.turret = turretGroup; // This will be rotated to aim
+                        
+                        // Main armored turret body (part of turret group)
+                        const bodyGeometry = new THREE.BoxGeometry(0.7, 0.5, 0.7);
+                        const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x566573, emissive: 0x2c3e50 });
+                        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                        body.position.y = 0;
+                        turretGroup.add(body);
+                        
+                        // Dual barrels - massive cannons (part of turret group)
+                        for (let side = -1; side <= 1; side += 2) {
+                            const barrelGeometry = new THREE.CylinderGeometry(0.12, 0.12, 1.2, 16);
+                            const barrelMaterial = new THREE.MeshLambertMaterial({ color: 0x1c2833, emissive: 0x0e1419 });
+                            const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+                            barrel.position.set(side * 0.2, 0, 0.7);
+                            barrel.rotation.x = Math.PI / 2;
+                            turretGroup.add(barrel);
+                            
+                            // Barrel tips (muzzle brake)
+                            const tipGeometry = new THREE.CylinderGeometry(0.14, 0.12, 0.1, 16);
+                            const tipMaterial = new THREE.MeshLambertMaterial({ color: 0xd35400 });
+                            const tip = new THREE.Mesh(tipGeometry, tipMaterial);
+                            tip.position.set(side * 0.2, 0, 1.25);
+                            tip.rotation.x = Math.PI / 2;
+                            turretGroup.add(tip);
+                        }
+                        
+                        // Ammo drums on sides (part of turret group)
+                        for (let i = 0; i < 2; i++) {
+                            const angle = (Math.PI / 2) + i * Math.PI;
+                            const drumGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.35, 16);
+                            const drumMaterial = new THREE.MeshLambertMaterial({ color: 0xd4af37, emissive: 0x8b7835 });
+                            const drum = new THREE.Mesh(drumGeometry, drumMaterial);
+                            drum.position.set(Math.cos(angle) * 0.5, -0.1, Math.sin(angle) * 0.5);
+                            drum.rotation.z = Math.PI / 2;
+                            turretGroup.add(drum);
+                        }
+                        
+                        // Radar and sensor array on top (part of turret group)
+                        const radarBaseGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8);
+                        const radarBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x2874a6 });
+                        const radarBase = new THREE.Mesh(radarBaseGeometry, radarBaseMaterial);
+                        radarBase.position.y = 0.3;
+                        turretGroup.add(radarBase);
+                        
+                        const radarDishGeometry = new THREE.CylinderGeometry(0.3, 0.1, 0.05, 16);
+                        const radarDishMaterial = new THREE.MeshLambertMaterial({ color: 0x2e86c1, emissive: 0x154360 });
+                        const radarDish = new THREE.Mesh(radarDishGeometry, radarDishMaterial);
+                        radarDish.position.y = 0.35;
+                        radarDish.userData.animationType = 'spin';
+                        radarDish.userData.spinSpeed = 0.08;
+                        turretGroup.add(radarDish);
+                        this.decorations.push(radarDish); // Add to decorations for animation
+                        
+                        // Energy core - glowing center (part of turret group)
+                        const coreGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+                        const coreMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9 });
                         const core = new THREE.Mesh(coreGeometry, coreMaterial);
-                        core.position.y = 1.0;
-                        core.userData.animationType = 'spinAndBob';
-                        core.userData.spinSpeed = 0.05;
-                        core.userData.bobSpeed = 0.04;
-                        core.userData.bobAmount = 0.15;
-                        core.userData.baseY = core.position.y;
-                        core.userData.bobOffset = 0;
-                        this.mesh.add(core);
-                        this.decorations.push(core);
+                        core.position.y = 0.5;
+                        core.userData.animationType = 'pulsate';
+                        core.userData.pulsateSpeed = 0.08;
+                        core.userData.pulsateAmount = 0.3; // Scale between 0.7x and 1.3x
+                        core.userData.baseScale = 1.0;
+                        turretGroup.add(core);
+                        this.decorations.push(core); // Add to decorations for animation
+                        
+                        // Energy rings around core (not part of turret - stationary)
+                        for (let i = 0; i < 3; i++) {
+                            const ringGeometry = new THREE.TorusGeometry(0.5 + i * 0.15, 0.03, 8, 20);
+                            const ringMaterial = new THREE.MeshBasicMaterial({ 
+                                color: 0x00bfff, 
+                                transparent: true, 
+                                opacity: 0.6 - i * 0.1 
+                            });
+                            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                            ring.position.y = 0.6 + i * 0.2;
+                            ring.rotation.x = Math.PI / 2;
+                            ring.userData.animationType = 'spinAndBob';
+                            ring.userData.spinSpeed = 0.03 + i * 0.01;
+                            ring.userData.bobSpeed = 0.02 + i * 0.01;
+                            ring.userData.bobAmount = 0.08;
+                            ring.userData.baseY = ring.position.y;
+                            ring.userData.bobOffset = i * (Math.PI * 2 / 3);
+                            this.mesh.add(ring);
+                            this.decorations.push(ring);
+                        }
+                        
+                        // Armor plating around base - 8 plates
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (Math.PI * 2 / 8) * i;
+                            const plateGeometry = new THREE.BoxGeometry(0.2, 0.4, 0.08);
+                            const plateMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e, emissive: 0x1a252f });
+                            const plate = new THREE.Mesh(plateGeometry, plateMaterial);
+                            plate.position.set(Math.cos(angle) * 0.7, 0.5, Math.sin(angle) * 0.7);
+                            plate.rotation.y = angle;
+                            this.mesh.add(plate);
+                            this.decorations.push(plate);
+                        }
+                        
+                        // Warning lights on corners - fast blinking
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 4) + (Math.PI / 2) * i;
+                            const lightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+                            const lightMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
+                            const light = new THREE.Mesh(lightGeometry, lightMaterial);
+                            light.position.set(Math.cos(angle) * 0.75, 0.9, Math.sin(angle) * 0.75);
+                            light.userData.animationType = 'blink';
+                            light.userData.blinkSpeed = 0.15; // Faster blink cycle
+                            light.userData.blinkOffset = i * (Math.PI / 2); // Offset so they blink in sequence
+                            this.mesh.add(light);
+                            this.decorations.push(light);
+                        }
                     }
                 } else if (this.type === 'medic') {
                     // Medic: Medical/healing decorations
@@ -3360,6 +4452,213 @@
                         this.mesh.add(crystal);
                         this.decorations.push(crystal);
                     }
+                } else if (this.type === 'pyro') {
+                    // Pyro: Flame and fuel tank decorations
+                    if (level === 4) {
+                        // Fuel tanks around base
+                        for (let i = 0; i < 3; i++) {
+                            const angle = (Math.PI * 2 / 3) * i;
+                            const tankGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.25, 12);
+                            const tankMaterial = new THREE.MeshLambertMaterial({ color: 0xff6600, emissive: 0xff3300 });
+                            const tank = new THREE.Mesh(tankGeometry, tankMaterial);
+                            tank.position.set(Math.cos(angle) * 0.45, 0.3, Math.sin(angle) * 0.45);
+                            this.mesh.add(tank);
+                            this.decorations.push(tank);
+                        }
+                    } else if (level === 5) {
+                        // Flame particles floating around - spinning and bobbing
+                        for (let i = 0; i < 5; i++) {
+                            const angle = (Math.PI * 2 / 5) * i;
+                            const flameGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                            const flameMaterial = new THREE.MeshBasicMaterial({ 
+                                color: i % 2 === 0 ? 0xff4400 : 0xffaa00, 
+                                transparent: true, 
+                                opacity: 0.8 
+                            });
+                            const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+                            flame.position.set(Math.cos(angle) * 0.35, 0.6, Math.sin(angle) * 0.35);
+                            flame.userData.animationType = 'spinAndBob';
+                            flame.userData.spinSpeed = 0.05 + i * 0.01;
+                            flame.userData.bobSpeed = 0.03 + i * 0.005;
+                            flame.userData.bobAmount = 0.15;
+                            flame.userData.baseY = flame.position.y;
+                            flame.userData.bobOffset = i * (Math.PI * 2 / 5);
+                            this.mesh.add(flame);
+                            this.decorations.push(flame);
+                        }
+                        
+                        // Glowing flame core on top
+                        const coreGeometry = new THREE.SphereGeometry(0.12, 12, 12);
+                        const coreMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0xffaa00, 
+                            transparent: true, 
+                            opacity: 0.9 
+                        });
+                        const core = new THREE.Mesh(coreGeometry, coreMaterial);
+                        core.position.y = 0.9;
+                        core.userData.animationType = 'spinAndBob';
+                        core.userData.spinSpeed = 0.06;
+                        core.userData.bobSpeed = 0.04;
+                        core.userData.bobAmount = 0.2;
+                        core.userData.baseY = core.position.y;
+                        core.userData.bobOffset = 0;
+                        this.mesh.add(core);
+                        this.decorations.push(core);
+                    }
+                } else if (this.type === 'mortar') {
+                    // Mortar: Artillery decorations
+                    if (level === 4) {
+                        // Ammo crates around base
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 2) * i;
+                            const crateGeometry = new THREE.BoxGeometry(0.2, 0.15, 0.15);
+                            const crateMaterial = new THREE.MeshLambertMaterial({ color: 0x7a5c3d, emissive: 0x4a3825 });
+                            const crate = new THREE.Mesh(crateGeometry, crateMaterial);
+                            crate.position.set(Math.cos(angle) * 0.45, 0.25, Math.sin(angle) * 0.45);
+                            crate.rotation.y = angle + Math.PI / 4;
+                            this.mesh.add(crate);
+                            this.decorations.push(crate);
+                        }
+                    } else if (level === 5) {
+                        // Stabilizer legs extended
+                        for (let i = 0; i < 3; i++) {
+                            const angle = (Math.PI * 2 / 3) * i;
+                            const legGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+                            const legMaterial = new THREE.MeshLambertMaterial({ color: 0x3a3a3a, emissive: 0x1a1a1a });
+                            const leg = new THREE.Mesh(legGeometry, legMaterial);
+                            leg.position.set(Math.cos(angle) * 0.5, 0.25, Math.sin(angle) * 0.5);
+                            leg.rotation.z = Math.cos(angle) * 0.3;
+                            leg.rotation.x = Math.sin(angle) * 0.3;
+                            this.mesh.add(leg);
+                            this.decorations.push(leg);
+                        }
+                    } else if (level === 6) {
+                        // Rangefinder equipment
+                        for (let i = 0; i < 2; i++) {
+                            const angle = i * Math.PI;
+                            const finderGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.2, 8);
+                            const finderMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, emissive: 0x00ff00 });
+                            const finder = new THREE.Mesh(finderGeometry, finderMaterial);
+                            finder.position.set(Math.cos(angle) * 0.35, 0.7, Math.sin(angle) * 0.35);
+                            this.mesh.add(finder);
+                            this.decorations.push(finder);
+                        }
+                    } else if (level === 7) {
+                        // Targeting laser array
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 2) * i;
+                            const laserGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6);
+                            const laserMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
+                            const laser = new THREE.Mesh(laserGeometry, laserMaterial);
+                            laser.position.set(Math.cos(angle) * 0.3, 0.8, Math.sin(angle) * 0.3);
+                            this.mesh.add(laser);
+                            this.decorations.push(laser);
+                        }
+                    } else if (level === 8) {
+                        // Radar dish on side - spinning
+                        const dishGeometry = new THREE.CylinderGeometry(0.2, 0.1, 0.08, 12);
+                        const dishMaterial = new THREE.MeshLambertMaterial({ color: 0x2874a6, emissive: 0x154360 });
+                        const dish = new THREE.Mesh(dishGeometry, dishMaterial);
+                        dish.position.set(0.4, 0.6, 0);
+                        dish.userData.animationType = 'spin';
+                        dish.userData.spinSpeed = 0.06;
+                        this.mesh.add(dish);
+                        this.decorations.push(dish);
+                    } else if (level === 9) {
+                        // Cooling vents with steam effect
+                        for (let i = 0; i < 6; i++) {
+                            const angle = (Math.PI * 2 / 6) * i;
+                            const ventGeometry = new THREE.BoxGeometry(0.1, 0.25, 0.06);
+                            const ventMaterial = new THREE.MeshLambertMaterial({ color: 0x555555, emissive: 0xff6600 });
+                            const vent = new THREE.Mesh(ventGeometry, ventMaterial);
+                            vent.position.set(Math.cos(angle) * 0.45, 0.5, Math.sin(angle) * 0.45);
+                            vent.rotation.y = angle;
+                            this.mesh.add(vent);
+                            this.decorations.push(vent);
+                        }
+                    } else if (level === 10) {
+                        // ULTIMATE LEVEL 10 - Massive artillery platform
+                        
+                        // Large base platform
+                        const platformGeometry = new THREE.CylinderGeometry(0.85, 0.95, 0.25, 8);
+                        const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x2a2a2a, emissive: 0x1a1a1a });
+                        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+                        platform.position.y = 0.1;
+                        this.mesh.add(platform);
+                        this.decorations.push(platform);
+                        
+                        // Four heavy stabilizer legs
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 4) + (Math.PI / 2) * i;
+                            const legGeometry = new THREE.BoxGeometry(0.15, 0.5, 0.15);
+                            const legMaterial = new THREE.MeshLambertMaterial({ color: 0x3a3a3a, emissive: 0x2a2a2a });
+                            const leg = new THREE.Mesh(legGeometry, legMaterial);
+                            leg.position.set(Math.cos(angle) * 0.7, 0.4, Math.sin(angle) * 0.7);
+                            leg.rotation.z = Math.cos(angle) * 0.2;
+                            leg.rotation.x = Math.sin(angle) * 0.2;
+                            this.mesh.add(leg);
+                            this.decorations.push(leg);
+                        }
+                        
+                        // Massive mortar tube
+                        const mortarGeometry = new THREE.CylinderGeometry(0.25, 0.28, 1.5, 12);
+                        const mortarMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, emissive: 0x0a0a0a });
+                        const mortarTube = new THREE.Mesh(mortarGeometry, mortarMaterial);
+                        mortarTube.position.set(0, 0.8, 0);
+                        mortarTube.rotation.z = 0; // Pointing straight up
+                        this.mesh.add(mortarTube);
+                        this.decorations.push(mortarTube);
+                        
+                        // Hide the original barrel since we have the big one now
+                        if (this.mortarBarrel) {
+                            this.mortarBarrel.visible = false;
+                        }
+                        
+                        // Barrel reinforcement rings
+                        for (let i = 0; i < 4; i++) {
+                            const ringGeometry = new THREE.TorusGeometry(0.26, 0.04, 6, 12);
+                            const ringMaterial = new THREE.MeshLambertMaterial({ color: 0x666666, emissive: 0x333333 });
+                            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                            ring.position.y = 0.8 + i * 0.15;
+                            ring.rotation.z = 0; // Straight up with the tube
+                            ring.rotation.y = Math.PI / 2;
+                            this.mesh.add(ring);
+                            this.decorations.push(ring);
+                        }
+                        
+                        // Large ammo shells stacked around base
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (Math.PI * 2 / 8) * i;
+                            const shellGeometry = new THREE.CylinderGeometry(0.1, 0.12, 0.35, 8);
+                            const shellMaterial = new THREE.MeshLambertMaterial({ color: 0x7a5c3d, emissive: 0x4a3825 });
+                            const shell = new THREE.Mesh(shellGeometry, shellMaterial);
+                            shell.position.set(Math.cos(angle) * 0.6, 0.3, Math.sin(angle) * 0.6);
+                            this.mesh.add(shell);
+                            this.decorations.push(shell);
+                        }
+                        
+                        // Targeting computer on side
+                        const computerGeometry = new THREE.BoxGeometry(0.2, 0.25, 0.15);
+                        const computerMaterial = new THREE.MeshLambertMaterial({ color: 0x2874a6, emissive: 0x00ff00 });
+                        const computer = new THREE.Mesh(computerGeometry, computerMaterial);
+                        computer.position.set(0.5, 0.7, 0);
+                        this.mesh.add(computer);
+                        this.decorations.push(computer);
+                        
+                        // Warning lights - fast blinking
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 2) * i;
+                            const lightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+                            const lightMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.9 });
+                            const light = new THREE.Mesh(lightGeometry, lightMaterial);
+                            light.position.set(Math.cos(angle) * 0.75, 0.9, Math.sin(angle) * 0.75);
+                            light.userData.animationType = 'blink';
+                            light.userData.blinkSpeed = 0.12;
+                            light.userData.blinkOffset = i * (Math.PI / 2);
+                            this.mesh.add(light);
+                            this.decorations.push(light);
+                        }
+                    }
                 }
             }
             
@@ -3369,18 +4668,42 @@
                 
                 // Heavy Gunner has different upgrade cost progression
                 if (this.type === 'heavygunner') {
+                    // Level 10 upgrade costs 5000
+                    if (this.level === 9) return 5000;
                     return this.baseUpgradeCost + (this.level - 1) * 250;
+                }
+                
+                // Mortar has higher upgrade costs
+                if (this.type === 'mortar') {
+                    return this.baseUpgradeCost + (this.level - 1) * 200;
+                }
+                
+                // Power Plant increases by 200 each level
+                if (this.type === 'powerplant') {
+                    return this.baseUpgradeCost + (this.level - 1) * 200;
                 }
                 
                 return this.baseUpgradeCost + (this.level - 1) * 50;
             }
             
             getSellValue() {
-                const baseCost = this.type === 'basic' ? 50 : this.type === 'fast' ? 75 : this.type === 'heavy' ? 100 : this.type === 'heavygunner' ? 750 : 150;
+                const baseCost = this.type === 'basic' ? 50 : 
+                               this.type === 'fast' ? 75 : 
+                               this.type === 'heavy' ? 100 : 
+                               this.type === 'heavygunner' ? 750 : 
+                               this.type === 'pyro' ? 125 :
+                               this.type === 'freezer' ? 125 :
+                               this.type === 'mortar' ? 250 :
+                               this.type === 'powerplant' ? 200 :
+                               150;
                 let totalUpgradeCost = 0;
                 for (let i = 1; i < this.level; i++) {
                     if (this.type === 'heavygunner') {
                         totalUpgradeCost += this.baseUpgradeCost + (i - 1) * 250;
+                    } else if (this.type === 'mortar') {
+                        totalUpgradeCost += this.baseUpgradeCost + (i - 1) * 200;
+                    } else if (this.type === 'powerplant') {
+                        totalUpgradeCost += this.baseUpgradeCost + (i - 1) * 200;
                     } else {
                         totalUpgradeCost += this.baseUpgradeCost + (i - 1) * 50;
                     }
@@ -3391,6 +4714,75 @@
             update() {
                 if (this.cooldown > 0) {
                     this.cooldown--;
+                }
+                
+                // Handle Freezer tower freeze cooldown
+                if (this.type === 'freezer' && this.freezeCooldown > 0) {
+                    this.freezeCooldown--;
+                }
+                
+                // Handle Power Plant income generation
+                if (this.type === 'powerplant') {
+                    if (this.cooldown <= 0 && !isDemoMode) {
+                        // Generate income
+                        game.gold += this.incomePerSecond;
+                        this.cooldown = this.fireRate; // Reset to 60 frames (1 second)
+                        updateUI();
+                    }
+                    
+                    // Rotate turbine for levels 1-4
+                    if (this.turret && this.level <= 4) {
+                        if (this.level <= 2) {
+                            // Water turbine rotates around Y axis
+                            this.turret.rotation.y += 0.02;
+                        } else {
+                            // Wind turbine rotates around X axis (facing forward)
+                            this.turret.rotation.x += 0.03;
+                        }
+                    }
+                    
+                    // Animate smoke for nuclear plant (level 5)
+                    if (this.level === 5 && this.smokeParticles) {
+                        // Continuously create new smoke particles every frame (truly continuous)
+                        if (this.smokeParticles.length < 40) {
+                            const smokeGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+                            const smokeMaterial = new THREE.MeshBasicMaterial({ 
+                                color: 0xcccccc,
+                                transparent: true,
+                                opacity: 0.6
+                            });
+                            const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
+                            smoke.position.set(
+                                this.position.x + (Math.random() - 0.5) * 0.2,
+                                1.5,
+                                this.position.z + (Math.random() - 0.5) * 0.2
+                            );
+                            smoke.userData.velocityY = 0.015 + Math.random() * 0.015;
+                            smoke.userData.age = 0;
+                            scene.add(smoke);
+                            this.smokeParticles.push(smoke);
+                        }
+                        
+                        // Update smoke particles
+                        for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
+                            const smoke = this.smokeParticles[i];
+                            smoke.userData.age++;
+                            smoke.position.y += smoke.userData.velocityY;
+                            
+                            // Fade out as it rises
+                            smoke.material.opacity = Math.max(0, 0.7 - (smoke.userData.age / 180));
+                            
+                            // Remove particle when it fades out completely
+                            if (smoke.userData.age > 180) {
+                                scene.remove(smoke);
+                                this.smokeParticles.splice(i, 1);
+                            }
+                        }
+                    } else if (this.smokeParticles) {
+                        // Clean up smoke particles if not level 5
+                        this.smokeParticles.forEach(particle => scene.remove(particle));
+                        this.smokeParticles = [];
+                    }
                 }
                 
                 // Handle Medic tower healing
@@ -3500,8 +4892,8 @@
                             wireframe: true
                         });
                         this.healShield = new THREE.Mesh(shieldGeometry, shieldMaterial);
-                        this.healShield.position.set(this.position.x, 0.5, this.position.z);
-                        scene.add(this.healShield);
+                        this.healShield.position.set(0, 0.5, 0); // Relative to tower mesh
+                        this.mesh.add(this.healShield); // Add to tower mesh, not scene
                     }
                     
                     // Animate shield - rotate and color shift
@@ -3512,7 +4904,7 @@
                     this.healShield.material.opacity = 0.3; // Keep constant opacity
                 } else if (this.healShield) {
                     // Remove shield if no longer being healed
-                    scene.remove(this.healShield);
+                    this.mesh.remove(this.healShield); // Remove from tower mesh
                     this.healShield = null;
                 }
                 
@@ -3530,11 +4922,41 @@
                         decoration.rotation.z += decoration.userData.spinSpeed;
                         const bobTime = Date.now() * 0.001 * decoration.userData.bobSpeed + decoration.userData.bobOffset;
                         decoration.position.y = decoration.userData.baseY + Math.sin(bobTime) * decoration.userData.bobAmount;
+                    } else if (decoration.userData.animationType === 'blink') {
+                        // Blink animation for warning lights
+                        const blinkTime = Date.now() * 0.001 * decoration.userData.blinkSpeed + decoration.userData.blinkOffset;
+                        const blinkValue = (Math.sin(blinkTime) + 1) * 0.5; // 0 to 1
+                        decoration.material.opacity = 0.2 + blinkValue * 0.8; // Blink between 0.2 and 1.0
+                    } else if (decoration.userData.animationType === 'pulsate') {
+                        // Pulsate animation for reactor core - scale and glow
+                        const pulsateTime = Date.now() * 0.001 * decoration.userData.pulsateSpeed;
+                        const pulsateValue = (Math.sin(pulsateTime) + 1) * 0.5; // 0 to 1
+                        const scale = decoration.userData.baseScale * (1 - decoration.userData.pulsateAmount + pulsateValue * decoration.userData.pulsateAmount * 2);
+                        decoration.scale.set(scale, scale, scale);
+                        // Also pulse the opacity/glow
+                        decoration.material.opacity = 0.7 + pulsateValue * 0.3; // Pulse between 0.7 and 1.0
                     }
                 });
                 
+                // Animate mortar barrel recoil
+                if (this.mortarBarrel && this.mortarBarrel.userData.recoilAmount > 0) {
+                    // Move barrel down aggressively (recoil into ground effect)
+                    this.mortarBarrel.position.y = this.mortarBarrel.userData.baseY - this.mortarBarrel.userData.recoilAmount;
+                    // Recover recoil with spring-like motion
+                    this.mortarBarrel.userData.recoilAmount -= 0.04; // Faster recovery
+                    if (this.mortarBarrel.userData.recoilAmount < 0) {
+                        this.mortarBarrel.userData.recoilAmount = 0;
+                        this.mortarBarrel.position.y = this.mortarBarrel.userData.baseY;
+                    }
+                }
+                
                 if (this.cooldown > 0) {
                     return;
+                }
+                
+                // Power Plant doesn't target enemies, Medic targets towers, Pyro uses constant beam
+                if (this.type === 'powerplant') {
+                    return; // Power Plant generates income, doesn't need to target
                 }
                 
                 // Find target enemy based on targeting mode
@@ -3657,6 +5079,23 @@
                 }
                 
                 if (targetEnemy) {
+                    // Pyrotechnician has special constant beam behavior
+                    if (this.type === 'pyro') {
+                        // Aim at enemy
+                        const angle = Math.atan2(
+                            targetEnemy.position.x - this.position.x,
+                            targetEnemy.position.z - this.position.z
+                        );
+                        this.turret.rotation.y = angle;
+                        
+                        // Update or create flame beam particles
+                        this.updateFlameBeam(targetEnemy);
+                        
+                        // Deal damage every frame (infinite fire rate)
+                        this.dealFlameDamage(targetEnemy);
+                        return;
+                    }
+                    
                     // Check if Light Gunner can shoot (has ammo and not reloading)
                     if (this.type === 'fast' && this.level < 5) {
                         if (this.isReloading || this.currentAmmo <= 0) {
@@ -3671,12 +5110,14 @@
                         }
                     }
                     
-                    // Aim at enemy
-                    const angle = Math.atan2(
-                        targetEnemy.position.x - this.position.x,
-                        targetEnemy.position.z - this.position.z
-                    );
-                    this.turret.rotation.y = angle;
+                    // Aim at enemy (skip for mortar - it doesn't rotate)
+                    if (this.turret) {
+                        const angle = Math.atan2(
+                            targetEnemy.position.x - this.position.x,
+                            targetEnemy.position.z - this.position.z
+                        );
+                        this.turret.rotation.y = angle;
+                    }
                     
                     // Shoot
                     this.shoot(targetEnemy);
@@ -3700,9 +5141,238 @@
                         }
                     }
                 }
+                
+                // Pyrotechnician: Clear flame beam if no target
+                if (this.type === 'pyro' && !targetEnemy) {
+                    this.clearFlameBeam();
+                }
+            }
+            
+            // Pyrotechnician: Update flame beam particles
+            updateFlameBeam(target) {
+                // Calculate direction to target
+                const dx = target.position.x - this.position.x;
+                const dz = target.position.z - this.position.z;
+                const distToTarget = Math.sqrt(dx * dx + dz * dz);
+                
+                // Clamp distance to tower range
+                const effectiveDistance = Math.min(distToTarget, this.range);
+                const dirX = dx / distToTarget;
+                const dirZ = dz / distToTarget;
+                
+                // Spawn more particles per frame
+                const particlesToSpawn = Math.min(4, this.maxFlameParticles - this.flameParticles.length);
+                
+                for (let i = 0; i < particlesToSpawn; i++) {
+                    // Create smaller flame particles
+                    const size = 0.12;
+                    const geometry = new THREE.BoxGeometry(size, size, size);
+                    
+                    // Simple color selection
+                    const color = Math.random() < 0.6 ? 0xff6600 : 0xffaa00;
+                    
+                    const material = new THREE.MeshBasicMaterial({ 
+                        color: color,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const particle = new THREE.Mesh(geometry, material);
+                    
+                    // Start at turret position
+                    const startOffset = 0.4;
+                    particle.position.set(
+                        this.position.x + dirX * startOffset,
+                        0.5,
+                        this.position.z + dirZ * startOffset
+                    );
+                    
+                    // Random spread
+                    const spreadAngle = (Math.random() - 0.5) * 0.6;
+                    const spreadDirX = dirX * Math.cos(spreadAngle) - dirZ * Math.sin(spreadAngle);
+                    const spreadDirZ = dirX * Math.sin(spreadAngle) + dirZ * Math.cos(spreadAngle);
+                    
+                    // Store movement data
+                    particle.userData = {
+                        velocityX: spreadDirX * 0.4,
+                        velocityZ: spreadDirZ * 0.4,
+                        velocityY: 0.03,
+                        life: 0,
+                        maxLife: 15,
+                        towerRange: this.range, // Use tower's actual range, not distance to target
+                        startX: this.position.x,
+                        startZ: this.position.z
+                    };
+                    
+                    scene.add(particle);
+                    this.flameParticles.push(particle);
+                }
+                
+                // Update existing particles - optimized
+                for (let i = this.flameParticles.length - 1; i >= 0; i--) {
+                    const particle = this.flameParticles[i];
+                    const userData = particle.userData;
+                    userData.life++;
+                    
+                    // Simple movement
+                    particle.position.x += userData.velocityX;
+                    particle.position.z += userData.velocityZ;
+                    particle.position.y += userData.velocityY;
+                    
+                    // Fire rises
+                    userData.velocityY += 0.01;
+                    
+                    // Simple rotation
+                    particle.rotation.y += 0.2;
+                    
+                    // Quick distance check using tower's range
+                    const dx = particle.position.x - userData.startX;
+                    const dz = particle.position.z - userData.startZ;
+                    const distSq = dx * dx + dz * dz;
+                    const maxDistSq = userData.towerRange * userData.towerRange;
+                    
+                    // Remove if out of range or too old
+                    if (distSq > maxDistSq || userData.life > userData.maxLife || particle.position.y > 1.2) {
+                        scene.remove(particle);
+                        this.flameParticles.splice(i, 1);
+                        continue;
+                    }
+                    
+                    // Simple fade
+                    const lifeProgress = userData.life / userData.maxLife;
+                    particle.material.opacity = 0.8 * (1 - lifeProgress);
+                    
+                    // Slight expansion
+                    const scale = 1 + lifeProgress * 0.3;
+                    particle.scale.set(scale, scale, scale);
+                }
+            }
+            
+            // Pyrotechnician: Clear flame beam
+            clearFlameBeam() {
+                this.flameParticles.forEach(particle => scene.remove(particle));
+                this.flameParticles = [];
+            }
+            
+            // Pyrotechnician: Deal damage to all enemies in beam
+            dealFlameDamage(primaryTarget) {
+                const dx = primaryTarget.position.x - this.position.x;
+                const dz = primaryTarget.position.z - this.position.z;
+                const distToTarget = Math.sqrt(dx * dx + dz * dz);
+                const dirX = dx / distToTarget;
+                const dirZ = dz / distToTarget;
+                
+                // Check all enemies within range and beam width
+                for (const enemy of game.enemies) {
+                    const edx = enemy.position.x - this.position.x;
+                    const edz = enemy.position.z - this.position.z;
+                    const distFromTower = Math.sqrt(edx * edx + edz * edz);
+                    
+                    // Skip if out of range
+                    if (distFromTower > this.range) continue;
+                    
+                    // Calculate distance from beam centerline
+                    const dotProduct = edx * dirX + edz * dirZ; // Projection onto beam direction
+                    if (dotProduct < 0) continue; // Behind tower
+                    
+                    const perpX = edx - dirX * dotProduct;
+                    const perpZ = edz - dirZ * dotProduct;
+                    const perpDist = Math.sqrt(perpX * perpX + perpZ * perpZ);
+                    
+                    // Triangular spread: beam width increases with distance
+                    // Width = 0.3 at start, increases by ~0.15 per unit distance (tan(0.3 radians) ≈ 0.3)
+                    const maxBeamWidth = 0.3 + dotProduct * 0.3;
+                    
+                    // Check if within beam width
+                    if (perpDist > maxBeamWidth) continue;
+                    
+                    // No direct damage - only apply burning effect
+                    // Apply burning effect (refresh if already burning)
+                    if (!enemy.burnDamage || enemy.burnDamage < this.burnDamage) {
+                        enemy.burnDamage = this.burnDamage;
+                        enemy.burnDuration = this.burnDuration;
+                        enemy.burnTick = 0;
+                        
+                        // Create fire visual on enemy
+                        if (enemy.fireEffect) {
+                            scene.remove(enemy.fireEffect);
+                        }
+                        const fireGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+                        const fireMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0xff4400,
+                            transparent: true,
+                            opacity: 0.7
+                        });
+                        enemy.fireEffect = new THREE.Mesh(fireGeometry, fireMaterial);
+                        enemy.fireEffect.position.set(enemy.position.x, 0.5, enemy.position.z);
+                        scene.add(enemy.fireEffect);
+                    }
+                }
             }
             
             shoot(target) {
+                // Pyrotechnician uses constant beam, not projectiles
+                if (this.type === 'pyro') {
+                    return;
+                }
+                
+                // Level 10 Heavy Gunner fires dual projectiles from both barrels
+                if (this.type === 'heavygunner' && this.level === 10) {
+                    // The orange muzzle tips are at local position (±0.2, 0, 1.25) in turret space
+                    // We need to get their world positions accounting for rotation and scale
+                    
+                    const barrelPositions = [
+                        new THREE.Vector3(-0.2, 0, 1.25), // Left barrel in turret local space
+                        new THREE.Vector3(0.2, 0, 1.25)   // Right barrel in turret local space
+                    ];
+                    
+                    // Create projectiles from each barrel
+                    for (const localPos of barrelPositions) {
+                        // Convert local position to world position
+                        const worldPos = localPos.clone();
+                        worldPos.applyMatrix4(this.turret.matrixWorld);
+                        
+                        const projectile = {
+                            position: { 
+                                x: worldPos.x, 
+                                y: worldPos.y,
+                                z: worldPos.z
+                            },
+                            target: target,
+                            damage: this.damage,
+                            speed: 0.45,
+                            splashRadius: 0,
+                            isHeavy: true, // Enable fire trail
+                            towerType: 'heavy', // Use 'heavy' to trigger fire trail
+                            isMaxLevel: true, // Flag for level 10 heavy gunner
+                            sourceTower: this, // Reference to the tower for beam rendering
+                            barrelOffset: localPos.clone(), // Store which barrel this came from
+                            trail: [],
+                            pierceCount: 0,
+                            hitEnemies: [],
+                            slowAmount: 0,
+                            slowDuration: 0,
+                            freezerTower: null,
+                            beamMesh: null // Will hold the beam cylinder
+                        };
+                        
+                        // Create bullet mesh - nearly invisible, only trail visible
+                        const geometry = new THREE.CylinderGeometry(0.05, 0.05, 0.15, 8);
+                        const material = new THREE.MeshBasicMaterial({ 
+                            color: 0xff6600,
+                            transparent: true,
+                            opacity: 0.1 // Almost invisible
+                        });
+                        projectile.mesh = new THREE.Mesh(geometry, material);
+                        projectile.mesh.castShadow = false;
+                        projectile.mesh.position.set(projectile.position.x, projectile.position.y, projectile.position.z);
+                        projectile.mesh.rotation.y = this.turret.rotation.y;
+                        scene.add(projectile.mesh);
+                        game.projectiles.push(projectile);
+                    }
+                    
+                    return; // Exit early for dual firing
+                }
+                
                 const projectile = {
                     position: { x: this.position.x, y: 0.5, z: this.position.z },
                     target: target,
@@ -3713,7 +5383,11 @@
                     towerType: this.type,
                     trail: [], // For fire trail on heavy projectiles
                     pierceCount: this.type === 'sniper' ? this.pierceCount : 0, // Sniper can pierce
-                    hitEnemies: [] // Track which enemies have been hit (for pierce)
+                    hitEnemies: [], // Track which enemies have been hit (for pierce)
+                    // Freezer properties
+                    slowAmount: this.type === 'freezer' ? this.slowAmount : 0,
+                    slowDuration: this.type === 'freezer' ? this.slowDuration : 0,
+                    freezerTower: this.type === 'freezer' ? this : null // Reference to tower for cooldown
                 };
                 
                 // Create 3D projectile mesh based on tower type
@@ -3754,6 +5428,37 @@
                         color: 0x00ff00,
                         emissive: 0x00aa00
                     });
+                } else if (this.type === 'freezer') {
+                    // Freezer: Ice blue crystal
+                    geometry = new THREE.OctahedronGeometry(0.14, 0);
+                    material = new THREE.MeshLambertMaterial({ 
+                        color: 0x00ccff,
+                        emissive: 0x0088ff,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                } else if (this.type === 'mortar') {
+                    // Mortar: Large dark shell (octahedron)
+                    geometry = new THREE.OctahedronGeometry(0.2, 0);
+                    material = new THREE.MeshLambertMaterial({ 
+                        color: 0x4a4a4a,
+                        emissive: 0x2a2a2a
+                    });
+                    // Mortar-specific properties
+                    projectile.speed = 0.15; // Faster projectile speed
+                    projectile.isMortar = true;
+                    projectile.arcHeight = 5; // How high the shell goes
+                    projectile.progress = 0; // Progress along arc (0-1)
+                    projectile.splashRadius = this.splashRadius;
+                    projectile.startPos = { x: this.position.x, y: 0.5, z: this.position.z };
+                    projectile.endPos = { x: target.position.x, y: 0.5, z: target.position.z };
+                    projectile.target = target; // Store target reference for homing
+                    projectile.clusterBombs = this.clusterBombs;
+                    
+                    // Trigger recoil animation on mortar barrel (dramatic downward recoil)
+                    if (this.mortarBarrel) {
+                        this.mortarBarrel.userData.recoilAmount = 0.5; // Larger recoil amount
+                    }
                 }
                 
                 projectile.mesh = new THREE.Mesh(geometry, material);
@@ -3764,7 +5469,10 @@
                 if (this.type === 'fast') {
                     // Sphere projectile - no special rotation needed
                     projectile.mesh.rotation.y = this.turret.rotation.y;
-                } else {
+                } else if (this.type === 'mortar') {
+                    // Mortar projectile - no rotation needed (fires straight up)
+                    projectile.mesh.rotation.set(0, 0, 0);
+                } else if (this.turret) {
                     // Other projectiles can use turret rotation for initial spin
                     projectile.mesh.rotation.y = this.turret.rotation.y;
                 }
@@ -3785,8 +5493,25 @@
                 
                 // Remove heal shield if present
                 if (this.healShield) {
-                    scene.remove(this.healShield);
+                    this.mesh.remove(this.healShield); // Remove from tower mesh
                     this.healShield = null;
+                }
+                
+                // Remove flame beam particles if pyro tower
+                if (this.type === 'pyro') {
+                    this.clearFlameBeam();
+                }
+                
+                // Remove power plant specific objects
+                if (this.type === 'powerplant') {
+                    // Remove water floor
+                    if (this.waterFloor) {
+                        scene.remove(this.waterFloor);
+                        this.waterFloor = null;
+                    }
+                    // Remove smoke particles
+                    this.smokeParticles.forEach(particle => scene.remove(particle));
+                    this.smokeParticles = [];
                 }
                 
                 // Remove decorations
@@ -3819,8 +5544,17 @@
             game.waveClearTimer = 0;
             
             if (isBossWave) {
-                // Boss wave - spawn 1 random boss
-                const bossType = Math.floor(Math.random() * 4); // Random boss 0, 1, 2, or 3
+                // Boss wave - spawn 1 random boss (but not the same as last time)
+                let bossType;
+                if (game.lastBossType === -1) {
+                    // First boss wave, choose any
+                    bossType = Math.floor(Math.random() * 4);
+                } else {
+                    // Choose a different boss than last time
+                    const availableBosses = [0, 1, 2, 3].filter(b => b !== game.lastBossType);
+                    bossType = availableBosses[Math.floor(Math.random() * availableBosses.length)];
+                }
+                game.lastBossType = bossType;
                 
                 // Spawn location depends on map expansion
                 let spawnX, spawnZ;
@@ -4027,15 +5761,16 @@
         }
         
         // Create hit effect particles
-        function createHitEffect(position, isDeath = false) {
+        function createHitEffect(position, isDeath = false, color = 0xff0000) {
             const particleCount = isDeath ? 0 : 3 + Math.floor(Math.random() * 3); // 3-5 particles for hits, 0 for death (has own effect)
             const particles = [];
             
             for (let i = 0; i < particleCount; i++) {
                 const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+                const emissiveColor = color === 0xff4400 ? 0x882200 : 0x880000;
                 const material = new THREE.MeshLambertMaterial({ 
-                    color: 0xff0000,
-                    emissive: 0x880000
+                    color: color,
+                    emissive: emissiveColor
                 });
                 const particle = new THREE.Mesh(geometry, material);
                 
@@ -4098,6 +5833,11 @@
                 };
                 animateParticles();
             }
+        }
+        
+        // Create explosion effect for mortar/artillery (simpler wrapper)
+        function createExplosion(position, splashRadius) {
+            createExplosionEffect(position, splashRadius);
         }
         
         // Create explosion effect for Rocketeer splash damage
@@ -4385,14 +6125,28 @@
                 }
                 
                 // Normal tower projectiles - remove if no target
-                // BUT: piercing projectiles intentionally clear their target to continue straight
-                if ((!proj.target || !game.enemies.includes(proj.target)) && proj.pierceCount === 0) {
-                    scene.remove(proj.mesh);
-                    if (proj.trail) {
-                        proj.trail.forEach(tp => scene.remove(tp));
+                // Piercing projectiles need a target OR an established direction to continue
+                if (!proj.target || !game.enemies.includes(proj.target)) {
+                    // If it's a piercing projectile that hasn't established a direction yet, remove it
+                    if (proj.pierceCount > 0 && !proj.direction) {
+                        scene.remove(proj.mesh);
+                        if (proj.beamMesh) scene.remove(proj.beamMesh);
+                        if (proj.trail) {
+                            proj.trail.forEach(tp => scene.remove(tp));
+                        }
+                        game.projectiles.splice(i, 1);
+                        continue;
                     }
-                    game.projectiles.splice(i, 1);
-                    continue;
+                    // If it's a non-piercing projectile, remove it
+                    if (proj.pierceCount === 0) {
+                        scene.remove(proj.mesh);
+                        if (proj.beamMesh) scene.remove(proj.beamMesh);
+                        if (proj.trail) {
+                            proj.trail.forEach(tp => scene.remove(tp));
+                        }
+                        game.projectiles.splice(i, 1);
+                        continue;
+                    }
                 }
                 
                 // Skip the targeting/distance calculation if this is a piercing projectile without a target
@@ -4517,6 +6271,56 @@
                             // Single target damage
                             const died = proj.target.takeDamage(proj.damage);
                             createHitEffect({ x: proj.target.position.x, y: 0.4, z: proj.target.position.z }, died);
+                            
+                            // Apply slow/freeze effect from Freezer tower
+                            if (proj.towerType === 'freezer' && !died) {
+                                const enemy = proj.target;
+                                
+                                // Add slow stacks
+                                enemy.slowStacks = Math.min(1.0, enemy.slowStacks + proj.slowAmount);
+                                // Reset duration timer every time enemy is hit
+                                enemy.slowDuration = proj.slowDuration;
+                                
+                                // Check if enemy should be frozen (100% slow)
+                                if (enemy.slowStacks >= 1.0 && proj.freezerTower && proj.freezerTower.freezeCooldown <= 0) {
+                                    enemy.isFrozen = true;
+                                    enemy.frozenDuration = 30; // 0.5 seconds (30 frames at 60fps)
+                                    
+                                    // Set cooldown on the tower
+                                    proj.freezerTower.freezeCooldown = proj.freezerTower.freezeCooldownTime;
+                                    
+                                    // Create freeze visual effect
+                                    if (!enemy.freezeEffect) {
+                                        const iceGeometry = new THREE.BoxGeometry(1.8, 2.0, 1.8);
+                                        const iceMaterial = new THREE.MeshBasicMaterial({ 
+                                            color: 0x88ddff,
+                                            transparent: true,
+                                            opacity: 0.5,
+                                            wireframe: true
+                                        });
+                                        enemy.freezeEffect = new THREE.Mesh(iceGeometry, iceMaterial);
+                                        enemy.freezeEffect.position.set(enemy.position.x, 0.8, enemy.position.z);
+                                        scene.add(enemy.freezeEffect);
+                                    }
+                                } else if (enemy.slowStacks > 0) {
+                                    // Update freeze effect for partial slow (not frozen)
+                                    if (!enemy.freezeEffect && !enemy.isFrozen) {
+                                        const iceGeometry = new THREE.BoxGeometry(1.6, 1.8, 1.6);
+                                        const iceMaterial = new THREE.MeshBasicMaterial({ 
+                                            color: 0x88ddff,
+                                            transparent: true,
+                                            opacity: 0.2 + (0.1 * enemy.slowStacks),
+                                            wireframe: true
+                                        });
+                                        enemy.freezeEffect = new THREE.Mesh(iceGeometry, iceMaterial);
+                                        enemy.freezeEffect.position.set(enemy.position.x, 0.8, enemy.position.z);
+                                        scene.add(enemy.freezeEffect);
+                                    } else if (enemy.freezeEffect && !enemy.isFrozen) {
+                                        // Update opacity based on slow amount
+                                        enemy.freezeEffect.material.opacity = 0.3 * enemy.slowStacks;
+                                    }
+                                }
+                            }
                             
                             if (died) {
                                 const idx = game.enemies.indexOf(proj.target);
@@ -4651,9 +6455,122 @@
                         
                         if (outOfBounds || traveledTooFar) {
                             scene.remove(proj.mesh);
+                            if (proj.beamMesh) scene.remove(proj.beamMesh);
                             if (proj.trail) proj.trail.forEach(tp => scene.remove(tp));
                             game.projectiles.splice(i, 1);
                         }
+                    }
+                } else if (proj.isMortar) {
+                    // Mortar projectile with arc trajectory
+                    // Cluster bombs progress faster (speed is already higher, but use better calculation)
+                    const progressIncrement = proj.isClusterBomb ? (proj.speed / 5) : (proj.speed / 10);
+                    proj.progress += progressIncrement;
+                    
+                    if (proj.progress >= 1.0) {
+                        // Reached target - create explosion
+                        const explosionPos = { x: proj.endPos.x, y: 0.4, z: proj.endPos.z };
+                        
+                        // Create explosion effect
+                        createExplosion(explosionPos, proj.splashRadius);
+                        
+                        // Damage all enemies in splash radius
+                        for (const enemy of game.enemies) {
+                            const dx = enemy.position.x - explosionPos.x;
+                            const dz = enemy.position.z - explosionPos.z;
+                            const dist = Math.sqrt(dx * dx + dz * dz);
+                            
+                            if (dist < proj.splashRadius) {
+                                const died = enemy.takeDamage(proj.damage);
+                                createHitEffect({ x: enemy.position.x, y: 0.4, z: enemy.position.z }, died);
+                                
+                                if (died) {
+                                    game.gold += enemy.value;
+                                    if (enemy.isBoss && enemy.bossType) {
+                                        game.defeatedBosses[enemy.bossType] = true;
+                                    }
+                                    if (enemy.die && typeof enemy.die === 'function') {
+                                        enemy.die();
+                                    } else {
+                                        enemy.destroy();
+                                    }
+                                    const enemyIndex = game.enemies.indexOf(enemy);
+                                    if (enemyIndex !== -1) {
+                                        game.enemies.splice(enemyIndex, 1);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Level 10: Create cluster bombs (only from main mortar, not from cluster bombs)
+                        if (proj.clusterBombs && !proj.isClusterBomb) {
+                            for (let c = 0; c < 6; c++) {
+                                const angle = (c / 6) * Math.PI * 2;
+                                const clusterDist = 2.5;
+                                const clusterPos = {
+                                    x: explosionPos.x + Math.cos(angle) * clusterDist,
+                                    z: explosionPos.z + Math.sin(angle) * clusterDist
+                                };
+                                
+                                // Create cluster bomb projectile - mini mortar style
+                                const clusterBomb = {
+                                    position: { x: explosionPos.x, y: 0.4, z: explosionPos.z },
+                                    damage: 350,
+                                    speed: 0.25, // Even faster than normal mortars
+                                    splashRadius: 1.5,
+                                    isClusterBomb: true,
+                                    isMortar: true, // Use mortar trajectory
+                                    arcHeight: 3.0, // Medium arc height
+                                    progress: 0,
+                                    startPos: { x: explosionPos.x, y: 0.4, z: explosionPos.z },
+                                    endPos: { x: clusterPos.x, y: 0.4, z: clusterPos.z },
+                                    target: null, // No homing for cluster bombs
+                                    clusterBombs: false // Prevent infinite cluster spawning
+                                };
+                                
+                                // Create cluster bomb mesh - gray like main mortar, but smaller
+                                const clusterGeometry = new THREE.OctahedronGeometry(0.15, 0);
+                                const clusterMaterial = new THREE.MeshLambertMaterial({ 
+                                    color: 0x4a4a4a,
+                                    emissive: 0x2a2a2a
+                                });
+                                clusterBomb.mesh = new THREE.Mesh(clusterGeometry, clusterMaterial);
+                                clusterBomb.mesh.position.set(explosionPos.x, 0.4, explosionPos.z);
+                                clusterBomb.mesh.castShadow = true;
+                                scene.add(clusterBomb.mesh);
+                                
+                                game.projectiles.push(clusterBomb);
+                                console.log('Created cluster bomb', c, 'at', explosionPos);
+                            }
+                        }
+                        
+                        // Remove mortar shell
+                        scene.remove(proj.mesh);
+                        game.projectiles.splice(i, 1);
+                    } else {
+                        // Smooth homing: adjust end position toward target's current position
+                        if (proj.target && proj.target.mesh) {
+                            // Stronger homing as projectile gets closer (guaranteed hit)
+                            // Increases from 5% early on to 25% near impact
+                            const homingFactor = 0.05 + (proj.progress * 0.20);
+                            proj.endPos.x += (proj.target.position.x - proj.endPos.x) * homingFactor;
+                            proj.endPos.z += (proj.target.position.z - proj.endPos.z) * homingFactor;
+                        }
+                        
+                        // Update position along arc
+                        const t = proj.progress;
+                        
+                        // Linear interpolation for x and z
+                        proj.position.x = proj.startPos.x + (proj.endPos.x - proj.startPos.x) * t;
+                        proj.position.z = proj.startPos.z + (proj.endPos.z - proj.startPos.z) * t;
+                        
+                        // Parabolic arc for y (peaks at middle)
+                        proj.position.y = proj.startPos.y + proj.arcHeight * Math.sin(t * Math.PI);
+                        
+                        proj.mesh.position.set(proj.position.x, proj.position.y, proj.position.z);
+                        
+                        // Rotate projectile to simulate tumbling
+                        proj.mesh.rotation.x += 0.1;
+                        proj.mesh.rotation.z += 0.05;
                     }
                 } else if (proj.target && game.enemies.includes(proj.target)) {
                     // Normal homing projectile movement toward target
@@ -4663,36 +6580,79 @@
                     
                     // Create fire trail for heavy projectiles and sniper projectiles
                     if (proj.towerType === 'heavy' || proj.towerType === 'sniper') {
-                        // Sniper has green fast particles, heavy has orange fire
-                        const trailColors = proj.towerType === 'sniper' 
-                            ? [0x00ff00, 0x00cc00, 0x00aa00] // Green shades for sniper
-                            : [0xff6600, 0xff9900, 0xffcc00]; // Orange/yellow for heavy
-                        const color = trailColors[Math.floor(Math.random() * trailColors.length)];
+                        // Max level heavy gunner creates beam from continuous circular projectiles
+                        if (proj.isMaxLevel && proj.sourceTower && proj.barrelOffset) {
+                            // Get current barrel position in world space
+                            const barrelWorldPos = proj.barrelOffset.clone();
+                            barrelWorldPos.applyMatrix4(proj.sourceTower.turret.matrixWorld);
+                            
+                            // Calculate beam from barrel to projectile position
+                            const beamDx = proj.position.x - barrelWorldPos.x;
+                            const beamDy = proj.position.y - barrelWorldPos.y;
+                            const beamDz = proj.position.z - barrelWorldPos.z;
+                            const beamLength = Math.sqrt(beamDx * beamDx + beamDy * beamDy + beamDz * beamDz);
+                            
+                            // Spawn fewer particles (optimized from 10 to 4)
+                            const particlesPerFrame = 4;
+                            for (let p = 0; p < particlesPerFrame; p++) {
+                                const t = p / particlesPerFrame; // Even spacing instead of random
+                                
+                                const trailColors = [0x00ccff, 0x00ffff, 0x33ccff, 0x66ddff];
+                                const color = trailColors[p % trailColors.length];
+                                
+                                // Lower poly sphere (6 segments instead of 8)
+                                const geometry = new THREE.SphereGeometry(0.1, 6, 6);
+                                const material = new THREE.MeshBasicMaterial({ 
+                                    color: color,
+                                    transparent: true,
+                                    opacity: 0.9
+                                });
+                                const beamParticle = new THREE.Mesh(geometry, material);
+                                
+                                // Position along the line from barrel to projectile
+                                beamParticle.position.set(
+                                    barrelWorldPos.x + beamDx * t,
+                                    barrelWorldPos.y + beamDy * t,
+                                    barrelWorldPos.z + beamDz * t
+                                );
+                                
+                                beamParticle.lifetime = 0;
+                                beamParticle.maxLifetime = 2; // Shorter lifetime (2 instead of 3)
+                                
+                                scene.add(beamParticle);
+                                proj.trail.push(beamParticle);
+                            }
+                        } else {
+                            // Normal particle trail for non-max level
+                            const trailColors = proj.towerType === 'sniper' 
+                                ? [0x00ff00, 0x00cc00, 0x00aa00]
+                                : [0xff6600, 0xff9900, 0xffcc00];
+                            const color = trailColors[Math.floor(Math.random() * trailColors.length)];
+                            
+                            const geometry = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+                            const material = new THREE.MeshBasicMaterial({ 
+                                color: color,
+                                transparent: true,
+                                opacity: 0.8
+                            });
+                            const trailParticle = new THREE.Mesh(geometry, material);
+                            trailParticle.position.set(
+                                proj.position.x + (Math.random() - 0.5) * 0.1,
+                                proj.position.y + (Math.random() - 0.5) * 0.1,
+                                proj.position.z + (Math.random() - 0.5) * 0.1
+                            );
+                            trailParticle.lifetime = 0;
+                            trailParticle.maxLifetime = proj.towerType === 'sniper' ? 5 : 15;
+                            
+                            scene.add(trailParticle);
+                            proj.trail.push(trailParticle);
+                        }
                         
-                        const geometry = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-                        const material = new THREE.MeshBasicMaterial({ 
-                            color: color,
-                            transparent: true,
-                            opacity: 0.8
-                        });
-                        const trailParticle = new THREE.Mesh(geometry, material);
-                        trailParticle.position.set(
-                            proj.position.x + (Math.random() - 0.5) * 0.1,
-                            proj.position.y + (Math.random() - 0.5) * 0.1,
-                            proj.position.z + (Math.random() - 0.5) * 0.1
-                        );
-                        trailParticle.lifetime = 0;
-                        // Sniper particles fade faster (3x speed)
-                        trailParticle.maxLifetime = proj.towerType === 'sniper' ? 5 : 15;
-                        
-                        scene.add(trailParticle);
-                        proj.trail.push(trailParticle);
-                        
+                        // Update trail particles
                         for (let t = proj.trail.length - 1; t >= 0; t--) {
                             const tp = proj.trail[t];
                             tp.lifetime++;
-                            tp.material.opacity = 0.8 * (1 - tp.lifetime / tp.maxLifetime);
-                            tp.scale.set(1 - tp.lifetime / tp.maxLifetime, 1 - tp.lifetime / tp.maxLifetime, 1 - tp.lifetime / tp.maxLifetime);
+                            tp.material.opacity = (proj.isMaxLevel ? 0.85 : 0.8) * (1 - tp.lifetime / tp.maxLifetime);
                             
                             if (tp.lifetime >= tp.maxLifetime) {
                                 scene.remove(tp);
@@ -4962,11 +6922,14 @@
                 if (enemy.healthBar) scene.remove(enemy.healthBar);
                 if (enemy.shield) scene.remove(enemy.shield);
                 if (enemy.freezeEffect) scene.remove(enemy.freezeEffect);
+                if (enemy.fireEffect) scene.remove(enemy.fireEffect);
             });
+            game.enemies = [];
             game.projectiles.forEach(proj => {
                 scene.remove(proj.mesh);
                 if (proj.trail) proj.trail.forEach(tp => scene.remove(tp));
             });
+            game.projectiles = [];
             
             // Clear steam particles
             steamParticles.forEach(particle => scene.remove(particle));
@@ -5042,7 +7005,23 @@
             game.mapExpanded = false;
             game.currentMapWidth = CONFIG.mapWidth;
             game.currentMapDepth = CONFIG.mapDepth;
+            game.wave = 1; // Reset wave counter
+            game.gold = 100; // Reset gold
+            game.health = 100; // Reset health
+            game.waveTimer = 0;
+            game.waveCleared = false;
+            game.waveClearTimer = 0;
+            game.lastBossType = -1; // Reset boss tracking
+            // Reset defeated bosses so special enemies don't spawn in wave 1
+            game.defeatedBosses = {
+                ranger: false,
+                shielder: false,
+                hidden: false,
+                flock: false
+            };
             game.grid = initGrid();
+            frameCount = 0; // Reset frame counter
+            demoTowerPlaced = false; // Reset demo state
         }
         
         // Next wave
@@ -5054,10 +7033,11 @@
                 expandMap();
             }
             
-            // Award gems every 5 waves
-            if (game.wave % 5 === 0 && !isDemoMode) {
+            // Award gems every 5 waves (but not if HARAMBE cheat was used)
+            if (game.wave % 5 === 0 && !isDemoMode && !game.harambeUsed) {
                 const gemReward = Math.floor(Math.random() * 5) + 1; // 1-5 gems
                 game.gems += gemReward;
+                saveGameData(); // Save after gem reward
                 
                 // Show gem reward message at bottom with glowing pink text
                 const message = document.getElementById('message');
@@ -5075,14 +7055,7 @@
                 game.wavesWithoutDamage++;
                 if (game.wavesWithoutDamage >= 3 && game.shieldHealth < game.maxShieldHealth) {
                     game.shieldHealth = game.maxShieldHealth;
-                    const message = document.getElementById('message');
-                    message.textContent = 'Shield Regenerated!';
-                    message.style.display = 'block';
-                    message.style.fontSize = '32px';
-                    message.style.color = '#3498db';
-                    setTimeout(() => {
-                        message.style.display = 'none';
-                    }, 1500);
+                    // Shield regenerated silently - no message
                 }
             }
             
@@ -5124,6 +7097,11 @@
             else if (tower.type === 'heavygunner') towerName = 'Heavy Gunner';
             else if (tower.type === 'heavy') towerName = 'Rocketeer';
             else if (tower.type === 'sniper') towerName = 'Sniper';
+            else if (tower.type === 'medic') towerName = 'Medic';
+            else if (tower.type === 'pyro') towerName = 'Pyrotechnician';
+            else if (tower.type === 'freezer') towerName = 'Freezer';
+            else if (tower.type === 'mortar') towerName = 'Mortar';
+            else if (tower.type === 'powerplant') towerName = 'Power Plant';
             
             // Add ammo counter to title for Light Gunner and Heavy Gunner
             let titleText = `${towerName} (Lvl ${tower.level})`;
@@ -5181,6 +7159,8 @@
             } else if (tower.type === 'basic' && nextLevel >= 4) {
                 nextHasHiddenDetection = true;
             } else if (tower.type === 'heavy' && nextLevel >= 5) {
+                nextHasHiddenDetection = true;
+            } else if (tower.type === 'pyro' && nextLevel >= 3) {
                 nextHasHiddenDetection = true;
             }
             
@@ -5279,6 +7259,90 @@
                     }
                 }
                 
+                // Show pyro changes
+                if (tower.type === 'pyro') {
+                    // Range increases by 1
+                    if (nextRange !== tower.range) {
+                        previewLines.push(`Range: +1`);
+                        hasChanges = true;
+                    }
+                    
+                    // Burning damage increases by 10
+                    const nextBurnDamage = tower.baseBurnDamage * nextLevel;
+                    previewLines.push(`<span style="color: #ff6600;">Burn Damage: +10/s</span>`);
+                    hasChanges = true;
+                    
+                    // Hidden detection at level 3
+                    if (nextLevel === 3) {
+                        previewLines.push(`<span style="color: #3498db;">Hidden Detection: True</span>`);
+                    }
+                }
+                
+                // Show freezer changes
+                if (tower.type === 'freezer') {
+                    // Range increases by 1
+                    if (nextRange !== tower.range) {
+                        previewLines.push(`Range: +1`);
+                        hasChanges = true;
+                    }
+                    
+                    // Slow amount changes
+                    let nextSlowAmount;
+                    if (nextLevel === 1 || nextLevel === 2) {
+                        nextSlowAmount = 0.25;
+                    } else if (nextLevel === 3) {
+                        nextSlowAmount = 0.50;
+                    } else if (nextLevel === 4) {
+                        nextSlowAmount = 0.75;
+                    } else {
+                        nextSlowAmount = 1.0;
+                    }
+                    
+                    if (nextSlowAmount !== tower.slowAmount) {
+                        const slowChange = ((nextSlowAmount - tower.slowAmount) * 100).toFixed(0);
+                        previewLines.push(`<span style="color: #00ccff;">Slow: +${slowChange}%</span>`);
+                        hasChanges = true;
+                    }
+                    
+                    // Fire rate improvement
+                    if (nextFireRate !== tower.fireRate) {
+                        const fireRateChange = ((60 / nextFireRate) - (60 / tower.fireRate)).toFixed(1);
+                        const sign = fireRateChange > 0 ? '+' : '';
+                        previewLines.push(`Fire Rate: ${sign}${fireRateChange}/s`);
+                        hasChanges = true;
+                    }
+                }
+                
+                // Show Power Plant changes
+                if (tower.type === 'powerplant') {
+                    // Income increases at each level
+                    let nextIncome;
+                    if (nextLevel === 2) {
+                        nextIncome = 10;
+                    } else if (nextLevel === 3) {
+                        nextIncome = 25;
+                    } else if (nextLevel === 4) {
+                        nextIncome = 50;
+                    } else if (nextLevel === 5) {
+                        nextIncome = 100;
+                    }
+                    
+                    if (nextIncome && nextIncome !== tower.incomePerSecond) {
+                        const incomeIncrease = nextIncome - tower.incomePerSecond;
+                        previewLines.push(`<span style="color: #00ff00;">Income: +${incomeIncrease}g/s</span>`);
+                        hasChanges = true;
+                    }
+                    
+                    // Type changes
+                    if (nextLevel === 3) {
+                        previewLines.push(`<span style="color: #ffcc00;">Type: Wind Turbine</span>`);
+                        hasChanges = true;
+                    } else if (nextLevel === 5) {
+                        previewLines.push(`<span style="color: #ffcc00;">Type: Nuclear Plant</span>`);
+                        hasChanges = true;
+                    }
+                }
+                
                 if (hasChanges) {
                     upgradePreview = '<br><span style="color: #4CAF50; font-size: 11px;">Next Level:</span><br><span style="font-size: 11px; color: #aaa;">';
                     upgradePreview += previewLines.join('<br>');
@@ -5313,8 +7377,54 @@
                 `;
             }
             
+            // Display burning info for pyro
+            let pyroInfo = '';
+            if (tower.type === 'pyro') {
+                pyroInfo = `
+                    <br><span style="color: #ff6600;">Burn: ${tower.burnDamage}/s for 5s</span>
+                    <br>Total Burn: ${tower.burnDamage * 5} HP
+                `;
+            }
+            
+            // Display slow/freeze info for freezer
+            let freezerInfo = '';
+            if (tower.type === 'freezer') {
+                const slowPercent = (tower.slowAmount * 100).toFixed(0);
+                
+                // Only show freeze status if tower can actually freeze (level 5 with 100% slow)
+                if (tower.slowAmount >= 1.0) {
+                    const freezeStatus = tower.freezeCooldown > 0 
+                        ? `<span style="color: #ff6666;">(Cooldown: ${(tower.freezeCooldown / 60).toFixed(1)}s)</span>` 
+                        : `<span style="color: #00ff00;">(Ready)</span>`;
+                    freezerInfo = `
+                        <br><span style="color: #00ccff;">Max Slow: ${slowPercent}%</span>
+                        <br>Freeze: ${freezeStatus}
+                    `;
+                } else {
+                    freezerInfo = `
+                        <br><span style="color: #00ccff;">Max Slow: ${slowPercent}%</span>
+                    `;
+                }
+            }
+            
+            // Display income info for Power Plant
+            let powerPlantInfo = '';
+            if (tower.type === 'powerplant') {
+                const levelName = tower.level <= 2 ? 'Water Turbine' : tower.level <= 4 ? 'Wind Turbine' : 'Nuclear Plant';
+                powerPlantInfo = `
+                    <br><span style="color: #ffcc00;">Type: ${levelName}</span>
+                    <br><span style="color: #00ff00;">Income: ${tower.incomePerSecond}g/s</span>
+                `;
+            }
+            
             const statsContent = tower.type === 'medic' 
                 ? `Range: ${rangeDisplay}${medicInfo}${upgradePreview}`
+                : tower.type === 'pyro'
+                ? `Range: ${rangeDisplay}${pyroInfo}${hiddenDetectionStatus}${upgradePreview}`
+                : tower.type === 'freezer'
+                ? `Damage: ${tower.damage}<br>Range: ${rangeDisplay}<br>Fire Rate: ${(60 / tower.fireRate).toFixed(1)}/s${freezerInfo}${upgradePreview}`
+                : tower.type === 'powerplant'
+                ? `${powerPlantInfo}${upgradePreview}`
                 : `Damage: ${tower.damage}${splashInfo}<br>Range: ${rangeDisplay}<br>Fire Rate: ${(60 / tower.fireRate).toFixed(1)}/s${pierceInfo}${ammoInfo}${hiddenDetectionStatus}${upgradePreview}`;
             
             document.getElementById('towerStats').innerHTML = statsContent;
@@ -5335,8 +7445,8 @@
             const targetingName = tower.targetingMode.charAt(0).toUpperCase() + tower.targetingMode.slice(1);
             targetingBtn.textContent = `Targeting: ${targetingName}`;
             
-            // Hide targeting button for medic (doesn't target enemies)
-            if (tower.type === 'medic') {
+            // Hide targeting button for medic and power plant (doesn't target enemies)
+            if (tower.type === 'medic' || tower.type === 'powerplant') {
                 targetingBtn.style.display = 'none';
             } else {
                 targetingBtn.style.display = 'block';
@@ -5372,8 +7482,13 @@
                 const clickedMesh = towerIntersects[0].object;
                 // Find the tower (might have clicked on turret or base)
                 let tower = clickedMesh.userData.tower;
-                if (!tower && clickedMesh.parent && clickedMesh.parent.userData.tower) {
+                if (!tower && clickedMesh.parent) {
+                    // Check parent for tower reference
                     tower = clickedMesh.parent.userData.tower;
+                    // Check parent's parent (for deeply nested decorations like power plant)
+                    if (!tower && clickedMesh.parent.parent) {
+                        tower = clickedMesh.parent.parent.userData.tower;
+                    }
                 }
                 if (tower) {
                     showTowerMenu(tower, event.clientX, event.clientY);
@@ -5399,6 +7514,14 @@
                     gridZ >= 0 && gridZ < game.currentMapDepth &&
                     game.grid[gridX][gridZ].walkable) {
                     
+                    // Prevent placing towers inside base area (shield radius of 2.2)
+                    const baseX = game.currentMapWidth - 2;
+                    const baseZ = game.currentMapDepth / 2;
+                    const distToBase = Math.sqrt(Math.pow(gridX + 0.5 - baseX, 2) + Math.pow(gridZ + 0.5 - baseZ, 2));
+                    if (distToBase < 2.5) {
+                        return; // Too close to base, can't place tower
+                    }
+                    
                     // Check if we can afford it
                     let cost = 0;
                     if (game.selectedTowerType === 'basic') cost = 50;
@@ -5407,6 +7530,9 @@
                     else if (game.selectedTowerType === 'heavy') cost = 100;
                     else if (game.selectedTowerType === 'sniper') cost = 150;
                     else if (game.selectedTowerType === 'medic') cost = 200;
+                    else if (game.selectedTowerType === 'freezer') cost = 125;
+                    else if (game.selectedTowerType === 'mortar') cost = 250;
+                    else if (game.selectedTowerType === 'powerplant') cost = 200;
                     
                     if (game.gold >= cost) {
                         // Place tower
@@ -5505,6 +7631,18 @@
             document.getElementById('medicTower').classList.add('active');
         });
         
+        document.getElementById('freezerTower').addEventListener('click', () => {
+            game.selectedTowerType = 'freezer';
+            document.querySelectorAll('.tower-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('freezerTower').classList.add('active');
+        });
+        
+        document.getElementById('powerPlantTower').addEventListener('click', () => {
+            game.selectedTowerType = 'powerplant';
+            document.querySelectorAll('.tower-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('powerPlantTower').classList.add('active');
+        });
+        
         // Retry button
         document.getElementById('retryBtn').addEventListener('click', retryGame);
         
@@ -5537,10 +7675,17 @@
                 const sellValue = tower.getSellValue();
                 game.gold += sellValue;
                 
-                // Mark grid as walkable again
-                const gridX = Math.floor(tower.position.x);
-                const gridZ = Math.floor(tower.position.z);
-                game.grid[gridX][gridZ].walkable = true;
+                // Mark all occupied tiles as walkable again (handles 2x2 towers)
+                if (tower.occupiedTiles) {
+                    tower.occupiedTiles.forEach(([x, z]) => {
+                        game.grid[x][z].walkable = true;
+                    });
+                } else {
+                    // Fallback for towers without occupiedTiles array
+                    const gridX = Math.floor(tower.position.x);
+                    const gridZ = Math.floor(tower.position.z);
+                    game.grid[gridX][gridZ].walkable = true;
+                }
                 
                 // Remove tower
                 const idx = game.towers.indexOf(tower);
@@ -5617,8 +7762,62 @@
             });
         });
         
+        // Cheat code: HARAMBE
+        let cheatSequence = [];
+        const cheatCode = ['h', 'a', 'r', 'a', 'm', 'b', 'e'];
+        
         // Capture key presses for keybind assignment
         document.addEventListener('keydown', (e) => {
+            // Track cheat code sequence (only when not setting keybinds)
+            if (!listeningForKey && !isPaused) {
+                const key = e.key.toLowerCase();
+                cheatSequence.push(key);
+                
+                // Keep only last 7 keys
+                if (cheatSequence.length > 7) {
+                    cheatSequence.shift();
+                }
+                
+                // Check if sequence matches HARAMBE
+                if (cheatSequence.length === 7) {
+                    let match = true;
+                    for (let i = 0; i < 7; i++) {
+                        if (cheatSequence[i] !== cheatCode[i]) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    
+                    if (match) {
+                        // Grant 777,777,777 gold
+                        game.gold += 777777777;
+                        game.harambeUsed = true; // Flag that cheat was used
+                        updateUI();
+                        cheatSequence = []; // Reset sequence
+                        
+                        // Show fullscreen Harambe image with 75% transparency
+                        const harambeOverlay = document.createElement('div');
+                        harambeOverlay.style.position = 'fixed';
+                        harambeOverlay.style.top = '0';
+                        harambeOverlay.style.left = '0';
+                        harambeOverlay.style.width = '100vw';
+                        harambeOverlay.style.height = '100vh';
+                        harambeOverlay.style.backgroundImage = 'url(Images/Harambe.png)';
+                        harambeOverlay.style.backgroundSize = 'contain';
+                        harambeOverlay.style.backgroundRepeat = 'no-repeat';
+                        harambeOverlay.style.backgroundPosition = 'center 90%';
+                        harambeOverlay.style.opacity = '0.2';
+                        harambeOverlay.style.zIndex = '9999';
+                        harambeOverlay.style.pointerEvents = 'none'; // Allow clicking through
+                        document.body.appendChild(harambeOverlay);
+                        
+                        setTimeout(() => {
+                            harambeOverlay.remove();
+                        }, 3000);
+                    }
+                }
+            }
+            
             // Handle escape key for pause menu and settings
             if (e.key === 'Escape' && !isDemoMode) {
                 e.preventDefault();
@@ -5669,12 +7868,27 @@
                 return;
             }
             
-            // Only handle game keys when not in demo mode and a tower is selected
+            // Number keys 1-5 for tower selection (works anytime, not just when tower selected)
+            const key = e.key;
+            if (['1', '2', '3', '4', '5'].includes(key) && !isDemoMode && !listeningForKey) {
+                const index = parseInt(key) - 1;
+                if (index < selectedTowerDeck.length) {
+                    const towerType = selectedTowerDeck[index];
+                    // Find button by ID (format: {type}Tower)
+                    const towerBtn = document.getElementById(`${towerType}Tower`);
+                    if (towerBtn) {
+                        towerBtn.click(); // Simulate clicking the tower button
+                    }
+                }
+                return;
+            }
+            
+            // Only handle other game keys when not in demo mode and a tower is selected
             if (isDemoMode || !game.selectedTower) return;
             
-            const key = e.key.toLowerCase();
+            const keyLower = e.key.toLowerCase();
             
-            if (key === keybinds.upgrade) {
+            if (keyLower === keybinds.upgrade) {
                 // Upgrade tower
                 const upgradeCost = game.selectedTower.getUpgradeCost();
                 const maxLevel = game.selectedTower.maxLevel || 5;
@@ -5753,6 +7967,9 @@
             if (!game.isGameOver && !isPaused) {
                 // Update steam particles from base
                 updateSteamParticles();
+                
+                // Update base shield visual
+                updateBaseShield();
                 
                 frameCount++;
                 
@@ -6119,6 +8336,18 @@
             document.body.classList.remove('demo-mode');
             document.getElementById('mainMenu').style.display = 'none';
             
+            // Reset defeated bosses FIRST before clearing anything
+            // This ensures special enemies don't spawn in wave 1
+            game.defeatedBosses = {
+                ranger: false,
+                shielder: false,
+                hidden: false,
+                flock: false
+            };
+            
+            // Reset HARAMBE cheat flag
+            game.harambeUsed = false;
+            
             // Clear demo towers
             game.towers.forEach(tower => {
                 scene.remove(tower.mesh);
@@ -6135,13 +8364,60 @@
                 if (enemy.healthBar) scene.remove(enemy.healthBar);
                 if (enemy.shield) scene.remove(enemy.shield);
                 if (enemy.freezeEffect) scene.remove(enemy.freezeEffect);
+                if (enemy.fireEffect) scene.remove(enemy.fireEffect);
             });
+            game.enemies = []; // Clear the array immediately
             
             // Clear projectiles
             game.projectiles.forEach(proj => {
                 scene.remove(proj.mesh);
                 if (proj.trail) proj.trail.forEach(tp => scene.remove(tp));
             });
+            game.projectiles = []; // Clear the array immediately
+            
+            // Reset map expansion if it was expanded
+            if (game.mapExpanded) {
+                // Remove expanded ground and grid
+                scene.remove(ground);
+                scene.remove(gridHelper);
+                
+                // Recreate original ground
+                const originalGroundGeometry = new THREE.PlaneGeometry(CONFIG.mapWidth, CONFIG.mapDepth);
+                ground = new THREE.Mesh(originalGroundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.set(CONFIG.mapWidth / 2, 0, CONFIG.mapDepth / 2);
+                ground.receiveShadow = true;
+                scene.add(ground);
+                
+                // Recreate original grid
+                gridHelper = new THREE.GridHelper(CONFIG.mapWidth, CONFIG.mapWidth, 0x000000, 0x000000);
+                gridHelper.position.set(CONFIG.mapWidth / 2, 0.01, CONFIG.mapDepth / 2);
+                gridHelper.material.opacity = 0.2;
+                gridHelper.material.transparent = true;
+                scene.add(gridHelper);
+                
+                // Reset camera zoom
+                const aspect = window.innerWidth / window.innerHeight;
+                camera.left = -10 * aspect;
+                camera.right = 10 * aspect;
+                camera.top = 10;
+                camera.bottom = -10;
+                camera.updateProjectionMatrix();
+                camera.position.set(CONFIG.mapWidth / 2, 20, CONFIG.mapDepth / 2 + 5);
+                camera.lookAt(CONFIG.mapWidth / 2, 0, CONFIG.mapDepth / 2);
+                
+                // Reset directional light shadow camera
+                directionalLight.shadow.camera.left = -15;
+                directionalLight.shadow.camera.right = 15;
+                directionalLight.shadow.camera.top = 15;
+                directionalLight.shadow.camera.bottom = -15;
+                directionalLight.shadow.camera.updateProjectionMatrix();
+                
+                // Reset base position
+                game.basePosition.x = CONFIG.mapWidth - 2;
+                game.basePosition.z = CONFIG.mapDepth / 2;
+                baseGroup.position.set(game.basePosition.x, 0, game.basePosition.z);
+            }
             
             // Reset game state
             game.towers = [];
@@ -6158,13 +8434,8 @@
             game.mapExpanded = false;
             game.currentMapWidth = CONFIG.mapWidth;
             game.currentMapDepth = CONFIG.mapDepth;
-            // Reset defeated bosses so special enemies don't spawn in early game
-            game.defeatedBosses = {
-                ranger: false,
-                shielder: false,
-                hidden: false,
-                flock: false
-            };
+            game.lastBossType = -1; // Reset boss tracking
+            // defeatedBosses already reset at the beginning of this function
             // Reset shield health if shield upgrade is owned
             if (game.upgrades.shield) {
                 game.shieldHealth = game.maxShieldHealth;
@@ -6243,8 +8514,9 @@
                 descDiv.textContent = tower.desc;
                 card.appendChild(descDiv);
                 
-                // Render 3D tower preview
-                const previewRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+                // Render 3D tower preview (optimized: no antialiasing, lower pixel ratio)
+                const previewRenderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
+                previewRenderer.setPixelRatio(1); // Fixed pixel ratio instead of window.devicePixelRatio
                 previewRenderer.setSize(200, 200);
                 const preview = createTowerPreview(tower.type);
                 
@@ -6335,6 +8607,12 @@
         document.getElementById('upgradesBtn').addEventListener('click', () => {
             document.getElementById('upgradeShop').classList.add('active');
             updateShopDisplay();
+            // Initialize factory 3D scene if not already created
+            setTimeout(() => {
+                if (!factoryScene) {
+                    initFactory3D();
+                }
+            }, 100);
         });
         
         document.getElementById('settingsBtn').addEventListener('click', () => {
@@ -6443,6 +8721,8 @@
                 game.gems -= 10;
                 game.upgrades.shield = true;
                 game.shieldHealth = game.maxShieldHealth;
+                saveGameData(); // Save after purchase
+                updateBaseShield(); // Show shield visual immediately
                 updateShopDisplay();
                 updateUI();
             }
@@ -6452,6 +8732,7 @@
             if (game.gems >= 10 && !game.upgrades.freeze) {
                 game.gems -= 10;
                 game.upgrades.freeze = true;
+                saveGameData(); // Save after purchase
                 updateShopDisplay();
                 updateUI();
             }
@@ -7296,16 +9577,7 @@
             fireParticles = [];
         }
         
-        // Initialize factory when shop opens
-        document.getElementById('upgradesBtn').addEventListener('click', () => {
-            setTimeout(() => {
-                if (!factoryScene) {
-                    initFactory3D();
-                }
-            }, 100);
-        });
-        
-        // Handle window resize
+        // Handle window resize for factory
         window.addEventListener('resize', () => {
             if (factoryCamera && factoryRenderer) {
                 factoryCamera.aspect = window.innerWidth / window.innerHeight;
