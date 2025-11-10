@@ -1125,68 +1125,135 @@
             
             // Base platform with detail
             const levelScale = 1 + (maxLevel - 1) * 0.2;
-            const baseGeometry = new THREE.CylinderGeometry(0.5, 0.55, 0.15, 16);
-            const baseMaterial = new THREE.MeshStandardMaterial({ 
-                color: accentColor,
-                metalness: 0.5,
-                roughness: 0.3
-            });
-            const basePlatform = new THREE.Mesh(baseGeometry, baseMaterial);
-            basePlatform.position.y = 0.075;
-            previewScene.add(basePlatform);
-            
-            // Main tower body (taller and more detailed)
-            const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.45, 0.6 * levelScale, 16);
-            const bodyMaterial = new THREE.MeshStandardMaterial({ 
-                color: towerColor,
-                metalness: 0.6,
-                roughness: 0.4
-            });
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.y = 0.3 * levelScale + 0.15;
-            previewScene.add(body);
-            
-            // Add panel details to body
-            for (let i = 0; i < 4; i++) {
-                const angle = (Math.PI / 2) * i;
-                const panelGeometry = new THREE.BoxGeometry(0.35, 0.4 * levelScale, 0.05);
-                const panelMaterial = new THREE.MeshStandardMaterial({ 
+            if (type === 'mortar') {
+                // Use the default generic preview model for mortar
+                const baseGeometry = new THREE.CylinderGeometry(0.5, 0.55, 0.15, 16);
+                const baseMaterial = new THREE.MeshStandardMaterial({ 
                     color: accentColor,
+                    metalness: 0.5,
+                    roughness: 0.3
+                });
+                const basePlatform = new THREE.Mesh(baseGeometry, baseMaterial);
+                basePlatform.position.y = 0.075;
+                previewScene.add(basePlatform);
+                
+                // Main tower body (taller and more detailed)
+                const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.45, 0.6 * levelScale, 16);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                    color: towerColor,
+                    metalness: 0.6,
+                    roughness: 0.4
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 0.3 * levelScale + 0.15;
+                previewScene.add(body);
+                
+                // Add panel details to body
+                for (let i = 0; i < 4; i++) {
+                    const angle = (Math.PI / 2) * i;
+                    const panelGeometry = new THREE.BoxGeometry(0.35, 0.4 * levelScale, 0.05);
+                    const panelMaterial = new THREE.MeshStandardMaterial({ 
+                        color: accentColor,
+                        metalness: 0.7,
+                        roughness: 0.3
+                    });
+                    const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+                    panel.position.set(
+                        Math.cos(angle) * 0.42,
+                        0.3 * levelScale + 0.15,
+                        Math.sin(angle) * 0.42
+                    );
+                    panel.rotation.y = angle;
+                    previewScene.add(panel);
+                }
+                
+                // Top ring detail
+                const topRingGeometry = new THREE.TorusGeometry(0.42, 0.04, 8, 16);
+                const topRingMaterial = new THREE.MeshStandardMaterial({ 
+                    color: accentColor,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const topRing = new THREE.Mesh(topRingGeometry, topRingMaterial);
+                topRing.position.y = 0.6 * levelScale + 0.15;
+                topRing.rotation.x = Math.PI / 2;
+                previewScene.add(topRing);
+                
+                // Turret mount
+                const mountGeometry = new THREE.CylinderGeometry(0.25, 0.28, 0.15, 16);
+                const mountMaterial = new THREE.MeshStandardMaterial({ 
+                    color: towerColor,
                     metalness: 0.7,
                     roughness: 0.3
                 });
-                const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-                panel.position.set(
-                    Math.cos(angle) * 0.42,
-                    0.3 * levelScale + 0.15,
-                    Math.sin(angle) * 0.42
-                );
-                panel.rotation.y = angle;
-                previewScene.add(panel);
+                const mount = new THREE.Mesh(mountGeometry, mountMaterial);
+                mount.position.y = 0.675 * levelScale + 0.15;
+                previewScene.add(mount);
+            } else {
+                // Default: previous generic preview
+                const baseGeometry = new THREE.CylinderGeometry(0.5, 0.55, 0.15, 16);
+                const baseMaterial = new THREE.MeshStandardMaterial({ 
+                    color: accentColor,
+                    metalness: 0.5,
+                    roughness: 0.3
+                });
+                const basePlatform = new THREE.Mesh(baseGeometry, baseMaterial);
+                basePlatform.position.y = 0.075;
+                previewScene.add(basePlatform);
+                
+                // Main tower body (taller and more detailed)
+                const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.45, 0.6 * levelScale, 16);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                    color: towerColor,
+                    metalness: 0.6,
+                    roughness: 0.4
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 0.3 * levelScale + 0.15;
+                previewScene.add(body);
+                
+                // Add panel details to body
+                for (let i = 0; i < 4; i++) {
+                    const angle = (Math.PI / 2) * i;
+                    const panelGeometry = new THREE.BoxGeometry(0.35, 0.4 * levelScale, 0.05);
+                    const panelMaterial = new THREE.MeshStandardMaterial({ 
+                        color: accentColor,
+                        metalness: 0.7,
+                        roughness: 0.3
+                    });
+                    const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+                    panel.position.set(
+                        Math.cos(angle) * 0.42,
+                        0.3 * levelScale + 0.15,
+                        Math.sin(angle) * 0.42
+                    );
+                    panel.rotation.y = angle;
+                    previewScene.add(panel);
+                }
+                
+                // Top ring detail
+                const topRingGeometry = new THREE.TorusGeometry(0.42, 0.04, 8, 16);
+                const topRingMaterial = new THREE.MeshStandardMaterial({ 
+                    color: accentColor,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const topRing = new THREE.Mesh(topRingGeometry, topRingMaterial);
+                topRing.position.y = 0.6 * levelScale + 0.15;
+                topRing.rotation.x = Math.PI / 2;
+                previewScene.add(topRing);
+                
+                // Turret mount
+                const mountGeometry = new THREE.CylinderGeometry(0.25, 0.28, 0.15, 16);
+                const mountMaterial = new THREE.MeshStandardMaterial({ 
+                    color: towerColor,
+                    metalness: 0.7,
+                    roughness: 0.3
+                });
+                const mount = new THREE.Mesh(mountGeometry, mountMaterial);
+                mount.position.y = 0.675 * levelScale + 0.15;
+                previewScene.add(mount);
             }
-            
-            // Top ring detail
-            const topRingGeometry = new THREE.TorusGeometry(0.42, 0.04, 8, 16);
-            const topRingMaterial = new THREE.MeshStandardMaterial({ 
-                color: accentColor,
-                metalness: 0.8,
-                roughness: 0.2
-            });
-            const topRing = new THREE.Mesh(topRingGeometry, topRingMaterial);
-            topRing.position.y = 0.6 * levelScale + 0.15;
-            topRing.rotation.x = Math.PI / 2;
-            previewScene.add(topRing);
-            
-            // Turret mount
-            const mountGeometry = new THREE.CylinderGeometry(0.25, 0.28, 0.15, 16);
-            const mountMaterial = new THREE.MeshStandardMaterial({ 
-                color: towerColor,
-                metalness: 0.7,
-                roughness: 0.3
-            });
-            const mount = new THREE.Mesh(mountGeometry, mountMaterial);
-            mount.position.y = 0.675 * levelScale + 0.15;
-            previewScene.add(mount);
             
             // Type-specific turrets with much more detail
             if (type === 'basic') {
@@ -4661,10 +4728,10 @@
                             shell.position.set(Math.cos(angle) * 0.7, 0.35, Math.sin(angle) * 0.7);
                             this.mesh.add(shell);
                             this.decorations.push(shell);
-                            
-                            // Shell tips (brass colored)
+
+                            // Shell tips (brass colored, glowing yellow)
                             const tipGeometry = new THREE.ConeGeometry(0.08, 0.1, 8);
-                            const tipMaterial = new THREE.MeshLambertMaterial({ color: 0xb8860b, emissive: 0x886608 });
+                            const tipMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00, emissive: 0xffff66, emissiveIntensity: 1.5 });
                             const tip = new THREE.Mesh(tipGeometry, tipMaterial);
                             tip.position.set(Math.cos(angle) * 0.7, 0.6, Math.sin(angle) * 0.7);
                             this.mesh.add(tip);
@@ -4998,125 +5065,65 @@
                     return; // Power Plant generates income, doesn't need to target
                 }
                 
-                // Find target enemy based on targeting mode
+                // --- Begin: Dual-target logic for level 10 mortar ---
                 let targetEnemy = null;
-                
-                if (this.targetingMode === 'first') {
-                    // Target enemy furthest along path
-                    let maxProgress = -1;
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range && enemy.pathIndex > maxProgress) {
-                            targetEnemy = enemy;
-                            maxProgress = enemy.pathIndex;
-                        }
-                    }
-                } else if (this.targetingMode === 'closest') {
-                    // Target nearest enemy
-                    let minDist = Infinity;
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range && dist < minDist) {
-                            targetEnemy = enemy;
-                            minDist = dist;
-                        }
-                    }
-                } else if (this.targetingMode === 'strongest') {
-                    // Target enemy with most health
-                    let maxHealth = -1;
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range && enemy.health > maxHealth) {
-                            targetEnemy = enemy;
-                            maxHealth = enemy.health;
-                        }
-                    }
-                } else if (this.targetingMode === 'weakest') {
-                    // Target enemy with least health
-                    let minHealth = Infinity;
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range && enemy.health < minHealth) {
-                            targetEnemy = enemy;
-                            minHealth = enemy.health;
-                        }
-                    }
-                } else if (this.targetingMode === 'furthest') {
-                    // Target enemy furthest from tower
-                    let maxDist = -1;
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range && dist > maxDist) {
-                            targetEnemy = enemy;
-                            maxDist = dist;
-                        }
-                    }
-                } else if (this.targetingMode === 'last') {
-                    // Target enemy least along path
-                    let minProgress = Infinity;
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range && enemy.pathIndex < minProgress) {
-                            targetEnemy = enemy;
-                            minProgress = enemy.pathIndex;
-                        }
-                    }
-                } else if (this.targetingMode === 'random') {
-                    // Target random enemy in range
-                    const validEnemies = [];
-                    for (const enemy of game.enemies) {
-                        // Skip hidden enemies unless tower has hidden detection
-                        if (enemy.isHidden && !this.hasHiddenDetection) continue;
-                        
-                        const dx = enemy.position.x - this.position.x;
-                        const dz = enemy.position.z - this.position.z;
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        
-                        if (dist < this.range) {
-                            validEnemies.push(enemy);
-                        }
-                    }
-                    if (validEnemies.length > 0) {
-                        targetEnemy = validEnemies[Math.floor(Math.random() * validEnemies.length)];
+                let secondTarget = null;
+                let validEnemies = [];
+                // Gather all valid enemies in range
+                for (const enemy of game.enemies) {
+                    if (enemy.isHidden && !this.hasHiddenDetection) continue;
+                    const dx = enemy.position.x - this.position.x;
+                    const dz = enemy.position.z - this.position.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    if (dist < this.range) {
+                        validEnemies.push(enemy);
                     }
                 }
-                
+                // Sort validEnemies according to targetingMode
+                if (this.targetingMode === 'first') {
+                    validEnemies.sort((a, b) => b.pathIndex - a.pathIndex);
+                } else if (this.targetingMode === 'closest') {
+                    validEnemies.sort((a, b) => {
+                        const da = Math.hypot(a.position.x - this.position.x, a.position.z - this.position.z);
+                        const db = Math.hypot(b.position.x - this.position.x, b.position.z - this.position.z);
+                        return da - db;
+                    });
+                } else if (this.targetingMode === 'strongest') {
+                    validEnemies.sort((a, b) => b.health - a.health);
+                } else if (this.targetingMode === 'weakest') {
+                    validEnemies.sort((a, b) => a.health - b.health);
+                } else if (this.targetingMode === 'furthest') {
+                    validEnemies.sort((a, b) => {
+                        const da = Math.hypot(a.position.x - this.position.x, a.position.z - this.position.z);
+                        const db = Math.hypot(b.position.x - this.position.x, b.position.z - this.position.z);
+                        return db - da;
+                    });
+                } else if (this.targetingMode === 'last') {
+                    validEnemies.sort((a, b) => a.pathIndex - b.pathIndex);
+                } else if (this.targetingMode === 'random') {
+                    // Shuffle array
+                    for (let i = validEnemies.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [validEnemies[i], validEnemies[j]] = [validEnemies[j], validEnemies[i]];
+                    }
+                }
+
+                if (this.type === 'mortar' && this.level === 10) {
+                    // Fire at up to two unique targets
+                    if (validEnemies.length > 0) {
+                        targetEnemy = validEnemies[0];
+                    }
+                    if (validEnemies.length > 1) {
+                        secondTarget = validEnemies[1];
+                    }
+                } else {
+                    // Normal single-target logic
+                    if (validEnemies.length > 0) {
+                        targetEnemy = validEnemies[0];
+                    }
+                }
+                // --- End: Dual-target logic for level 10 mortar ---
+
                 if (targetEnemy) {
                     // Pyrotechnician has special constant beam behavior
                     if (this.type === 'pyro') {
@@ -5149,18 +5156,27 @@
                         }
                     }
                     
+
                     // Aim at enemy (skip for mortar - it doesn't rotate)
-                    if (this.turret) {
+                    if (this.turret && this.type !== 'mortar') {
                         const angle = Math.atan2(
                             targetEnemy.position.x - this.position.x,
                             targetEnemy.position.z - this.position.z
                         );
                         this.turret.rotation.y = angle;
                     }
-                    
-                    // Shoot
-                    this.shoot(targetEnemy);
-                    this.cooldown = this.fireRate;
+
+                    // --- Begin: Dual-shot for level 10 mortar ---
+                    if (this.type === 'mortar' && this.level === 10) {
+                        if (targetEnemy) this.shoot(targetEnemy);
+                        if (secondTarget && secondTarget !== targetEnemy) this.shoot(secondTarget);
+                        this.cooldown = this.fireRate;
+                    } else {
+                        // Normal single shot
+                        this.shoot(targetEnemy);
+                        this.cooldown = this.fireRate;
+                    }
+                    // --- End: Dual-shot for level 10 mortar ---
                     
                     // Consume ammo for Light Gunner
                     if (this.type === 'fast' && this.level < 5) {
@@ -5649,11 +5665,16 @@
                 }, 1000);
             } else {
                 // Normal wave - more enemies and faster spawning
-                const enemyCount = 3 + game.wave * 2; // Start with 3 base, increase by 2 per wave
-                // Much faster spawning after wave 5
-                const spawnInterval = game.wave <= 5 
+
+                // --- HARAMBE cheat: double enemies and double spawn rate ---
+                let enemyCount = 3 + game.wave * 2; // Start with 3 base, increase by 2 per wave
+                let spawnInterval = game.wave <= 5 
                     ? Math.max(300, 1000 - game.wave * 20) 
                     : Math.max(100, 500 - (game.wave - 5) * 15); // Very fast after wave 5
+                if (game.harambeUsed) {
+                    enemyCount *= 2;
+                    spawnInterval = Math.max(30, Math.floor(spawnInterval / 2));
+                }
                 
                 // Determine gold per kill based on wave
                 const goldPerKill = game.wave > 10 ? 10 : CONFIG.goldPerKill;
