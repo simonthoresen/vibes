@@ -3583,11 +3583,11 @@
                     this.mesh.add(this.turret);
                 }
                 
-                // Health bar - position below tower
+                // Health bar - position above tower
                 const hpGeometry = new THREE.PlaneGeometry(0.8, 0.1);
                 const hpMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
                 this.healthBar = new THREE.Mesh(hpGeometry, hpMaterial);
-                this.healthBar.position.set(x, 2.5, z);
+                this.healthBar.position.set(x, 3.5, z); // Higher position to avoid intersecting
                 this.healthBar.rotation.x = -Math.PI / 4;
                 scene.add(this.healthBar);
                 
@@ -4533,37 +4533,11 @@
                             this.decorations.push(leg);
                         }
                     } else if (level === 6) {
-                        // Rangefinder equipment
-                        for (let i = 0; i < 2; i++) {
-                            const angle = i * Math.PI;
-                            const finderGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.2, 8);
-                            const finderMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, emissive: 0x00ff00 });
-                            const finder = new THREE.Mesh(finderGeometry, finderMaterial);
-                            finder.position.set(Math.cos(angle) * 0.35, 0.7, Math.sin(angle) * 0.35);
-                            this.mesh.add(finder);
-                            this.decorations.push(finder);
-                        }
+                        // Level 6 decorations removed for cleaner look
                     } else if (level === 7) {
-                        // Targeting laser array
-                        for (let i = 0; i < 4; i++) {
-                            const angle = (Math.PI / 2) * i;
-                            const laserGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6);
-                            const laserMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 });
-                            const laser = new THREE.Mesh(laserGeometry, laserMaterial);
-                            laser.position.set(Math.cos(angle) * 0.3, 0.8, Math.sin(angle) * 0.3);
-                            this.mesh.add(laser);
-                            this.decorations.push(laser);
-                        }
+                        // Level 7 decorations removed for cleaner look
                     } else if (level === 8) {
-                        // Radar dish on side - spinning
-                        const dishGeometry = new THREE.CylinderGeometry(0.2, 0.1, 0.08, 12);
-                        const dishMaterial = new THREE.MeshLambertMaterial({ color: 0x2874a6, emissive: 0x154360 });
-                        const dish = new THREE.Mesh(dishGeometry, dishMaterial);
-                        dish.position.set(0.4, 0.6, 0);
-                        dish.userData.animationType = 'spin';
-                        dish.userData.spinSpeed = 0.06;
-                        this.mesh.add(dish);
-                        this.decorations.push(dish);
+                        // Level 8 decorations removed for cleaner look
                     } else if (level === 9) {
                         // Cooling vents with steam effect
                         for (let i = 0; i < 6; i++) {
@@ -4600,58 +4574,123 @@
                             this.decorations.push(leg);
                         }
                         
-                        // Massive mortar tube
+                        // Massive mortar tube (this will be the recoiling barrel at level 10)
                         const mortarGeometry = new THREE.CylinderGeometry(0.25, 0.28, 1.5, 12);
                         const mortarMaterial = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, emissive: 0x0a0a0a });
                         const mortarTube = new THREE.Mesh(mortarGeometry, mortarMaterial);
                         mortarTube.position.set(0, 0.8, 0);
                         mortarTube.rotation.z = 0; // Pointing straight up
+                        mortarTube.castShadow = true;
                         this.mesh.add(mortarTube);
                         this.decorations.push(mortarTube);
                         
-                        // Hide the original barrel since we have the big one now
+                        // Replace the mortarBarrel reference with the big tube for recoil animation
                         if (this.mortarBarrel) {
                             this.mortarBarrel.visible = false;
                         }
+                        // Set the big tube as the new recoiling barrel
+                        this.mortarBarrel = mortarTube;
+                        this.mortarBarrel.userData.baseY = 0.8;
+                        this.mortarBarrel.userData.recoilAmount = 0;
                         
-                        // Barrel reinforcement rings
-                        for (let i = 0; i < 4; i++) {
-                            const ringGeometry = new THREE.TorusGeometry(0.26, 0.04, 6, 12);
-                            const ringMaterial = new THREE.MeshLambertMaterial({ color: 0x666666, emissive: 0x333333 });
-                            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-                            ring.position.y = 0.8 + i * 0.15;
-                            ring.rotation.z = 0; // Straight up with the tube
-                            ring.rotation.y = Math.PI / 2;
-                            this.mesh.add(ring);
-                            this.decorations.push(ring);
+                        // Barrel bands (3 metal bands around the barrel) - attached to barrel so they recoil
+                        for (let i = 0; i < 3; i++) {
+                            const bandGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.08, 12);
+                            const bandMaterial = new THREE.MeshLambertMaterial({ color: 0x555555, emissive: 0x222222 });
+                            const band = new THREE.Mesh(bandGeometry, bandMaterial);
+                            band.position.y = 0.2 + i * 0.25; // Relative to barrel position
+                            this.mortarBarrel.add(band); // Add to barrel instead of mesh
+                            this.decorations.push(band);
                         }
                         
-                        // Large ammo shells stacked around base
+                        // Elevation gears on sides (mechanical details)
+                        for (let i = 0; i < 2; i++) {
+                            const angle = i * Math.PI;
+                            const gearGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8);
+                            const gearMaterial = new THREE.MeshLambertMaterial({ color: 0x444444, emissive: 0x222222 });
+                            const gear = new THREE.Mesh(gearGeometry, gearMaterial);
+                            gear.position.set(Math.cos(angle) * 0.4, 0.5, Math.sin(angle) * 0.4);
+                            gear.rotation.z = Math.PI / 2;
+                            this.mesh.add(gear);
+                            this.decorations.push(gear);
+                            
+                            // Gear teeth details
+                            for (let j = 0; j < 8; j++) {
+                                const toothAngle = (j / 8) * Math.PI * 2;
+                                const toothGeometry = new THREE.BoxGeometry(0.04, 0.08, 0.02);
+                                const toothMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+                                const tooth = new THREE.Mesh(toothGeometry, toothMaterial);
+                                tooth.position.set(
+                                    Math.cos(angle) * 0.4 + Math.cos(toothAngle) * 0.13,
+                                    0.5 + Math.sin(toothAngle) * 0.13,
+                                    Math.sin(angle) * 0.4
+                                );
+                                tooth.rotation.z = toothAngle + Math.PI / 2;
+                                this.mesh.add(tooth);
+                                this.decorations.push(tooth);
+                            }
+                        }
+                        
+                        // Heavy ammo crates stacked on platform
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 2) * i + Math.PI / 4;
+                            const crateGeometry = new THREE.BoxGeometry(0.18, 0.15, 0.18);
+                            const crateMaterial = new THREE.MeshLambertMaterial({ color: 0x5a4a3a, emissive: 0x3a2a1a });
+                            const crate = new THREE.Mesh(crateGeometry, crateMaterial);
+                            crate.position.set(Math.cos(angle) * 0.55, 0.25, Math.sin(angle) * 0.55);
+                            crate.rotation.y = angle;
+                            this.mesh.add(crate);
+                            this.decorations.push(crate);
+                            
+                            // Metal straps on crates
+                            const strapGeometry = new THREE.BoxGeometry(0.19, 0.02, 0.19);
+                            const strapMaterial = new THREE.MeshLambertMaterial({ color: 0x777777 });
+                            const strap = new THREE.Mesh(strapGeometry, strapMaterial);
+                            strap.position.set(Math.cos(angle) * 0.55, 0.3, Math.sin(angle) * 0.55);
+                            strap.rotation.y = angle;
+                            this.mesh.add(strap);
+                            this.decorations.push(strap);
+                        }
+                        
+                        // Large ammo shells standing upright
                         for (let i = 0; i < 8; i++) {
                             const angle = (Math.PI * 2 / 8) * i;
-                            const shellGeometry = new THREE.CylinderGeometry(0.1, 0.12, 0.35, 8);
+                            const shellGeometry = new THREE.CylinderGeometry(0.08, 0.1, 0.4, 8);
                             const shellMaterial = new THREE.MeshLambertMaterial({ color: 0x7a5c3d, emissive: 0x4a3825 });
                             const shell = new THREE.Mesh(shellGeometry, shellMaterial);
-                            shell.position.set(Math.cos(angle) * 0.6, 0.3, Math.sin(angle) * 0.6);
+                            shell.position.set(Math.cos(angle) * 0.7, 0.35, Math.sin(angle) * 0.7);
                             this.mesh.add(shell);
                             this.decorations.push(shell);
+                            
+                            // Shell tips (brass colored)
+                            const tipGeometry = new THREE.ConeGeometry(0.08, 0.1, 8);
+                            const tipMaterial = new THREE.MeshLambertMaterial({ color: 0xb8860b, emissive: 0x886608 });
+                            const tip = new THREE.Mesh(tipGeometry, tipMaterial);
+                            tip.position.set(Math.cos(angle) * 0.7, 0.6, Math.sin(angle) * 0.7);
+                            this.mesh.add(tip);
+                            this.decorations.push(tip);
                         }
                         
-                        // Targeting computer on side
-                        const computerGeometry = new THREE.BoxGeometry(0.2, 0.25, 0.15);
-                        const computerMaterial = new THREE.MeshLambertMaterial({ color: 0x2874a6, emissive: 0x00ff00 });
-                        const computer = new THREE.Mesh(computerGeometry, computerMaterial);
-                        computer.position.set(0.5, 0.7, 0);
-                        this.mesh.add(computer);
-                        this.decorations.push(computer);
+                        // Hydraulic pistons (recoil absorbers)
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 4) + (Math.PI / 2) * i;
+                            const pistonGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
+                            const pistonMaterial = new THREE.MeshLambertMaterial({ color: 0x333333, emissive: 0xff6600 });
+                            const piston = new THREE.Mesh(pistonGeometry, pistonMaterial);
+                            piston.position.set(Math.cos(angle) * 0.35, 0.35, Math.sin(angle) * 0.35);
+                            piston.rotation.z = Math.cos(angle) * 0.3;
+                            piston.rotation.x = Math.sin(angle) * 0.3;
+                            this.mesh.add(piston);
+                            this.decorations.push(piston);
+                        }
                         
-                        // Warning lights - fast blinking
+                        // Warning lights - fast blinking (on platform edge)
                         for (let i = 0; i < 4; i++) {
                             const angle = (Math.PI / 2) * i;
                             const lightGeometry = new THREE.SphereGeometry(0.08, 8, 8);
                             const lightMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.9 });
                             const light = new THREE.Mesh(lightGeometry, lightMaterial);
-                            light.position.set(Math.cos(angle) * 0.75, 0.9, Math.sin(angle) * 0.75);
+                            light.position.set(Math.cos(angle) * 0.85, 0.2, Math.sin(angle) * 0.85);
                             light.userData.animationType = 'blink';
                             light.userData.blinkSpeed = 0.12;
                             light.userData.blinkOffset = i * (Math.PI / 2);
@@ -4912,7 +4951,7 @@
                 const baseHeight = 0.5; // Base tower height
                 const scaledHeight = baseHeight * this.mesh.scale.y;
                 const towerTop = 0.25 + scaledHeight; // Base position + scaled height
-                this.healthBar.position.y = towerTop + 0.3; // 0.3 above tower top
+                this.healthBar.position.y = towerTop + 0.8; // Higher offset to stay above decorations
                 
                 // Animate decorations
                 this.decorations.forEach(decoration => {
@@ -6473,6 +6512,11 @@
                         // Create explosion effect
                         createExplosion(explosionPos, proj.splashRadius);
                         
+                        // Debug logging for cluster bombs
+                        if (!proj.isClusterBomb) {
+                            console.log('Main mortar exploded, clusterBombs:', proj.clusterBombs);
+                        }
+                        
                         // Damage all enemies in splash radius
                         for (const enemy of game.enemies) {
                             const dx = enemy.position.x - explosionPos.x;
@@ -6502,45 +6546,49 @@
                         }
                         
                         // Level 10: Create cluster bombs (only from main mortar, not from cluster bombs)
+                        // Spawn them after a short delay so they appear after the main explosion
                         if (proj.clusterBombs && !proj.isClusterBomb) {
-                            for (let c = 0; c < 6; c++) {
-                                const angle = (c / 6) * Math.PI * 2;
-                                const clusterDist = 2.5;
-                                const clusterPos = {
-                                    x: explosionPos.x + Math.cos(angle) * clusterDist,
-                                    z: explosionPos.z + Math.sin(angle) * clusterDist
-                                };
-                                
-                                // Create cluster bomb projectile - mini mortar style
-                                const clusterBomb = {
-                                    position: { x: explosionPos.x, y: 0.4, z: explosionPos.z },
-                                    damage: 350,
-                                    speed: 0.25, // Even faster than normal mortars
-                                    splashRadius: 1.5,
-                                    isClusterBomb: true,
-                                    isMortar: true, // Use mortar trajectory
-                                    arcHeight: 3.0, // Medium arc height
-                                    progress: 0,
-                                    startPos: { x: explosionPos.x, y: 0.4, z: explosionPos.z },
-                                    endPos: { x: clusterPos.x, y: 0.4, z: clusterPos.z },
-                                    target: null, // No homing for cluster bombs
-                                    clusterBombs: false // Prevent infinite cluster spawning
-                                };
-                                
-                                // Create cluster bomb mesh - gray like main mortar, but smaller
-                                const clusterGeometry = new THREE.OctahedronGeometry(0.15, 0);
-                                const clusterMaterial = new THREE.MeshLambertMaterial({ 
-                                    color: 0x4a4a4a,
-                                    emissive: 0x2a2a2a
-                                });
-                                clusterBomb.mesh = new THREE.Mesh(clusterGeometry, clusterMaterial);
-                                clusterBomb.mesh.position.set(explosionPos.x, 0.4, explosionPos.z);
-                                clusterBomb.mesh.castShadow = true;
-                                scene.add(clusterBomb.mesh);
-                                
-                                game.projectiles.push(clusterBomb);
-                                console.log('Created cluster bomb', c, 'at', explosionPos);
-                            }
+                            console.log('Spawning 6 cluster bombs!');
+                            setTimeout(() => {
+                                for (let c = 0; c < 6; c++) {
+                                    const angle = (c / 6) * Math.PI * 2;
+                                    const clusterDist = 2.5;
+                                    const clusterPos = {
+                                        x: explosionPos.x + Math.cos(angle) * clusterDist,
+                                        z: explosionPos.z + Math.sin(angle) * clusterDist
+                                    };
+                                    
+                                    // Create cluster bomb projectile - mini mortar style
+                                    const clusterBomb = {
+                                        position: { x: explosionPos.x, y: 0.4, z: explosionPos.z },
+                                        damage: 350,
+                                        speed: 0.25, // Even faster than normal mortars
+                                        splashRadius: 1.5,
+                                        isClusterBomb: true,
+                                        isMortar: true, // Use mortar trajectory
+                                        arcHeight: 3.0, // Medium arc height
+                                        progress: 0,
+                                        startPos: { x: explosionPos.x, y: 0.4, z: explosionPos.z },
+                                        endPos: { x: clusterPos.x, y: 0.4, z: clusterPos.z },
+                                        target: null, // No homing for cluster bombs
+                                        clusterBombs: false // Prevent infinite cluster spawning
+                                    };
+                                    
+                                    // Create cluster bomb mesh - gray like main mortar, but smaller
+                                    const clusterGeometry = new THREE.OctahedronGeometry(0.15, 0);
+                                    const clusterMaterial = new THREE.MeshLambertMaterial({ 
+                                        color: 0x4a4a4a,
+                                        emissive: 0x2a2a2a
+                                    });
+                                    clusterBomb.mesh = new THREE.Mesh(clusterGeometry, clusterMaterial);
+                                    clusterBomb.mesh.position.set(explosionPos.x, 0.4, explosionPos.z);
+                                    clusterBomb.mesh.castShadow = true;
+                                    scene.add(clusterBomb.mesh);
+                                    
+                                    game.projectiles.push(clusterBomb);
+                                    console.log('Created cluster bomb', c);
+                                }
+                            }, 100); // 100ms delay after main explosion
                         }
                         
                         // Remove mortar shell
