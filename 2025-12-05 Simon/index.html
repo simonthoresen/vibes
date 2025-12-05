@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizard Terrain Modifier</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <!-- HUD Container -->
+    <div id="hud">
+        <!-- Status Bar -->
+        <div id="statusBar" class="status-bar">
+            <div class="stat">Players: <span id="playerCount">1</span></div>
+            <div class="stat">FPS: <span id="fps">60</span></div>
+            <div class="stat">Latency: <span id="latency">0</span>ms</div>
+        </div>
+        
+        <!-- Spell Bar -->
+        <div id="spellBar" class="spell-bar">
+            <!-- Spell slots will be generated here -->
+        </div>
+        
+        <!-- Chat/Messages -->
+        <div id="chatContainer" class="chat-container">
+            <div id="chatMessages" class="chat-messages"></div>
+            <input type="text" id="chatInput" class="chat-input" placeholder="Press Enter to chat...">
+        </div>
+    </div>
+    
+    <!-- Menu Container -->
+    <div id="menuContainer" class="menu-container">
+        <!-- Main Menu -->
+        <div id="mainMenu" class="menu active">
+            <h1>Wizard Terrain Modifier</h1>
+            <button id="hostGameBtn" class="menu-btn">Host Game</button>
+            <button id="joinGameBtn" class="menu-btn">Join Game</button>
+            <button id="settingsBtn" class="menu-btn">Settings</button>
+            <button id="quitBtn" class="menu-btn">Quit</button>
+        </div>
+        
+        <!-- Host Game Menu -->
+        <div id="hostGameMenu" class="menu">
+            <h2>Host Game</h2>
+            <label>Island Size:</label>
+            <select id="islandSize">
+                <option value="64">64x64 (Small)</option>
+                <option value="128" selected>128x128 (Medium)</option>
+                <option value="256">256x256 (Large)</option>
+                <option value="512">512x512 (Huge)</option>
+            </select>
+            
+            <label>Seed (leave empty for random):</label>
+            <input type="text" id="seedInput" placeholder="Optional seed">
+            
+            <label>Max Players:</label>
+            <input type="number" id="maxPlayers" value="8" min="1" max="32">
+            
+            <button id="createGameBtn" class="menu-btn">Create Game</button>
+            <button id="backBtn" class="menu-btn">Back</button>
+        </div>
+        
+        <!-- Join Game Menu -->
+        <div id="joinGameMenu" class="menu">
+            <h2>Join Game</h2>
+            <label>Host IP:Port (e.g., localhost:8080):</label>
+            <input type="text" id="hostInput" placeholder="localhost:8080">
+            
+            <label>Player Name:</label>
+            <input type="text" id="playerName" placeholder="Your name">
+            
+            <button id="connectBtn" class="menu-btn">Connect</button>
+            <button id="backBtn2" class="menu-btn">Back</button>
+        </div>
+        
+        <!-- Settings Menu -->
+        <div id="settingsMenu" class="menu">
+            <h2>Settings</h2>
+            <div id="settingsContent"></div>
+            <button id="backBtn3" class="menu-btn">Back</button>
+        </div>
+        
+        <!-- Pause Menu -->
+        <div id="pauseMenu" class="menu">
+            <h2>Paused</h2>
+            <button id="resumeBtn" class="menu-btn">Resume</button>
+            <button id="pauseSettingsBtn" class="menu-btn">Settings</button>
+            <button id="quitToMenuBtn" class="menu-btn">Quit to Menu</button>
+        </div>
+        
+        <!-- Game Info Overlay (in-game) -->
+        <div id="gameInfo" class="game-info">
+            <div id="playerList" class="player-list"></div>
+        </div>
+    </div>
+    
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen hidden">
+        <div class="loading-content">
+            <h2>Loading Game...</h2>
+            <div class="loading-bar">
+                <div id="loadingProgress" class="loading-progress"></div>
+            </div>
+            <p id="loadingText">Generating terrain...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/inputManager.js"></script>
+    <script src="js/settingsManager.js"></script>
+    <script src="js/terrainGenerator.js"></script>
+    <script src="js/terrain.js"></script>
+    <script src="js/textureSystem.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/water.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/particleSystem.js"></script>
+    <script src="js/particleEmitter.js"></script>
+    <script src="js/particlePool.js"></script>
+    <script src="js/particleEffects.js"></script>
+    <script src="js/windSystem.js"></script>
+    <script src="js/grassSystem.js"></script>
+    <script src="js/environmentObjects.js"></script>
+    <script src="js/treeManager.js"></script>
+    <script src="js/rockManager.js"></script>
+    <script src="js/weatherSystem.js"></script>
+    <script src="js/cloudSystem.js"></script>
+    <script src="js/skySystem.js"></script>
+    <script src="js/lightingSystem.js"></script>
+    <script src="js/timeSystem.js"></script>
+    <script src="js/spells.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/spellBar.js"></script>
+    <script src="js/menuManager.js"></script>
+    <script src="js/networking.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

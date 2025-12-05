@@ -1,0 +1,18 @@
+{
+  "name": "wizard-terrain-modifier",
+  "version": "1.0.0",
+  "description": "Multiplayer wizard terrain modification game with networked terrain editing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["game", "multiplayer", "terrain", "wizard"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2",
+    "simplex-noise": "^3.0.1"
+  },
+  "devDependencies": {}
+}

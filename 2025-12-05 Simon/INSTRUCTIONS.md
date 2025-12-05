@@ -948,6 +948,8 @@ game/
 
 ## Control Scheme
 
+
+
 ### Movement
 - **W/A/S/D**: Move forward/left/back/right
 - **Spacebar**: Jump
@@ -969,6 +971,94 @@ game/
 - **ESC**: Pause menu
 - **Tab**: Player list
 - **Enter**: Chat (if applicable)
+
+## Setup & Installation
+
+### Requirements
+- Node.js (v14 or later)
+- Modern web browser with WebGL support (Chrome, Firefox, Edge, Safari)
+- npm package manager
+
+### Installation Steps
+
+1. **Install Node.js**
+   - Download from https://nodejs.org/
+   - Install with default settings
+   - Verify installation: `node --version` and `npm --version` in terminal
+
+2. **Install Dependencies**
+   - Navigate to game directory: `cd "2025-12-05 Simon"`
+   - Install required packages: `npm install`
+   - This will install:
+     - `ws`: WebSocket server for multiplayer
+     - `simplex-noise`: Procedural terrain generation
+
+3. **Start the Server**
+   - Run: `node server.js`
+   - Server will start on `localhost:8080`
+   - Console will show: "Game server running on ws://localhost:8080"
+
+4. **Open Game in Browser**
+   - Open `index.html` in web browser
+   - Or serve via HTTP: `npx http-server` (opens on http://localhost:8080)
+   - Game UI will appear with main menu
+
+### Game Modes
+
+#### Host Game
+1. Click "Host Game" button
+2. Select island size (64, 128, 256, 512)
+3. Enter seed (optional, leave blank for random)
+4. Set max players
+5. Click "Create Game"
+6. Server starts, game loads, you become host
+
+#### Join Game
+1. Click "Join Game" button
+2. Enter host address: `localhost:8080` (same machine) or `IP:8080` (remote)
+3. Enter player name
+4. Click "Connect"
+5. Game downloads world state and starts
+
+### Network Configuration
+
+#### Local Testing
+- Host and client on same machine: Use `localhost:8080`
+- Host runs server.js on main machine
+- Client opens index.html on any machine on same network
+
+#### Remote Play
+- Host machine: Run server.js and share IP address (e.g., `192.168.1.100:8080`)
+- Client: Enter host's IP address in join menu
+- Port 8080 must be open/forwarded if behind firewall
+
+### Troubleshooting
+
+#### "Node is not recognized"
+- Node.js not installed or not in system PATH
+- Solution: Install Node.js from https://nodejs.org/
+
+#### "Module not found: simplex-noise"
+- Dependencies not installed
+- Solution: Run `npm install` in game directory
+
+#### "Address already in use"
+- Port 8080 already occupied
+- Solution: Change port in server.js or stop other processes
+
+#### Game not loading
+- Browser cache issue
+- Solution: Hard refresh (Ctrl+Shift+R or Cmd+Shift+R)
+
+#### Low FPS / Stuttering
+- GPU not powerful enough or WebGL not enabled
+- Solution: Reduce terrain detail in settings or use smaller island size
+
+### Performance Tips
+- **Island Size**: Larger islands = more computation; start with 128x128
+- **Graphics Quality**: Adjust in settings menu
+- **Browser**: Chrome and Edge typically faster than Firefox/Safari
+- **Hardware**: Recommended: GTX 1060+, 8GB RAM, SSD
 
 ## Performance Targets
 - **FPS**: 60 on mid-range hardware
@@ -995,3 +1085,9 @@ game/
 - ✓ Camera controls feel responsive and smooth
 - ✓ Multiple players can simultaneously modify terrain
 - ✓ Game playable for 30+ minutes without issues
+- ✓ Day/night cycle with dynamic lighting
+- ✓ Procedural trees and rocks spawn on terrain
+- ✓ Wind-animated grass system renders
+- ✓ Weather system with cloud transitions
+- ✓ Sky color changes based on time of day
+
