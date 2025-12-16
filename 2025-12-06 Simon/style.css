@@ -1,0 +1,42 @@
+:root {
+  --primary: #FF4D4D;
+  --secondary: #4D4DFF;
+  --bg: #1a1a1a;
+  --text: #ffffff;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--bg);
+  font-family: 'Outfit', sans-serif;
+  user-select: none;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+#ui-layer {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: var(--text);
+  pointer-events: none;
+}
+
+h1 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 2rem;
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+  letter-spacing: -1px;
+}
+
+p {
+  margin-top: 5px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,23 @@
+{
+  "name": "aisland",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "simplex-noise": "^4.0.3",
+    "three": "^0.181.2",
+    "three-stdlib": "^2.36.1"
+  },
+  "devDependencies": {
+    "vite": "^7.2.6"
+  }
+}
