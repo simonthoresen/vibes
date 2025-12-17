@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Multiplayer Game</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <!-- Game Canvas -->
+  <div id="game-container"></div>
+
+  <!-- UI Overlay -->
+  <div id="ui-overlay">
+    <!-- Connection Panel -->
+    <div id="connection-panel" class="panel">
+      <h2>Multiplayer Connection</h2>
+      <div class="info-row">
+        <label>Your Peer ID:</label>
+        <span id="my-peer-id" class="peer-id">Connecting...</span>
+        <button id="copy-id-btn" class="btn-small">Copy</button>
+      </div>
+      <div class="connect-row">
+        <input type="text" id="peer-id-input" placeholder="Enter peer ID to connect" />
+        <button id="connect-btn" class="btn-primary">Connect</button>
+      </div>
+      <div id="connection-status" class="status">Not connected</div>
+    </div>
+
+    <!-- Players List -->
+    <div id="players-panel" class="panel">
+      <h3>Players (<span id="player-count">1</span>)</h3>
+      <ul id="players-list">
+        <li>You (Local)</li>
+      </ul>
+    </div>
+
+    <!-- Controls Info -->
+    <div id="controls-panel" class="panel">
+      <h3>Controls</h3>
+      <ul class="controls-list">
+        <li><strong>WASD</strong> - Move</li>
+        <li><strong>Mouse</strong> - Look around</li>
+        <li><strong>Click</strong> - Lock cursor</li>
+        <li><strong>ESC</strong> - Unlock cursor</li>
+      </ul>
+    </div>
+
+    <!-- Instructions -->
+    <div id="instructions" class="instructions">
+      Click to start playing
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="./node_modules/peerjs/dist/peerjs.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./node_modules/three/build/three.module.js"
+      }
+    }
+  </script>
+  <script type="module" src="src/main.js"></script>
+</body>
+
+</html>
