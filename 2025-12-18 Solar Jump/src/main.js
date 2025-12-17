@@ -246,18 +246,10 @@ class Game {
         // Get input
         const input = this.inputManager.getInput();
         
-        // Toggle debug mode with 'D' key
+        // Toggle debug mode with 'B' key
         if (input.toggleDebug) {
             this.toggleDebugMode();
             input.toggleDebug = false; // Prevent repeated toggles
-        }
-
-        // Toggle camera mode
-        if (input.toggleCamera) {
-            const mode = this.camera.toggleMode();
-            document.getElementById('cameraMode').textContent = 
-                mode === 'follow' ? 'Follow' : 'Sun View';
-            this.inputManager.resetToggle();
         }
 
         // Update player

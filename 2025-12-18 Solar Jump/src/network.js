@@ -140,7 +140,7 @@ export class NetworkManager {
             id: this.peerId,
             playerData: {
                 position: { x: playerData.position.x, y: playerData.position.y, z: playerData.position.z },
-                rotation: { x: playerData.rotation.x, y: playerData.rotation.y, z: playerData.rotation.z },
+                yaw: playerData.yaw,
                 velocity: { x: playerData.velocity.x, y: playerData.velocity.y, z: playerData.velocity.z }
             }
         };
