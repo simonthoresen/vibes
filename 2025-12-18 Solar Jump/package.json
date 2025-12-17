@@ -1,0 +1,12 @@
+{
+  "name": "solar-jump",
+  "version": "1.0.0",
+  "description": "Multiplayer gravity-based space game with Three.js and Peer.js",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx http-server -p 8080 -c-1"
+  },
+  "keywords": ["three.js", "peerjs", "multiplayer", "game"],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Jump - Multiplayer Space Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            background: #000;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        #crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+
+        #crosshair::after {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            pointer-events: all;
+        }
+
+        #menu h1 {
+            margin-bottom: 20px;
+            color: #ffa500;
+        }
+
+        #menu input {
+            margin: 10px 0;
+            padding: 10px;
+            width: 250px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #menu button {
+            margin: 5px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            pointer-events: all;
+        }
+
+        #menu button:hover {
+            background: #45a049;
+        }
+
+        #menu button.secondary {
+            background: #2196F3;
+        }
+
+        #menu button.secondary:hover {
+            background: #0b7dda;
+        }
+
+        #instructions {
+            margin-top: 20px;
+            font-size: 12px;
+            line-height: 1.6;
+            text-align: left;
+            max-width: 400px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="crosshair"></div>
+        <div id="info">
+            <div>Camera Mode: <span id="cameraMode">Follow</span></div>
+            <div>Players: <span id="playerCount">1</span></div>
+            <div>Velocity: <span id="velocity">0</span></div>
+            <div>Nearest Planet: <span id="nearestPlanet">-</span></div>
+        </div>
+
+        <div id="menu">
+            <h1>🌍 Solar Jump 🚀</h1>
+            <div id="menuContent">
+                <input type="text" id="playerName" placeholder="Enter your name" value="Player">
+                <br>
+                <button id="hostBtn">Host Game</button>
+                <button id="joinBtn" class="secondary">Join Game</button>
+                <div id="joinSection" class="hidden">
+                    <input type="text" id="peerId" placeholder="Enter host peer ID">
+                    <br>
+                    <button id="connectBtn">Connect</button>
+                </div>
+                <div id="hostSection" class="hidden">
+                    <p>Your Peer ID:</p>
+                    <p id="myPeerId" style="font-weight: bold; color: #ffa500;">-</p>
+                    <p style="font-size: 12px;">Share this ID with other players</p>
+                </div>
+                <button id="startBtn">Start Game</button>
+            </div>
+            <div id="instructions">
+                <strong>Controls:</strong><br>
+                WASD - Move on planet / Boost in air<br>
+                Space - Booster (escape planets / jetpack in air)<br>
+                Left Click - Throw Grenade<br>
+                Tab - Toggle Camera Mode<br>
+                B - Toggle Debug Mode<br>
+                Mouse - Look Around / Rotate around sun<br>
+                Mouse Wheel - Zoom (in sun view)<br><br>
+                <strong>Objective:</strong><br>
+                Jump between planets using gravity!<br>
+                Use booster to escape and explore space!<br>
+                Throw grenades at other players!
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
