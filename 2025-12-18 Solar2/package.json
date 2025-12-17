@@ -1,0 +1,22 @@
+{
+  "name": "3d-multiplayer-game",
+  "version": "1.0.0",
+  "description": "3D multiplayer game with Three.js and PeerJS",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.160.0",
+    "peerjs": "^1.5.2"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
