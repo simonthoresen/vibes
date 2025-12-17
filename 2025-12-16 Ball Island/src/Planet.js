@@ -19,10 +19,12 @@ export class Planet {
         // This ensures shared vertices move together, keeping the mesh connected
         this.displaceVertices(geometry);
 
-        // 3. Convert to non-indexed geometry
+        // 3. Convert to non-indexed geometry (only if needed)
         // This splits vertices so each triangle has its own unique 3 vertices
         // Essential for flat coloring where we want hard edges between colors
-        geometry = geometry.toNonIndexed();
+        if (geometry.index !== null) {
+            geometry = geometry.toNonIndexed();
+        }
 
         // 4. Optimization: Compute normals now so lighting is correct for flat faces
         geometry.computeVertexNormals();

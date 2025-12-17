@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Planet } from './Planet.js';
 import { Sun } from './Sun.js';
 import { Water } from './Water.js';
+import { Player } from './Player.js';
 
 // Scene Setup
 const scene = new THREE.Scene();
@@ -23,6 +24,10 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
+// Camera modes
+let cameraMode = 'orbit'; // 'orbit' or 'thirdPerson'
+let keys = {};
+
 // Lighting
 const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
 scene.add(ambientLight);
@@ -38,15 +43,53 @@ scene.add(planet.getMesh());
 const water = new Water();
 scene.add(water.getMesh());
 
+// Player
+const player = new Player(scene, planet, 50);
+
+// Input handling
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    
+    // Tab key to switch camera mode
+    if (e.code === 'Tab') {
+        e.preventDefault();
+        cameraMode = cameraMode === 'orbit' ? 'thirdPerson' : 'orbit';
+        
+        if (cameraMode === 'orbit') {
+            controls.enabled = true;
+        } else {
+            controls.enabled = false;
+        }
+    }
+    
+    // Spacebar to jump
+    if (e.code === 'Space') {
+        e.preventDefault();
+        player.jump();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+});
+
 // Animation Loop
+let lastTime = performance.now();
 function animate() {
     requestAnimationFrame(animate);
 
+    const currentTime = performance.now();
+    const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap at 100ms
+    lastTime = currentTime;
+
     // Update sun position
-    const currentTime = Date.now() * 0.001; // Convert to seconds
-    sun.update(currentTime);
-    water.update(currentTime);
-    planet.update(0.016); // ~60fps delta time
+    const time = currentTime * 0.001; // Convert to seconds
+    sun.update(time);
+    water.update(time);
+    planet.update(deltaTime);
+    
+    // Update player
+    player.update(deltaTime);
 
     // Update background color based on sun position (day/night cycle)
     const sunHeight = sun.getSunHeight(); // -1 to 1
@@ -71,11 +114,21 @@ function animate() {
         scene.background.copy(nightColor);
     }
 
-    controls.update();
-
-    // Prevent camera from going below water level
-    if (camera.position.y < 51) {
-        camera.position.y = 51;
+    // Update camera based on mode
+    if (cameraMode === 'orbit') {
+        controls.update();
+        
+        // Prevent camera from going below water level
+        if (camera.position.y < 51) {
+            camera.position.y = 51;
+        }
+    } else if (cameraMode === 'thirdPerson') {
+        // Third person camera follows player
+        const playerPos = player.getPosition();
+        const offset = new THREE.Vector3(0, 10, 20); // Behind and above player
+        
+        camera.position.copy(playerPos).add(offset);
+        camera.lookAt(playerPos);
     }
 
     renderer.render(scene, camera);

@@ -1,0 +1,4 @@
+Create a 3D multiplayer game.
+It must use three.js for graphics.
+It must use peer.js for networking, with support for both STUN and TURN servers.
+It must be packaged using electron so it can be distributed on Steam.

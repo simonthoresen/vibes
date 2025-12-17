@@ -26,10 +26,34 @@ export class NetworkManager {
                 this.peer = new Peer({
                     config: {
                         iceServers: [
+                            // STUN servers for NAT discovery
                             { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' }
-                        ]
-                    }
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' },
+
+                            // TURN servers for relaying when direct connection fails
+                            // Using free public TURN servers
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            }
+                        ],
+                        iceTransportPolicy: 'all' // Try all connection methods
+                    },
+                    debug: 2 // Enable PeerJS debug logging
                 });
 
                 this.peer.on('open', (id) => {
@@ -74,66 +98,116 @@ export class NetworkManager {
             return;
         }
 
-        console.log('Connecting to peer:', peerId);
+        console.log('[DEBUG] Connecting to peer:', peerId);
+        console.log('[DEBUG] My peer ID:', this.myPeerId);
+        console.log('[DEBUG] Peer object state:', this.peer);
         const conn = this.peer.connect(peerId, { reliable: true });
+        console.log('[DEBUG] Connection object created:', conn);
+        console.log('[DEBUG] Connection metadata:', { peer: conn.peer, open: conn.open, type: conn.type });
         this.setupConnection(conn);
     }
 
     handleIncomingConnection(conn) {
-        console.log('Incoming connection from:', conn.peer);
+        console.log('[DEBUG] Incoming connection from:', conn.peer);
+        console.log('[DEBUG] Incoming connection metadata:', { peer: conn.peer, open: conn.open, type: conn.type });
         this.setupConnection(conn);
     }
 
     setupConnection(conn) {
+        console.log('[DEBUG] Setting up connection listeners for:', conn.peer);
+
+        // Add timeout detection
+        const connectionTimeout = setTimeout(() => {
+            if (!conn.open) {
+                console.error('[DEBUG] ⏰ Connection timeout after 30 seconds for:', conn.peer);
+                console.error('[DEBUG] Connection state:', {
+                    open: conn.open,
+                    peerConnection: conn.peerConnection ? conn.peerConnection.connectionState : 'no peerConnection',
+                    iceConnectionState: conn.peerConnection ? conn.peerConnection.iceConnectionState : 'no peerConnection',
+                    iceGatheringState: conn.peerConnection ? conn.peerConnection.iceGatheringState : 'no peerConnection'
+                });
+            }
+        }, 30000);
+
+        // Monitor ICE connection state
+        setTimeout(() => {
+            if (conn.peerConnection) {
+                console.log('[DEBUG] Adding ICE state monitors');
+                conn.peerConnection.oniceconnectionstatechange = () => {
+                    console.log('[DEBUG] 🧊 ICE connection state:', conn.peerConnection.iceConnectionState);
+                };
+                conn.peerConnection.onconnectionstatechange = () => {
+                    console.log('[DEBUG] 🔗 Connection state:', conn.peerConnection.connectionState);
+                };
+            }
+        }, 100);
+
         conn.on('open', () => {
-            console.log('Connection established with:', conn.peer);
+            clearTimeout(connectionTimeout);
+            console.log('[DEBUG] ✅ Connection OPEN event fired for:', conn.peer);
+            console.log('[DEBUG] Connection is now open:', conn.open);
             this.connections.set(conn.peer, conn);
+            console.log('[DEBUG] Total connections:', this.connections.size);
 
             // Create remote player
+            console.log('[DEBUG] Creating remote player for:', conn.peer);
             const remotePlayer = new RemotePlayer(this.scene, conn.peer);
             this.remotePlayers.set(conn.peer, remotePlayer);
+            console.log('[DEBUG] Remote player created successfully');
 
             if (this.onPlayerJoined) {
+                console.log('[DEBUG] Calling onPlayerJoined callback');
                 this.onPlayerJoined(conn.peer);
             }
 
             // Send initial handshake
+            console.log('[DEBUG] Sending handshake to:', conn.peer);
             conn.send({
                 type: 'handshake',
                 peerId: this.myPeerId
             });
+            console.log('[DEBUG] Handshake sent');
         });
 
         conn.on('data', (data) => {
+            console.log('[DEBUG] 📨 Data received from:', conn.peer, data);
             this.handleMessage(conn.peer, data);
         });
 
         conn.on('close', () => {
-            console.log('Connection closed with:', conn.peer);
+            clearTimeout(connectionTimeout);
+            console.log('[DEBUG] ❌ Connection CLOSE event for:', conn.peer);
             this.handleDisconnection(conn.peer);
         });
 
         conn.on('error', (err) => {
-            console.error('Connection error with', conn.peer, ':', err);
+            clearTimeout(connectionTimeout);
+            console.error('[DEBUG] 🔴 Connection ERROR event for', conn.peer, ':', err);
+            console.error('[DEBUG] Error details:', { type: err.type, message: err.message });
             this.handleDisconnection(conn.peer);
         });
+
+        console.log('[DEBUG] All event listeners attached for:', conn.peer);
     }
 
     handleMessage(peerId, data) {
+        console.log('[DEBUG] Handling message from:', peerId, 'type:', data.type);
         switch (data.type) {
             case 'handshake':
-                console.log('Received handshake from:', peerId);
+                console.log('[DEBUG] ✅ Received handshake from:', peerId);
                 break;
 
             case 'playerUpdate':
                 const remotePlayer = this.remotePlayers.get(peerId);
                 if (remotePlayer && data.state) {
                     remotePlayer.setState(data.state);
+                } else {
+                    console.warn('[DEBUG] ⚠️ No remote player found for:', peerId);
                 }
                 break;
 
             default:
-                console.log('Unknown message type:', data.type);
+                console.log('[DEBUG] ⚠️ Unknown message type:', data.type);
         }
     }
 
